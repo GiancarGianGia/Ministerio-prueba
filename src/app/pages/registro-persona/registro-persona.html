@@ -1,0 +1,231 @@
+        <p-toast />
+
+        <div class="page-header">
+            <div>
+                <span class="page-eyebrow">Nuevo registro</span>
+                <h1>Registrar trabajador</h1>
+                <p>Completa la información para agregar un nuevo trabajador del Ministerio del Poder Popular para el Proceso Social de Trabajo en Caracas.</p>
+            </div>
+            <div class="page-actions">
+                <p-button label="Ver trabajadores" icon="pi pi-users" severity="secondary" [outlined]="true" routerLink="/personas" />
+            </div>
+        </div>
+
+        @if (savedPerson(); as saved) {
+            <div class="success-banner">
+                <div class="success-icon"><i class="pi pi-check"></i></div>
+                <div class="success-content">
+                    <strong>Trabajador registrado correctamente</strong>
+                    <p>{{ saved.firstName }} {{ saved.lastName }} quedó registrado con el código <b>{{ saved.id }}</b> el {{ saved.createdAt | date: 'dd/MM/yyyy' }} a las {{ saved.createdAt | date: 'HH:mm' }}.</p>
+                </div>
+                <div class="success-actions">
+                    <p-button label="Registrar otro" icon="pi pi-plus" [outlined]="true" (onClick)="registerAnother()" />
+                    <p-button label="Ver listado" icon="pi pi-arrow-right" routerLink="/personas" />
+                </div>
+            </div>
+        }
+
+        <div class="grid grid-cols-12 gap-6">
+            <div class="col-span-12 xl:col-span-8">
+                <form class="card" (ngSubmit)="save()">
+                    <div class="form-section">
+                        <div class="form-section-header">
+                            <span class="section-icon"><i class="pi pi-user"></i></span>
+                            <div>
+                                <h2>Datos personales</h2>
+                                <p>Información básica de identificación del trabajador.</p>
+                            </div>
+                        </div>
+
+                        <div class="form-grid">
+                            <div class="form-field">
+                                <label for="firstName">Nombres *</label>
+                                <input pInputText id="firstName" name="firstName" [(ngModel)]="person.firstName" placeholder="Ej. María Fernanda" />
+                                @if (submitted && !person.firstName.trim()) {
+                                    <small class="field-error">Los nombres son obligatorios.</small>
+                                }
+                            </div>
+                            <div class="form-field">
+                                <label for="lastName">Apellidos *</label>
+                                <input pInputText id="lastName" name="lastName" [(ngModel)]="person.lastName" placeholder="Ej. Gómez Ríos" />
+                                @if (submitted && !person.lastName.trim()) {
+                                    <small class="field-error">Los apellidos son obligatorios.</small>
+                                }
+                            </div>
+
+                            <div class="form-field">
+                                <label for="documentType">Tipo de documento *</label>
+                                <p-select id="documentType" name="documentType" [options]="documentTypeOptions" optionLabel="label" optionValue="value" [(ngModel)]="person.documentType" styleClass="w-full" />
+                            </div>
+                            <div class="form-field">
+                                <label for="documentNumber">Número de documento *</label>
+                                <input pInputText id="documentNumber" name="documentNumber" [(ngModel)]="person.documentNumber" placeholder="Ej. V-18745632 o 18745632" />
+                                @if (documentError()) {
+                                    <small class="field-error">{{ documentError() }}</small>
+                                }
+                            </div>
+
+                            <div class="form-field">
+                                <label for="birthDate">Fecha de nacimiento *</label>
+                                <input pInputText id="birthDate" name="birthDate" type="date" [max]="today" [min]="minBirthDate" [(ngModel)]="person.birthDate" />
+                                @if (birthDateError()) {
+                                    <small class="field-error">{{ birthDateError() }}</small>
+                                }
+                            </div>
+                            <div class="form-field">
+                                <label for="gender">Género</label>
+                                <p-select id="gender" name="gender" [options]="genderOptions" optionLabel="label" optionValue="value" [(ngModel)]="person.gender" styleClass="w-full" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <div class="form-section-header">
+                            <span class="section-icon"><i class="pi pi-envelope"></i></span>
+                            <div>
+                                <h2>Información de contacto</h2>
+                                <p>Canales para comunicarse con el trabajador registrado.</p>
+                            </div>
+                        </div>
+
+                        <div class="form-grid">
+                            <div class="form-field">
+                                <label for="email">Correo electrónico *</label>
+                                <input pInputText id="email" name="email" type="email" [(ngModel)]="person.email" placeholder="nombre@mpppst.gob.ve" />
+                                @if (emailError()) {
+                                    <small class="field-error">{{ emailError() }}</small>
+                                }
+                            </div>
+                            <div class="form-field">
+                                <label for="phone">Teléfono *</label>
+                                <input pInputText id="phone" name="phone" [(ngModel)]="person.phone" placeholder="Ej. +58 412 1234567" />
+                                @if (phoneError()) {
+                                    <small class="field-error">{{ phoneError() }}</small>
+                                }
+                            </div>
+                            <div class="form-field form-field-full">
+                                <label for="address">Dirección</label>
+                                <input pInputText id="address" name="address" [(ngModel)]="person.address" placeholder="Ej. Av. Lecuna, Caracas" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <div class="form-section-header">
+                            <span class="section-icon"><i class="pi pi-map-marker"></i></span>
+                            <div>
+                                <h2>Ubicación</h2>
+                                <p>Ciudad y estado donde reside el trabajador.</p>
+                            </div>
+                        </div>
+
+                        <div class="form-grid">
+                            <div class="form-field">
+                                <label for="city">Ciudad</label>
+                                <input pInputText id="city" name="city" [(ngModel)]="person.city" placeholder="Ej. Caracas" />
+                            </div>
+                            <div class="form-field">
+                                <label for="department">Estado</label>
+                                <p-select
+                                    id="department"
+                                    name="department"
+                                    [options]="departmentOptions"
+                                    optionLabel="label"
+                                    optionValue="value"
+                                    placeholder="Seleccione el estado"
+                                    [(ngModel)]="person.department"
+                                    styleClass="w-full"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <div class="form-section-header">
+                            <span class="section-icon"><i class="pi pi-briefcase"></i></span>
+                            <div>
+                                <h2>Cargo y estado del trabajador</h2>
+                                <p>Selecciona el cargo o puesto de trabajo y su estado dentro del ministerio.</p>
+                            </div>
+                        </div>
+
+                        <div class="form-grid">
+                            <div class="form-field">
+                                <label for="type">Cargo o puesto de trabajo *</label>
+                                <p-select
+                                    id="type"
+                                    name="type"
+                                    [options]="typeOptions"
+                                    optionLabel="label"
+                                    optionValue="value"
+                                    placeholder="Seleccione el cargo o puesto de trabajo"
+                                    [(ngModel)]="person.type"
+                                    styleClass="w-full"
+                                />
+                                @if (submitted && !person.type.trim()) {
+                                    <small class="field-error">Selecciona el cargo o puesto de trabajo.</small>
+                                }
+                            </div>
+                            <div class="form-field">
+                                <label for="status">Estado *</label>
+                                <p-select id="status" name="status" [options]="statusOptions" optionLabel="label" optionValue="value" [(ngModel)]="person.status" styleClass="w-full" />
+                            </div>
+                            <div class="form-field form-field-full">
+                                <label for="notes">Observaciones</label>
+                                <textarea pTextarea id="notes" name="notes" rows="4" [(ngModel)]="person.notes" placeholder="Información adicional relevante sobre el trabajador..." style="width: 100%"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <p-button label="Limpiar formulario" icon="pi pi-refresh" severity="secondary" [outlined]="true" type="button" (onClick)="resetForm()" />
+                        <p-button label="Registrar trabajador" icon="pi pi-check" type="submit" />
+                    </div>
+                </form>
+            </div>
+
+            <div class="col-span-12 xl:col-span-4">
+                <div class="card mb-6">
+                    <div class="card-header">
+                        <div>
+                            <h2>Antes de guardar</h2>
+                            <p>Revisa que la información esté completa.</p>
+                        </div>
+                    </div>
+                    <ul class="check-list">
+                        <li><i class="pi pi-check-circle"></i><span>Nombres y apellidos coinciden con la cédula de identidad.</span></li>
+                        <li><i class="pi pi-check-circle"></i><span>El número de documento no está repetido.</span></li>
+                        <li><i class="pi pi-check-circle"></i><span>El correo y el teléfono están actualizados.</span></li>
+                        <li><i class="pi pi-check-circle"></i><span>El cargo o puesto de trabajo corresponde al trabajador.</span></li>
+                    </ul>
+                    <div class="info-note">
+                        <i class="pi pi-info-circle"></i>
+                        <span>Todos los registros se guardan con fecha, hora y el usuario que realizó la acción en la bitácora.</span>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <h2>Últimos registros</h2>
+                            <p>Trabajadores agregados recientemente.</p>
+                        </div>
+                        <a routerLink="/personas" class="text-link">Ver todos</a>
+                    </div>
+
+                    <ul class="recent-list">
+                        @for (recent of recentPersons(); track recent.id) {
+                            <li>
+                                <span class="person-avatar">{{ initials(recent.firstName, recent.lastName) }}</span>
+                                <div>
+                                    <strong>{{ recent.firstName }} {{ recent.lastName }}</strong>
+                                    <small>{{ recent.type }} · {{ recent.createdAt | date: 'dd/MM/yyyy HH:mm' }}</small>
+                                </div>
+                            </li>
+                        } @empty {
+                            <li class="empty-state">Aún no hay trabajadores registrados.</li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        </div>

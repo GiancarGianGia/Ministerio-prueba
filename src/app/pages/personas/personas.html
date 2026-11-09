@@ -1,0 +1,253 @@
+        <p-toast />
+        <p-confirmdialog [style]="{ width: '420px' }" />
+
+        <div class="page-header">
+            <div>
+                <span class="page-eyebrow">Talento humano</span>
+                <h1>Trabajadores registrados</h1>
+                <p>Trabajadores del Ministerio del Poder Popular para el Proceso Social de Trabajo en Caracas registrados en el sistema.</p>
+            </div>
+            <div class="page-actions">
+                <p-button label="Nuevo trabajador" icon="pi pi-user-plus" routerLink="/registro" />
+                <p-button label="Exportar CSV" icon="pi pi-download" severity="secondary" [outlined]="true" (onClick)="exportCsv()" />
+                <p-button label="Exportar Excel" icon="pi pi-file-excel" severity="secondary" [outlined]="true" (onClick)="exportExcel()" />
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div class="mini-stat">
+                <span>Total registrados</span>
+                <strong>{{ stats().total }}</strong>
+            </div>
+            <div class="mini-stat">
+                <span>Activos</span>
+                <strong>{{ stats().active }}</strong>
+            </div>
+            <div class="mini-stat">
+                <span>Pendientes</span>
+                <strong>{{ stats().pending }}</strong>
+            </div>
+        </div>
+
+        <div class="card">
+            <p-table
+                #dt
+                [value]="filteredPersons()"
+                [rows]="10"
+                [paginator]="true"
+                [rowsPerPageOptions]="[5, 10, 20, 50]"
+                [globalFilterFields]="['firstName', 'lastName', 'documentNumber', 'email', 'phone', 'city', 'type', 'status']"
+                [tableStyle]="{ 'min-width': '68rem' }"
+                [(selection)]="selectedPersons"
+                dataKey="id"
+                [rowHover]="true"
+                currentPageReportTemplate="Mostrando {first} a {last} de {totalRecords} trabajadores"
+                [showCurrentPageReport]="true"
+            >
+                <ng-template #caption>
+                    <div class="table-caption">
+                        <div>
+                            <h2>Listado de trabajadores</h2>
+                            <p>{{ filteredPersons().length }} registros encontrados</p>
+                        </div>
+                        <div class="table-filters">
+                            <p-iconfield>
+                                <p-inputicon styleClass="pi pi-search" />
+                                <input pInputText type="text" (input)="onGlobalFilter(dt, $event)" placeholder="Buscar trabajador..." />
+                            </p-iconfield>
+                            <p-select
+                                [options]="typeOptions"
+                                optionLabel="label"
+                                optionValue="value"
+                                placeholder="Cargo"
+                                [showClear]="true"
+                                [ngModel]="filterType()"
+                                (ngModelChange)="filterType.set($event)"
+                                styleClass="filter-select"
+                            />
+                            <p-select
+                                [options]="statusOptions"
+                                optionLabel="label"
+                                optionValue="value"
+                                placeholder="Estado"
+                                [showClear]="true"
+                                [ngModel]="filterStatus()"
+                                (ngModelChange)="filterStatus.set($event)"
+                                styleClass="filter-select"
+                            />
+                            <p-button
+                                label="Eliminar"
+                                icon="pi pi-trash"
+                                severity="danger"
+                                [outlined]="true"
+                                [disabled]="!selectedPersons || !selectedPersons.length"
+                                (onClick)="deleteSelected()"
+                            />
+                        </div>
+                    </div>
+                </ng-template>
+
+                <ng-template #header>
+                    <tr>
+                        <th style="width: 3rem"><p-tableHeaderCheckbox /></th>
+                        <th pSortableColumn="firstName" style="min-width: 16rem">
+                            Trabajador
+                            <p-sortIcon field="firstName" />
+                        </th>
+                        <th style="min-width: 12rem">Documento</th>
+                        <th style="min-width: 12rem">Contacto</th>
+                        <th pSortableColumn="type" style="min-width: 11rem">
+                            Cargo
+                            <p-sortIcon field="type" />
+                        </th>
+                        <th pSortableColumn="status" style="min-width: 8rem">
+                            Estado
+                            <p-sortIcon field="status" />
+                        </th>
+                        <th pSortableColumn="createdAt" style="min-width: 11rem">
+                            Fecha y hora de registro
+                            <p-sortIcon field="createdAt" />
+                        </th>
+                        <th style="width: 8rem">Acciones</th>
+                    </tr>
+                </ng-template>
+
+                <ng-template #body let-person>
+                    <tr>
+                        <td><p-tableCheckbox [value]="person" /></td>
+                        <td>
+                            <div class="person-cell">
+                                <span class="person-avatar">{{ initials(person.firstName, person.lastName) }}</span>
+                                <div>
+                                    <strong>{{ person.firstName }} {{ person.lastName }}</strong>
+                                    <small>{{ person.email }}</small>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="stacked-cell">
+                                <span>{{ person.documentNumber }}</span>
+                                <small>{{ person.documentType }}</small>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="stacked-cell">
+                                <span>{{ person.phone }}</span>
+                                <small>{{ person.city }}, {{ person.department }}</small>
+                            </div>
+                        </td>
+                        <td><p-tag [value]="person.type" [severity]="getTypeSeverity(person.type)" /></td>
+                        <td><p-tag [value]="person.status" [severity]="getStatusSeverity(person.status)" /></td>
+                        <td>{{ person.createdAt | date: 'dd/MM/yyyy HH:mm' }}</td>
+                        <td>
+                            <div class="table-actions">
+                                <p-button icon="pi pi-pencil" ariaLabel="Editar trabajador" [rounded]="true" [outlined]="true" (click)="editPerson(person)" />
+                                <p-button icon="pi pi-trash" ariaLabel="Eliminar trabajador" severity="danger" [rounded]="true" [outlined]="true" (click)="deletePerson(person)" />
+                            </div>
+                        </td>
+                    </tr>
+                </ng-template>
+
+                <ng-template #emptymessage>
+                    <tr>
+                        <td colspan="8">No se encontraron trabajadores con los filtros seleccionados.</td>
+                    </tr>
+                </ng-template>
+            </p-table>
+        </div>
+
+        <p-dialog [(visible)]="personDialog" [style]="{ width: '760px' }" header="Editar trabajador" [modal]="true">
+            <div class="form-grid">
+                <div class="form-field">
+                    <label for="editFirstName">Nombres *</label>
+                    <input pInputText id="editFirstName" [(ngModel)]="person.firstName" />
+                    @if (submitted && !person.firstName.trim()) {
+                        <small class="field-error">Este campo es obligatorio.</small>
+                    }
+                </div>
+                <div class="form-field">
+                    <label for="editLastName">Apellidos *</label>
+                    <input pInputText id="editLastName" [(ngModel)]="person.lastName" />
+                    @if (submitted && !person.lastName.trim()) {
+                        <small class="field-error">Este campo es obligatorio.</small>
+                    }
+                </div>
+
+                <div class="form-field">
+                    <label for="editDocumentType">Tipo de documento *</label>
+                    <p-select id="editDocumentType" [options]="documentTypeOptions" optionLabel="label" optionValue="value" [(ngModel)]="person.documentType" styleClass="w-full" />
+                </div>
+                <div class="form-field">
+                    <label for="editDocumentNumber">Número de documento *</label>
+                    <input pInputText id="editDocumentNumber" [(ngModel)]="person.documentNumber" />
+                    @if (submitted && !person.documentNumber.trim()) {
+                        <small class="field-error">Este campo es obligatorio.</small>
+                    }
+                </div>
+
+                <div class="form-field">
+                    <label for="editBirthDate">Fecha de nacimiento</label>
+                    <input pInputText id="editBirthDate" type="date" [(ngModel)]="person.birthDate" />
+                </div>
+                <div class="form-field">
+                    <label for="editGender">Género</label>
+                    <p-select id="editGender" [options]="genderOptions" optionLabel="label" optionValue="value" [(ngModel)]="person.gender" styleClass="w-full" />
+                </div>
+
+                <div class="form-field">
+                    <label for="editEmail">Correo electrónico *</label>
+                    <input pInputText id="editEmail" type="email" [(ngModel)]="person.email" />
+                    @if (submitted && !person.email.trim()) {
+                        <small class="field-error">Este campo es obligatorio.</small>
+                    }
+                </div>
+                <div class="form-field">
+                    <label for="editPhone">Teléfono</label>
+                    <input pInputText id="editPhone" [(ngModel)]="person.phone" />
+                </div>
+
+                <div class="form-field form-field-full">
+                    <label for="editAddress">Dirección</label>
+                    <input pInputText id="editAddress" [(ngModel)]="person.address" />
+                </div>
+
+                <div class="form-field">
+                    <label for="editCity">Ciudad</label>
+                    <input pInputText id="editCity" [(ngModel)]="person.city" />
+                </div>
+                <div class="form-field">
+                    <label for="editDepartment">Estado</label>
+                    <p-select id="editDepartment" [options]="departmentOptions" optionLabel="label" optionValue="value" [(ngModel)]="person.department" styleClass="w-full" />
+                </div>
+
+                <div class="form-field">
+                    <label for="editType">Cargo o puesto de trabajo *</label>
+                    <p-select
+                        id="editType"
+                        [options]="typeOptions"
+                        optionLabel="label"
+                        optionValue="value"
+                        placeholder="Seleccione el cargo o puesto de trabajo"
+                        [(ngModel)]="person.type"
+                        styleClass="w-full"
+                    />
+                    @if (submitted && !person.type.trim()) {
+                        <small class="field-error">Selecciona el cargo o puesto de trabajo.</small>
+                    }
+                </div>
+                <div class="form-field">
+                    <label for="editStatus">Estado</label>
+                    <p-select id="editStatus" [options]="statusOptions" optionLabel="label" optionValue="value" [(ngModel)]="person.status" styleClass="w-full" />
+                </div>
+
+                <div class="form-field form-field-full">
+                    <label for="editNotes">Observaciones</label>
+                    <textarea pTextarea id="editNotes" rows="3" [(ngModel)]="person.notes" style="width: 100%"></textarea>
+                </div>
+            </div>
+
+            <ng-template #footer>
+                <p-button label="Cancelar" icon="pi pi-times" text (click)="hideDialog()" />
+                <p-button label="Guardar cambios" icon="pi pi-check" (click)="savePerson()" />
+            </ng-template>
+        </p-dialog>

@@ -1,0 +1,160 @@
+        <div class="page-header">
+            <div>
+                <span class="page-eyebrow">Talento humano</span>
+                <h1>Panel del Ministerio del Poder Popular para el Proceso Social de Trabajo</h1>
+                <p>Resumen de trabajadores de Caracas, usuarios y actividad reciente del sistema.</p>
+            </div>
+            <div class="page-actions">
+                <p-button label="Nuevo trabajador" icon="pi pi-user-plus" routerLink="/registro" />
+                <p-button label="Ver trabajadores" icon="pi pi-users" severity="secondary" [outlined]="true" routerLink="/personas" />
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 mb-6">
+            <div class="stat-card">
+                <div class="stat-icon"><i class="pi pi-users"></i></div>
+                <div class="stat-content">
+                    <span>Total de trabajadores</span>
+                    <strong>{{ stats().total }}</strong>
+                    <small>Registros en el sistema</small>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon stat-icon-green"><i class="pi pi-user-check"></i></div>
+                <div class="stat-content">
+                    <span>Trabajadores activos</span>
+                    <strong>{{ stats().active }}</strong>
+                    <small>{{ stats().pending }} pendientes</small>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon stat-icon-orange"><i class="pi pi-calendar-plus"></i></div>
+                <div class="stat-content">
+                    <span>Nuevos este mes</span>
+                    <strong>{{ stats().thisMonth }}</strong>
+                    <small>Trabajadores registrados</small>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon stat-icon-violet"><i class="pi pi-shield"></i></div>
+                <div class="stat-content">
+                    <span>Usuarios activos</span>
+                    <strong>{{ auth.activeUsers().length }}</strong>
+                    <small>Cuentas de usuario registradas</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-12 gap-6">
+            <div class="col-span-12 xl:col-span-8">
+                <div class="card h-full">
+                    <div class="card-header">
+                        <div>
+                            <h2>Últimos trabajadores registrados</h2>
+                            <p>Los registros más recientes aparecen primero.</p>
+                        </div>
+                        <a routerLink="/personas" class="text-link">Ver todos <i class="pi pi-arrow-right"></i></a>
+                    </div>
+
+                    <p-table [value]="recentPersons()" dataKey="id" [tableStyle]="{ 'min-width': '44rem' }">
+                        <ng-template #header>
+                            <tr>
+                                <th>Trabajador</th>
+                                <th>Documento</th>
+                                <th>Cargo</th>
+                                <th>Estado</th>
+                                <th>Fecha y hora de registro</th>
+                            </tr>
+                        </ng-template>
+                        <ng-template #body let-person>
+                            <tr>
+                                <td>
+                                    <div class="person-cell">
+                                        <span class="person-avatar">{{ initials(person.firstName, person.lastName) }}</span>
+                                        <div>
+                                            <strong>{{ person.firstName }} {{ person.lastName }}</strong>
+                                            <small>{{ person.email }}</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="stacked-cell">
+                                        <span>{{ person.documentNumber }}</span>
+                                        <small>{{ person.documentType }}</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <p-tag [value]="person.type" [severity]="getTypeSeverity(person.type)" />
+                                </td>
+                                <td>
+                                    <p-tag [value]="person.status" [severity]="getStatusSeverity(person.status)" />
+                                </td>
+                                <td>{{ person.createdAt | date: 'dd/MM/yyyy HH:mm' }}</td>
+                            </tr>
+                        </ng-template>
+                        <ng-template #emptymessage>
+                            <tr>
+                                <td colspan="5">Todavía no hay trabajadores registrados.</td>
+                            </tr>
+                        </ng-template>
+                    </p-table>
+                </div>
+            </div>
+
+            <div class="col-span-12 xl:col-span-4">
+                <div class="card mb-6">
+                    <div class="card-header">
+                        <div>
+                            <h2>Actividad reciente</h2>
+                            <p>Últimos movimientos registrados.</p>
+                        </div>
+                        <a routerLink="/actividad" class="text-link">Ver log <i class="pi pi-arrow-right"></i></a>
+                    </div>
+
+                    <ul class="activity-list">
+                        @for (log of recentLogs(); track log.id) {
+                            <li>
+                                <span class="activity-dot" [ngClass]="activityTone(log.action)">
+                                    <i [ngClass]="activityIcon(log.action)"></i>
+                                </span>
+                                <div class="activity-content">
+                                    <strong>{{ log.action }}</strong>
+                                    <p>{{ log.description }}</p>
+                                    <small>{{ log.timestamp | date: 'dd/MM/yyyy HH:mm' }} · {{ log.actor }}</small>
+                                </div>
+                            </li>
+                        } @empty {
+                            <li class="empty-state">Aún no hay actividad registrada.</li>
+                        }
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <h2>Trabajadores por cargo</h2>
+                            <p>Distribución de los puestos de trabajo registrados.</p>
+                        </div>
+                    </div>
+
+                    <div class="distribution-list">
+                        @for (item of typeSummary(); track item.type) {
+                            <div class="distribution-row">
+                                <div class="distribution-label">
+                                    <span>{{ item.type }}</span>
+                                    <strong>{{ item.count }}</strong>
+                                </div>
+                                <div class="distribution-bar">
+                                    <span [style.width.%]="typePercent(item.count)"></span>
+                                </div>
+                            </div>
+                        } @empty {
+                            <p class="empty-state">Sin datos para mostrar.</p>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>

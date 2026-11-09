@@ -1,0 +1,113 @@
+        <p-toast />
+        <p-confirmdialog [style]="{ width: '420px' }" />
+
+        <div class="page-header">
+            <div>
+                <span class="page-eyebrow">Trazabilidad</span>
+                <h1>Registro de actividad</h1>
+                <p>Historial de ingresos, registros de trabajadores y cambios de usuarios.</p>
+            </div>
+            @if (auth.isAdmin()) {
+                <div class="page-actions">
+                    <p-button label="Limpiar historial" icon="pi pi-trash" severity="danger" [outlined]="true" (onClick)="clearLogs()" />
+                </div>
+            }
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div class="mini-stat">
+                <span>Eventos registrados</span>
+                <strong>{{ logs().length }}</strong>
+            </div>
+            <div class="mini-stat">
+                <span>Eventos de hoy</span>
+                <strong>{{ logService.todayCount() }}</strong>
+            </div>
+            <div class="mini-stat">
+                <span>Última actividad</span>
+                <strong class="text-base!">{{ logs()[0] ? (logs()[0].timestamp | date: 'dd/MM HH:mm') : 'Sin datos' }}</strong>
+            </div>
+        </div>
+
+        <div class="card">
+            <p-table
+                #dt
+                [value]="filteredLogs()"
+                [rows]="12"
+                [paginator]="true"
+                [rowsPerPageOptions]="[6, 12, 25, 50]"
+                [globalFilterFields]="['action', 'description', 'actor']"
+                [tableStyle]="{ 'min-width': '58rem' }"
+                [rowHover]="true"
+                currentPageReportTemplate="Mostrando {first} a {last} de {totalRecords} eventos"
+                [showCurrentPageReport]="true"
+            >
+                <ng-template #caption>
+                    <div class="table-caption">
+                        <div>
+                            <h2>Bitácora del sistema</h2>
+                            <p>Cada acción importante queda guardada automáticamente.</p>
+                        </div>
+                        <div class="table-filters">
+                            <p-iconfield>
+                                <p-inputicon styleClass="pi pi-search" />
+                                <input pInputText type="text" (input)="onGlobalFilter(dt, $event)" placeholder="Buscar en la bitácora..." />
+                            </p-iconfield>
+                            <p-select
+                                [options]="actionOptions()"
+                                optionLabel="label"
+                                optionValue="value"
+                                placeholder="Tipo de evento"
+                                [showClear]="true"
+                                [ngModel]="selectedAction()"
+                                (ngModelChange)="selectedAction.set($event)"
+                                styleClass="filter-select"
+                            />
+                        </div>
+                    </div>
+                </ng-template>
+
+                <ng-template #header>
+                    <tr>
+                        <th pSortableColumn="timestamp" style="min-width: 11rem">
+                            Fecha y hora
+                            <p-sortIcon field="timestamp" />
+                        </th>
+                        <th pSortableColumn="action" style="min-width: 12rem">
+                            Acción
+                            <p-sortIcon field="action" />
+                        </th>
+                        <th style="min-width: 24rem">Descripción</th>
+                        <th pSortableColumn="actor" style="min-width: 12rem">
+                            Usuario
+                            <p-sortIcon field="actor" />
+                        </th>
+                    </tr>
+                </ng-template>
+
+                <ng-template #body let-log>
+                    <tr>
+                        <td>{{ log.timestamp | date: 'dd/MM/yyyy HH:mm:ss' }}</td>
+                        <td><p-tag [value]="log.action" [severity]="getActionSeverity(log.action)" /></td>
+                        <td>{{ log.description }}</td>
+                        <td>
+                            <div class="person-cell">
+                                <span class="person-avatar">{{ initials(log.actor) }}</span>
+                                <div>
+                                    <strong>{{ log.actor }}</strong>
+                                    @if (log.entityId) {
+                                        <small>{{ log.entityId }}</small>
+                                    }
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </ng-template>
+
+                <ng-template #emptymessage>
+                    <tr>
+                        <td colspan="4">No hay eventos que coincidan con los filtros.</td>
+                    </tr>
+                </ng-template>
+            </p-table>
+        </div>
