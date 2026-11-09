@@ -28,7 +28,7 @@ import {
     TagSeverity
 } from '@/app/services/models';
 import { PersonService } from '@/app/services/person.service';
-import { validateBirthDate, validateDocument, validateEmail, validatePhone } from '@/app/services/validators';
+import { validateBirthDate, validateDocument, validateEmail, validatePersonName, validatePhone } from '@/app/services/validators';
 
 @Component({
     selector: 'app-personas',
@@ -140,6 +140,14 @@ export class Personas {
         };
     }
 
+    firstNameError(): string {
+        return this.submitted ? (validatePersonName(this.person.firstName, 'nombres') ?? '') : '';
+    }
+
+    lastNameError(): string {
+        return this.submitted ? (validatePersonName(this.person.lastName, 'apellidos') ?? '') : '';
+    }
+
     documentError(): string {
         if (!this.submitted) {
             return '';
@@ -176,6 +184,28 @@ export class Personas {
                 severity: 'error',
                 summary: 'Formulario incompleto',
                 detail: 'Completa los campos obligatorios para guardar los cambios.',
+                life: 3500
+            });
+            return;
+        }
+
+        const nameErr = validatePersonName(this.person.firstName, 'nombres');
+        if (nameErr) {
+            this.messageService.add({
+                severity: 'error',
+                summary: 'Nombres inválidos',
+                detail: nameErr,
+                life: 3500
+            });
+            return;
+        }
+
+        const lastNameErr = validatePersonName(this.person.lastName, 'apellidos');
+        if (lastNameErr) {
+            this.messageService.add({
+                severity: 'error',
+                summary: 'Apellidos inválidos',
+                detail: lastNameErr,
                 life: 3500
             });
             return;

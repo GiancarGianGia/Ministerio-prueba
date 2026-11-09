@@ -115,27 +115,27 @@
                 <div class="form-field form-field-full">
                     <label for="userFullName">Nombre completo *</label>
                     <input pInputText id="userFullName" [(ngModel)]="userForm.fullName" placeholder="Ej. Laura Sánchez" />
-                    @if (submitted && !userForm.fullName.trim()) {
-                        <small class="field-error">El nombre es obligatorio.</small>
+                    @if (fullNameError()) {
+                        <small class="field-error">{{ fullNameError() }}</small>
                     }
                 </div>
 
                 <div class="form-field form-field-full">
                     <label for="userEmail">Correo electrónico *</label>
                     <input pInputText id="userEmail" type="email" [(ngModel)]="userForm.email" placeholder="usuario@correo.com" />
-                    @if (submitted && !userForm.email.trim()) {
-                        <small class="field-error">El correo es obligatorio.</small>
+                    @if (emailError()) {
+                        <small class="field-error">{{ emailError() }}</small>
                     }
                 </div>
 
                 <div class="form-field form-field-full">
                     <label for="userPassword">{{ editing ? 'Nueva contraseña' : 'Contraseña *' }}</label>
-                    <p-password id="userPassword" [(ngModel)]="userForm.password" [toggleMask]="true" [feedback]="false" [fluid]="true" [placeholder]="editing ? 'Déjala vacía para conservar la actual' : 'Mínimo 6 caracteres'" />
+                    <p-password id="userPassword" [(ngModel)]="userForm.password" [toggleMask]="true" [feedback]="false" [fluid]="true" [placeholder]="editing ? 'Déjala vacía para conservar la actual' : 'Mínimo 6 caracteres (letras y números)'" />
                     @if (editing) {
                         <small class="field-hint">Si no escribes una contraseña, se conserva la actual.</small>
                     }
-                    @if (submitted && !editing && userForm.password.length < 6) {
-                        <small class="field-error">La contraseña debe tener al menos 6 caracteres.</small>
+                    @if (passwordError()) {
+                        <small class="field-error">{{ passwordError() }}</small>
                     }
                 </div>
 

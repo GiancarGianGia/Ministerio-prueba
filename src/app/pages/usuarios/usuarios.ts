@@ -15,6 +15,7 @@ import { TagModule } from 'primeng/tag';
 import { ToastModule } from 'primeng/toast';
 import { AuthService } from '@/app/services/auth.service';
 import { AppUser, NewUserInput, TagSeverity, UpdateUserInput } from '@/app/services/models';
+import { validateEmail, validatePassword, validatePersonName } from '@/app/services/validators';
 
 @Component({
     selector: 'app-usuarios',
@@ -89,14 +90,37 @@ export class Usuarios {
         this.submitted = false;
     }
 
+    fullNameError(): string {
+        return this.submitted ? (validatePersonName(this.userForm.fullName, 'nombre completo') ?? '') : '';
+    }
+
+    emailError(): string {
+        return this.submitted ? (validateEmail(this.userForm.email) ?? '') : '';
+    }
+
+    passwordError(): string {
+        if (!this.submitted) {
+            return '';
+        }
+        if (this.editing && !this.userForm.password) {
+            return '';
+        }
+        return validatePassword(this.userForm.password) ?? '';
+    }
+
     saveUser(): void {
         this.submitted = true;
 
-        if (!this.userForm.fullName.trim() || !this.userForm.email.trim() || (!this.editing && this.userForm.password.length < 6)) {
+        const nameErr = validatePersonName(this.userForm.fullName, 'nombre completo');
+        const emailErr = validateEmail(this.userForm.email);
+        const passErr = (!this.editing || this.userForm.password) ? validatePassword(this.userForm.password) : null;
+
+        if (nameErr || emailErr || passErr) {
+            const firstError = nameErr || emailErr || passErr;
             this.messageService.add({
                 severity: 'error',
-                summary: 'Formulario incompleto',
-                detail: 'Completa el nombre, el correo y una contraseña de al menos 6 caracteres.',
+                summary: 'Formulario con errores',
+                detail: firstError ?? 'Por favor corrige los campos señalados.',
                 life: 3500
             });
             return;

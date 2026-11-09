@@ -41,15 +41,15 @@
                             <div class="form-field">
                                 <label for="firstName">Nombres *</label>
                                 <input pInputText id="firstName" name="firstName" [(ngModel)]="person.firstName" placeholder="Ej. María Fernanda" />
-                                @if (submitted && !person.firstName.trim()) {
-                                    <small class="field-error">Los nombres son obligatorios.</small>
+                                @if (firstNameError()) {
+                                    <small class="field-error">{{ firstNameError() }}</small>
                                 }
                             </div>
                             <div class="form-field">
                                 <label for="lastName">Apellidos *</label>
                                 <input pInputText id="lastName" name="lastName" [(ngModel)]="person.lastName" placeholder="Ej. Gómez Ríos" />
-                                @if (submitted && !person.lastName.trim()) {
-                                    <small class="field-error">Los apellidos son obligatorios.</small>
+                                @if (lastNameError()) {
+                                    <small class="field-error">{{ lastNameError() }}</small>
                                 }
                             </div>
 

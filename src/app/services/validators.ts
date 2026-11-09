@@ -4,6 +4,33 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/;
 
 const VENEZUELAN_MOBILE_CODES = ['412', '414', '416', '424', '426'];
 
+const NAME_PATTERN = /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]+$/;
+
+/**
+ * Valida nombres y apellidos: solo letras, espacios, tildes, diéresis, apóstrofes o guiones.
+ * Longitud mínima de 2 y máxima de 60 caracteres.
+ */
+export function validatePersonName(value: string, fieldName = 'nombre'): string | null {
+    const name = (value || '').trim();
+    if (!name) {
+        return `El ${fieldName} es obligatorio.`;
+    }
+    if (name.length < 2) {
+        return `El ${fieldName} debe tener al menos 2 caracteres.`;
+    }
+    if (name.length > 60) {
+        return `El ${fieldName} no puede exceder 60 caracteres.`;
+    }
+    if (!NAME_PATTERN.test(name)) {
+        return `El ${fieldName} solo puede contener letras y espacios (sin números ni símbolos).`;
+    }
+    return null;
+}
+
+export function isValidPersonName(value: string): boolean {
+    return validatePersonName(value) === null;
+}
+
 export function isValidEmail(value: string): boolean {
     const email = value.trim();
     return email.length > 0 && email.length <= 120 && EMAIL_PATTERN.test(email);

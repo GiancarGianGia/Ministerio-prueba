@@ -6,7 +6,7 @@ import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { PasswordModule } from 'primeng/password';
 import { AuthService } from '@/app/services/auth.service';
-import { validateEmail, validatePassword, validatePasswordConfirmation } from '@/app/services/validators';
+import { validateEmail, validatePassword, validatePasswordConfirmation, validatePersonName } from '@/app/services/validators';
 
 @Component({
     selector: 'app-register',
@@ -172,14 +172,7 @@ export class Register {
     }
 
     fullNameError(): string {
-        const name = this.fullName.trim();
-        if (!name) {
-            return 'El nombre completo es obligatorio.';
-        }
-        if (name.length < 3) {
-            return 'Escribe el nombre completo (mínimo 3 caracteres).';
-        }
-        return '';
+        return this.submitted ? (validatePersonName(this.fullName, 'nombre completo') ?? '') : '';
     }
 
     emailError(): string {

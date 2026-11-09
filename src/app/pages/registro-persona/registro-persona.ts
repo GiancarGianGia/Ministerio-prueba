@@ -19,7 +19,7 @@ import {
     PERSON_TYPES
 } from '@/app/services/models';
 import { PersonService } from '@/app/services/person.service';
-import { isValidEmail, isValidVenezuelanPhone, validateBirthDate, validateDocument, validateEmail, validatePhone } from '@/app/services/validators';
+import { isValidEmail, isValidVenezuelanPhone, validateBirthDate, validateDocument, validateEmail, validatePersonName, validatePhone } from '@/app/services/validators';
 
 @Component({
     selector: 'app-registro-persona',
@@ -65,6 +65,28 @@ export class RegistroPersona {
                 severity: 'error',
                 summary: 'Formulario incompleto',
                 detail: 'Completa todos los campos obligatorios marcados con asterisco.',
+                life: 3500
+            });
+            return;
+        }
+
+        const nameErr = validatePersonName(this.person.firstName, 'nombres');
+        if (nameErr) {
+            this.messageService.add({
+                severity: 'error',
+                summary: 'Nombres inválidos',
+                detail: nameErr,
+                life: 3500
+            });
+            return;
+        }
+
+        const lastNameErr = validatePersonName(this.person.lastName, 'apellidos');
+        if (lastNameErr) {
+            this.messageService.add({
+                severity: 'error',
+                summary: 'Apellidos inválidos',
+                detail: lastNameErr,
                 life: 3500
             });
             return;
@@ -149,6 +171,14 @@ export class RegistroPersona {
 
     initials(firstName: string, lastName: string): string {
         return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+    }
+
+    firstNameError(): string {
+        return this.submitted ? (validatePersonName(this.person.firstName, 'nombres') ?? '') : '';
+    }
+
+    lastNameError(): string {
+        return this.submitted ? (validatePersonName(this.person.lastName, 'apellidos') ?? '') : '';
     }
 
     documentError(): string {

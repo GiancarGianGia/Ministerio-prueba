@@ -161,15 +161,15 @@
                 <div class="form-field">
                     <label for="editFirstName">Nombres *</label>
                     <input pInputText id="editFirstName" [(ngModel)]="person.firstName" />
-                    @if (submitted && !person.firstName.trim()) {
-                        <small class="field-error">Este campo es obligatorio.</small>
+                    @if (firstNameError()) {
+                        <small class="field-error">{{ firstNameError() }}</small>
                     }
                 </div>
                 <div class="form-field">
                     <label for="editLastName">Apellidos *</label>
                     <input pInputText id="editLastName" [(ngModel)]="person.lastName" />
-                    @if (submitted && !person.lastName.trim()) {
-                        <small class="field-error">Este campo es obligatorio.</small>
+                    @if (lastNameError()) {
+                        <small class="field-error">{{ lastNameError() }}</small>
                     }
                 </div>
 
