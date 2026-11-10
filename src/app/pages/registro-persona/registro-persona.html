@@ -81,21 +81,14 @@
 
                     <div class="form-section">
                         <div class="form-section-header">
-                            <span class="section-icon"><i class="pi pi-envelope"></i></span>
+                            <span class="section-icon"><i class="pi pi-phone"></i></span>
                             <div>
-                                <h2>Información de contacto</h2>
-                                <p>Canales para comunicarse con el trabajador registrado.</p>
+                                <h2>Teléfono de contacto</h2>
+                                <p>Número para comunicarse con el trabajador registrado.</p>
                             </div>
                         </div>
 
                         <div class="form-grid">
-                            <div class="form-field">
-                                <label for="email">Correo electrónico *</label>
-                                <input pInputText id="email" name="email" type="email" [(ngModel)]="person.email" placeholder="nombre@mpppst.gob.ve" />
-                                @if (emailError()) {
-                                    <small class="field-error">{{ emailError() }}</small>
-                                }
-                            </div>
                             <div class="form-field">
                                 <label for="phone">Teléfono *</label>
                                 <input pInputText id="phone" name="phone" [(ngModel)]="person.phone" placeholder="Ej. +58 412 1234567" />
@@ -195,7 +188,7 @@
                     <ul class="check-list">
                         <li><i class="pi pi-check-circle"></i><span>Nombres y apellidos coinciden con la cédula de identidad.</span></li>
                         <li><i class="pi pi-check-circle"></i><span>El número de documento no está repetido.</span></li>
-                        <li><i class="pi pi-check-circle"></i><span>El correo y el teléfono están actualizados.</span></li>
+                        <li><i class="pi pi-check-circle"></i><span>El teléfono está actualizado.</span></li>
                         <li><i class="pi pi-check-circle"></i><span>El cargo o puesto de trabajo corresponde al trabajador.</span></li>
                     </ul>
                     <div class="info-note">

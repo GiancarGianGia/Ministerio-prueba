@@ -1,17 +1,16 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, inject, signal, ViewChild } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
-import { ConfirmationService, MessageService } from 'primeng/api';
+import { MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
-import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { DialogModule } from 'primeng/dialog';
 import { IconFieldModule } from 'primeng/iconfield';
 import { InputIconModule } from 'primeng/inputicon';
 import { InputTextModule } from 'primeng/inputtext';
 import { RippleModule } from 'primeng/ripple';
 import { SelectModule } from 'primeng/select';
-import { Table, TableModule } from 'primeng/table';
+import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { TextareaModule } from 'primeng/textarea';
 import { ToastModule } from 'primeng/toast';
@@ -28,7 +27,7 @@ import {
     TagSeverity
 } from '@/app/services/models';
 import { PersonService } from '@/app/services/person.service';
-import { validateBirthDate, validateDocument, validateEmail, validatePersonName, validatePhone } from '@/app/services/validators';
+import { validateBirthDate, validateDocument, validatePersonName, validatePhone } from '@/app/services/validators';
 
 @Component({
     selector: 'app-personas',
@@ -47,10 +46,9 @@ import { validateBirthDate, validateDocument, validateEmail, validatePersonName,
         DialogModule,
         TagModule,
         InputIconModule,
-        IconFieldModule,
-        ConfirmDialogModule
+        IconFieldModule
     ],
-    providers: [MessageService, ConfirmationService],
+    providers: [MessageService],
     templateUrl: './personas.html'
 })
 export class Personas {
@@ -60,13 +58,11 @@ export class Personas {
 
     private readonly messageService = inject(MessageService);
 
-    private readonly confirmationService = inject(ConfirmationService);
-
     readonly persons = this.personService.persons;
 
     readonly stats = this.personService.stats;
 
-    selectedPersons: Person[] | null = null;
+    searchTerm = signal('');
 
     filterType = signal<string | null>(null);
 
@@ -74,9 +70,24 @@ export class Personas {
 
     readonly filteredPersons = computed(() =>
         this.persons().filter((person) => {
+            const search = this.normalizeSearchText(this.searchTerm());
+            const searchableText = this.normalizeSearchText(
+                [
+                    person.firstName,
+                    person.lastName,
+                    person.documentNumber,
+                    person.documentType,
+                    person.phone,
+                    person.city,
+                    person.department,
+                    person.type,
+                    person.status
+                ].join(' ')
+            );
             const matchesType = !this.filterType() || person.type === this.filterType();
             const matchesStatus = !this.filterStatus() || person.status === this.filterStatus();
-            return matchesType && matchesStatus;
+            const matchesSearch = !search || searchableText.includes(search);
+            return matchesType && matchesStatus && matchesSearch;
         })
     );
 
@@ -96,14 +107,24 @@ export class Personas {
 
     submitted = false;
 
-    @ViewChild('dt') dt!: Table;
+    statusDialog = false;
+
+    pendingStatusPerson: Person | null = null;
+
+    inactivationReason = '';
+
+    inactivationReasonError = '';
 
     private get actor(): string {
         return this.auth.currentUser()?.fullName ?? 'Sistema';
     }
 
-    onGlobalFilter(table: Table, event: Event): void {
-        table.filterGlobal((event.target as HTMLInputElement).value, 'contains');
+    private normalizeSearchText(value: string): string {
+        return value
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .replace(/[^a-z0-9]/g, '');
     }
 
     editPerson(person: Person): void {
@@ -117,6 +138,48 @@ export class Personas {
         this.submitted = false;
     }
 
+    openStatusDialog(person: Person): void {
+        this.pendingStatusPerson = person;
+        this.inactivationReason = '';
+        this.inactivationReasonError = '';
+        this.statusDialog = true;
+    }
+
+    hideStatusDialog(): void {
+        this.statusDialog = false;
+        this.pendingStatusPerson = null;
+        this.inactivationReason = '';
+        this.inactivationReasonError = '';
+    }
+
+    saveStatusChange(): void {
+        const person = this.pendingStatusPerson;
+        if (!person) {
+            return;
+        }
+
+        if (person.status !== 'Inactivo' && !this.inactivationReason.trim()) {
+            this.inactivationReasonError = 'El motivo es obligatorio para inhabilitar al trabajador.';
+            return;
+        }
+
+        const result =
+            person.status === 'Inactivo'
+                ? this.personService.activate(person.id, this.actor)
+                : this.personService.inactivate(person.id, this.inactivationReason, this.actor);
+
+        this.messageService.add({
+            severity: result.ok ? 'success' : 'error',
+            summary: result.ok ? 'Estado actualizado' : 'No se pudo actualizar',
+            detail: result.message,
+            life: 3500
+        });
+
+        if (result.ok) {
+            this.hideStatusDialog();
+        }
+    }
+
     private emptyPerson(): Person {
         return {
             id: '',
@@ -126,7 +189,6 @@ export class Personas {
             documentNumber: '',
             birthDate: '',
             gender: GENDERS[0],
-            email: '',
             phone: '',
             address: '',
             city: '',
@@ -162,13 +224,6 @@ export class Personas {
         return validateBirthDate(this.person.birthDate) ?? '';
     }
 
-    emailError(): string {
-        if (!this.submitted) {
-            return '';
-        }
-        return validateEmail(this.person.email) ?? '';
-    }
-
     phoneError(): string {
         if (!this.submitted || !this.person.phone) {
             return '';
@@ -179,7 +234,7 @@ export class Personas {
     savePerson(): void {
         this.submitted = true;
 
-        if (!this.person.firstName?.trim() || !this.person.lastName?.trim() || !this.person.documentNumber?.trim() || !this.person.email?.trim() || !this.person.type?.trim()) {
+        if (!this.person.firstName?.trim() || !this.person.lastName?.trim() || !this.person.documentNumber?.trim() || !this.person.type?.trim()) {
             this.messageService.add({
                 severity: 'error',
                 summary: 'Formulario incompleto',
@@ -235,17 +290,6 @@ export class Personas {
             }
         }
 
-        const emailErr = validateEmail(this.person.email);
-        if (emailErr) {
-            this.messageService.add({
-                severity: 'error',
-                summary: 'Correo inválido',
-                detail: emailErr,
-                life: 3500
-            });
-            return;
-        }
-
         if (this.person.phone) {
             const phoneErr = validatePhone(this.person.phone);
             if (phoneErr) {
@@ -276,7 +320,6 @@ export class Personas {
             documentNumber: this.person.documentNumber,
             birthDate: this.person.birthDate,
             gender: this.person.gender,
-            email: this.person.email,
             phone: this.person.phone,
             address: this.person.address,
             city: this.person.city,
@@ -307,64 +350,14 @@ export class Personas {
         });
     }
 
-    deletePerson(person: Person): void {
-        this.confirmationService.confirm({
-            message: `¿Deseas eliminar el registro de ${person.firstName} ${person.lastName}?`,
-            header: 'Confirmar eliminación',
-            icon: 'pi pi-exclamation-triangle',
-            acceptLabel: 'Eliminar',
-            rejectLabel: 'Cancelar',
-            acceptButtonStyleClass: 'p-button-danger',
-            accept: () => {
-                this.personService.remove(person.id, this.actor);
-                this.messageService.add({
-                    severity: 'success',
-                    summary: 'Trabajador eliminado',
-                    detail: `${person.firstName} ${person.lastName} fue eliminado del sistema.`,
-                    life: 3000
-                });
-            }
-        });
-    }
-
-    deleteSelected(): void {
-        if (!this.selectedPersons?.length) {
-            return;
-        }
-
-        const count = this.selectedPersons.length;
-        this.confirmationService.confirm({
-            message: `¿Deseas eliminar ${count} registro(s) seleccionado(s)?`,
-            header: 'Confirmar eliminación',
-            icon: 'pi pi-exclamation-triangle',
-            acceptLabel: 'Eliminar',
-            rejectLabel: 'Cancelar',
-            acceptButtonStyleClass: 'p-button-danger',
-            accept: () => {
-                const removed = this.personService.removeMany(
-                    (this.selectedPersons ?? []).map((person) => person.id),
-                    this.actor
-                );
-                this.selectedPersons = null;
-                this.messageService.add({
-                    severity: 'success',
-                    summary: 'Registros eliminados',
-                    detail: `${removed} trabajador(es) eliminado(s) del sistema.`,
-                    life: 3000
-                });
-            }
-        });
-    }
-
     exportCsv(): void {
-        const header = ['Código', 'Nombres', 'Apellidos', 'Tipo de documento', 'Documento', 'Correo', 'Teléfono', 'Ciudad', 'Estado', 'Cargo', 'Estado del trabajador', 'Fecha y hora de registro'];
+        const header = ['Código', 'Nombres', 'Apellidos', 'Tipo de documento', 'Documento', 'Teléfono', 'Ciudad', 'Estado', 'Cargo', 'Estado del trabajador', 'Fecha y hora de registro'];
         const rows = this.filteredPersons().map((person) => [
             person.id,
             person.firstName,
             person.lastName,
             person.documentType,
             person.documentNumber,
-            person.email,
             person.phone,
             person.city,
             person.department,
@@ -395,7 +388,6 @@ export class Personas {
             'Documento',
             'Fecha de nacimiento',
             'Género',
-            'Correo',
             'Teléfono',
             'Dirección',
             'Ciudad',
@@ -415,7 +407,6 @@ export class Personas {
             person.documentNumber,
             person.birthDate,
             person.gender,
-            person.email,
             person.phone,
             person.address,
             person.city,

@@ -5,7 +5,7 @@ export type TagSeverity = 'success' | 'secondary' | 'info' | 'warn' | 'danger' |
 export interface AppUser {
     id: string;
     fullName: string;
-    email: string;
+    cedula: string;
     password: string;
     role: UserRole;
     active: boolean;
@@ -16,7 +16,7 @@ export interface AppUser {
 
 export interface NewUserInput {
     fullName: string;
-    email: string;
+    cedula: string;
     password: string;
     role: UserRole;
     active: boolean;
@@ -24,7 +24,7 @@ export interface NewUserInput {
 
 export interface UpdateUserInput {
     fullName: string;
-    email: string;
+    cedula: string;
     role: UserRole;
     active: boolean;
     password?: string;
@@ -38,20 +38,20 @@ export interface Person {
     documentNumber: string;
     birthDate: string;
     gender: string;
-    email: string;
     phone: string;
     address: string;
     city: string;
     department: string;
     type: string;
     status: string;
+    deactivationReason?: string;
     notes: string;
     createdAt: string;
     updatedAt: string;
     createdBy: string;
 }
 
-export type NewPersonInput = Omit<Person, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>;
+export type NewPersonInput = Omit<Person, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'deactivationReason'>;
 
 export interface ActivityLog {
     id: string;

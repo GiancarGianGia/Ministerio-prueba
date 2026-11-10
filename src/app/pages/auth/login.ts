@@ -49,15 +49,15 @@ import { AuthService } from '@/app/services/auth.service';
                         </div>
 
                         <form class="auth-form" (ngSubmit)="submit()">
-                            <label for="email">Correo electrónico</label>
+                            <label for="cedula">Cédula</label>
                             <input
                                 pInputText
-                                id="email"
-                                name="email"
-                                type="email"
-                                [(ngModel)]="email"
-                                placeholder="nombre@mpppst.gob.ve"
-                                autocomplete="email"
+                                id="cedula"
+                                name="cedula"
+                                type="text"
+                                [(ngModel)]="cedula"
+                                placeholder="V-12345678"
+                                autocomplete="username"
                                 required
                             />
 
@@ -85,7 +85,7 @@ import { AuthService } from '@/app/services/auth.service';
 
                         <div class="auth-demo">
                             <span class="auth-demo-title">Acceso de prueba</span>
-                            <div><strong>admin&#64;registro.com</strong> / <strong>admin123</strong></div>
+                            <div><strong>V-00000000</strong> / <strong>admin123</strong></div>
                             <button type="button" class="auth-link" (click)="loginDemo()">Usar credenciales de administrador</button>
                         </div>
 
@@ -101,7 +101,7 @@ export class Login {
 
     private readonly router = inject(Router);
 
-    email = '';
+    cedula = '';
 
     password = '';
 
@@ -118,13 +118,13 @@ export class Login {
     submit(): void {
         this.error = '';
 
-        if (!this.email.trim() || !this.password) {
-            this.error = 'Escribe tu correo y contraseña.';
+        if (!this.cedula.trim() || !this.password) {
+            this.error = 'Escribe tu cédula y contraseña.';
             return;
         }
 
         this.loading = true;
-        const result = this.auth.login(this.email, this.password);
+        const result = this.auth.login(this.cedula, this.password);
 
         if (!result.ok) {
             this.error = result.message;
@@ -136,7 +136,7 @@ export class Login {
     }
 
     loginDemo(): void {
-        this.email = 'admin@registro.com';
+        this.cedula = 'V-00000000';
         this.password = 'admin123';
         this.submit();
     }

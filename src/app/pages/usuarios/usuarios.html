@@ -65,7 +65,7 @@
                                 <span class="person-avatar">{{ initials(user.fullName) }}</span>
                                 <div>
                                     <strong>{{ user.fullName }}</strong>
-                                    <small>{{ user.email }}</small>
+                                    <small>Cédula: {{ user.cedula || 'Pendiente de actualizar' }}</small>
                                 </div>
                                 @if (isCurrentUser(user)) {
                                     <span class="badge-soft ml-2">Tú</span>
@@ -121,10 +121,10 @@
                 </div>
 
                 <div class="form-field form-field-full">
-                    <label for="userEmail">Correo electrónico *</label>
-                    <input pInputText id="userEmail" type="email" [(ngModel)]="userForm.email" placeholder="usuario@correo.com" />
-                    @if (emailError()) {
-                        <small class="field-error">{{ emailError() }}</small>
+                    <label for="userCedula">Cédula *</label>
+                    <input pInputText id="userCedula" type="text" [(ngModel)]="userForm.cedula" placeholder="V-12345678" />
+                    @if (cedulaError()) {
+                        <small class="field-error">{{ cedulaError() }}</small>
                     }
                 </div>
 

@@ -6,7 +6,7 @@ import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { PasswordModule } from 'primeng/password';
 import { AuthService } from '@/app/services/auth.service';
-import { validateEmail, validatePassword, validatePasswordConfirmation, validatePersonName } from '@/app/services/validators';
+import { validateCedula, validatePassword, validatePasswordConfirmation, validatePersonName } from '@/app/services/validators';
 
 @Component({
     selector: 'app-register',
@@ -32,7 +32,7 @@ import { validateEmail, validatePassword, validatePasswordConfirmation, validate
                         <div class="auth-steps">
                             <div class="auth-step">
                                 <span>1</span>
-                                <div><strong>Completa tus datos</strong><small>Nombre, correo y una contraseña segura.</small></div>
+                                <div><strong>Completa tus datos</strong><small>Nombre, cédula y una contraseña segura.</small></div>
                             </div>
                             <div class="auth-step">
                                 <span>2</span>
@@ -71,10 +71,10 @@ import { validateEmail, validatePassword, validatePasswordConfirmation, validate
                                 <small class="field-error">{{ fullNameError() }}</small>
                             }
 
-                            <label for="email">Correo electrónico *</label>
-                            <input pInputText id="email" name="email" type="email" [(ngModel)]="email" placeholder="nombre@mpppst.gob.ve" autocomplete="email" />
-                            @if (submitted && emailError()) {
-                                <small class="field-error">{{ emailError() }}</small>
+                            <label for="cedula">Cédula *</label>
+                            <input pInputText id="cedula" name="cedula" type="text" [(ngModel)]="cedula" placeholder="V-12345678" autocomplete="username" />
+                            @if (submitted && cedulaError()) {
+                                <small class="field-error">{{ cedulaError() }}</small>
                             }
 
                             <div class="auth-form-row">
@@ -146,7 +146,7 @@ export class Register {
 
     fullName = '';
 
-    email = '';
+    cedula = '';
 
     password = '';
 
@@ -175,8 +175,8 @@ export class Register {
         return this.submitted ? (validatePersonName(this.fullName, 'nombre completo') ?? '') : '';
     }
 
-    emailError(): string {
-        return validateEmail(this.email) ?? '';
+    cedulaError(): string {
+        return validateCedula(this.cedula) ?? '';
     }
 
     passwordError(): string {
@@ -197,9 +197,9 @@ export class Register {
             return;
         }
 
-        const emailErr = this.emailError();
-        if (emailErr) {
-            this.error = emailErr;
+        const cedulaErr = this.cedulaError();
+        if (cedulaErr) {
+            this.error = cedulaErr;
             return;
         }
 
@@ -216,7 +216,7 @@ export class Register {
         }
 
         this.loading = true;
-        const result = this.auth.register(this.fullName, this.email, this.password);
+        const result = this.auth.register(this.fullName, this.cedula, this.password);
 
         if (!result.ok) {
             this.error = result.message;

@@ -1,5 +1,4 @@
         <p-toast />
-        <p-confirmdialog [style]="{ width: '420px' }" />
 
         <div class="page-header">
             <div>
@@ -31,14 +30,11 @@
 
         <div class="card">
             <p-table
-                #dt
                 [value]="filteredPersons()"
                 [rows]="10"
                 [paginator]="true"
                 [rowsPerPageOptions]="[5, 10, 20, 50]"
-                [globalFilterFields]="['firstName', 'lastName', 'documentNumber', 'email', 'phone', 'city', 'type', 'status']"
                 [tableStyle]="{ 'min-width': '68rem' }"
-                [(selection)]="selectedPersons"
                 dataKey="id"
                 [rowHover]="true"
                 currentPageReportTemplate="Mostrando {first} a {last} de {totalRecords} trabajadores"
@@ -53,7 +49,7 @@
                         <div class="table-filters">
                             <p-iconfield>
                                 <p-inputicon styleClass="pi pi-search" />
-                                <input pInputText type="text" (input)="onGlobalFilter(dt, $event)" placeholder="Buscar trabajador..." />
+                                <input pInputText type="text" [ngModel]="searchTerm()" (ngModelChange)="searchTerm.set($event)" placeholder="Buscar por nombre o cédula..." />
                             </p-iconfield>
                             <p-select
                                 [options]="typeOptions"
@@ -75,21 +71,12 @@
                                 (ngModelChange)="filterStatus.set($event)"
                                 styleClass="filter-select"
                             />
-                            <p-button
-                                label="Eliminar"
-                                icon="pi pi-trash"
-                                severity="danger"
-                                [outlined]="true"
-                                [disabled]="!selectedPersons || !selectedPersons.length"
-                                (onClick)="deleteSelected()"
-                            />
                         </div>
                     </div>
                 </ng-template>
 
                 <ng-template #header>
                     <tr>
-                        <th style="width: 3rem"><p-tableHeaderCheckbox /></th>
                         <th pSortableColumn="firstName" style="min-width: 16rem">
                             Trabajador
                             <p-sortIcon field="firstName" />
@@ -114,13 +101,11 @@
 
                 <ng-template #body let-person>
                     <tr>
-                        <td><p-tableCheckbox [value]="person" /></td>
                         <td>
                             <div class="person-cell">
                                 <span class="person-avatar">{{ initials(person.firstName, person.lastName) }}</span>
                                 <div>
                                     <strong>{{ person.firstName }} {{ person.lastName }}</strong>
-                                    <small>{{ person.email }}</small>
                                 </div>
                             </div>
                         </td>
@@ -142,7 +127,14 @@
                         <td>
                             <div class="table-actions">
                                 <p-button icon="pi pi-pencil" ariaLabel="Editar trabajador" [rounded]="true" [outlined]="true" (click)="editPerson(person)" />
-                                <p-button icon="pi pi-trash" ariaLabel="Eliminar trabajador" severity="danger" [rounded]="true" [outlined]="true" (click)="deletePerson(person)" />
+                                <p-button
+                                    [icon]="person.status === 'Inactivo' ? 'pi pi-check' : 'pi pi-ban'"
+                                    [ariaLabel]="person.status === 'Inactivo' ? 'Habilitar trabajador' : 'Inhabilitar trabajador'"
+                                    [severity]="person.status === 'Inactivo' ? 'success' : 'warn'"
+                                    [rounded]="true"
+                                    [outlined]="true"
+                                    (click)="openStatusDialog(person)"
+                                />
                             </div>
                         </td>
                     </tr>
@@ -150,7 +142,7 @@
 
                 <ng-template #emptymessage>
                     <tr>
-                        <td colspan="8">No se encontraron trabajadores con los filtros seleccionados.</td>
+                        <td colspan="7">No se encontraron trabajadores con los filtros seleccionados.</td>
                     </tr>
                 </ng-template>
             </p-table>
@@ -195,13 +187,6 @@
                 </div>
 
                 <div class="form-field">
-                    <label for="editEmail">Correo electrónico *</label>
-                    <input pInputText id="editEmail" type="email" [(ngModel)]="person.email" />
-                    @if (submitted && !person.email.trim()) {
-                        <small class="field-error">Este campo es obligatorio.</small>
-                    }
-                </div>
-                <div class="form-field">
                     <label for="editPhone">Teléfono</label>
                     <input pInputText id="editPhone" [(ngModel)]="person.phone" />
                 </div>
@@ -235,11 +220,6 @@
                         <small class="field-error">Selecciona el cargo o puesto de trabajo.</small>
                     }
                 </div>
-                <div class="form-field">
-                    <label for="editStatus">Estado</label>
-                    <p-select id="editStatus" [options]="statusOptions" optionLabel="label" optionValue="value" [(ngModel)]="person.status" styleClass="w-full" />
-                </div>
-
                 <div class="form-field form-field-full">
                     <label for="editNotes">Observaciones</label>
                     <textarea pTextarea id="editNotes" rows="3" [(ngModel)]="person.notes" style="width: 100%"></textarea>
@@ -249,5 +229,51 @@
             <ng-template #footer>
                 <p-button label="Cancelar" icon="pi pi-times" text (click)="hideDialog()" />
                 <p-button label="Guardar cambios" icon="pi pi-check" (click)="savePerson()" />
+            </ng-template>
+        </p-dialog>
+
+        <p-dialog
+            [(visible)]="statusDialog"
+            [style]="{ width: '520px' }"
+            [header]="pendingStatusPerson?.status === 'Inactivo' ? 'Habilitar trabajador' : 'Inhabilitar trabajador'"
+            [modal]="true"
+            (onHide)="hideStatusDialog()"
+        >
+            @if (pendingStatusPerson; as targetPerson) {
+                <div class="form-grid">
+                    <p class="form-field-full">
+                        {{ targetPerson.firstName }} {{ targetPerson.lastName }}
+                        <span class="text-color-secondary">({{ targetPerson.documentNumber }})</span>
+                    </p>
+                    @if (targetPerson.status !== 'Inactivo') {
+                        <div class="form-field form-field-full">
+                            <label for="inactivationReason">Motivo de la inhabilitación *</label>
+                            <textarea
+                                pTextarea
+                                id="inactivationReason"
+                                [(ngModel)]="inactivationReason"
+                                rows="4"
+                                maxlength="500"
+                                placeholder="Explica por qué se inhabilita este trabajador"
+                                style="width: 100%"
+                            ></textarea>
+                            @if (inactivationReasonError) {
+                                <small class="field-error">{{ inactivationReasonError }}</small>
+                            }
+                        </div>
+                    } @else {
+                        <p class="form-field-full">El trabajador volverá a quedar Activo. El motivo anterior permanecerá en la bitácora.</p>
+                    }
+                </div>
+            }
+
+            <ng-template #footer>
+                <p-button label="Cancelar" icon="pi pi-times" text (click)="hideStatusDialog()" />
+                <p-button
+                    [label]="pendingStatusPerson?.status === 'Inactivo' ? 'Habilitar' : 'Inhabilitar'"
+                    [icon]="pendingStatusPerson?.status === 'Inactivo' ? 'pi pi-check' : 'pi pi-ban'"
+                    [severity]="pendingStatusPerson?.status === 'Inactivo' ? 'success' : 'warn'"
+                    (click)="saveStatusChange()"
+                />
             </ng-template>
         </p-dialog>

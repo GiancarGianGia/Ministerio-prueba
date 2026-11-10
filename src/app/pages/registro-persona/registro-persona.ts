@@ -19,7 +19,7 @@ import {
     PERSON_TYPES
 } from '@/app/services/models';
 import { PersonService } from '@/app/services/person.service';
-import { isValidEmail, isValidVenezuelanPhone, validateBirthDate, validateDocument, validateEmail, validatePersonName, validatePhone } from '@/app/services/validators';
+import { isValidVenezuelanPhone, validateBirthDate, validateDocument, validatePersonName, validatePhone } from '@/app/services/validators';
 
 @Component({
     selector: 'app-registro-persona',
@@ -55,12 +55,12 @@ export class RegistroPersona {
 
     readonly typeOptions = PERSON_TYPES.map((value) => ({ label: value, value }));
 
-    readonly statusOptions = PERSON_STATUSES.map((value) => ({ label: value, value }));
+    readonly statusOptions = PERSON_STATUSES.filter((value) => value !== 'Inactivo').map((value) => ({ label: value, value }));
 
     save(): void {
         this.submitted = true;
 
-        if (!this.person.firstName.trim() || !this.person.lastName.trim() || !this.person.documentType.trim() || !this.person.documentNumber.trim() || !this.person.birthDate.trim() || !this.person.email.trim() || !this.person.phone.trim() || !this.person.type.trim()) {
+        if (!this.person.firstName.trim() || !this.person.lastName.trim() || !this.person.documentType.trim() || !this.person.documentNumber.trim() || !this.person.birthDate.trim() || !this.person.phone.trim() || !this.person.type.trim()) {
             this.messageService.add({
                 severity: 'error',
                 summary: 'Formulario incompleto',
@@ -110,17 +110,6 @@ export class RegistroPersona {
                 summary: 'Fecha de nacimiento inválida',
                 detail: birthDateError,
                 life: 4000
-            });
-            return;
-        }
-
-        const emailError = validateEmail(this.person.email);
-        if (emailError) {
-            this.messageService.add({
-                severity: 'error',
-                summary: 'Correo inválido',
-                detail: emailError,
-                life: 3500
             });
             return;
         }
@@ -192,13 +181,6 @@ export class RegistroPersona {
         return this.submitted ? (validateBirthDate(this.person.birthDate) ?? '') : '';
     }
 
-    emailError(): string {
-        if (!this.submitted) {
-            return '';
-        }
-        return validateEmail(this.person.email) ?? '';
-    }
-
     phoneError(): string {
         if (!this.submitted) {
             return '';
@@ -221,7 +203,6 @@ export class RegistroPersona {
             documentNumber: '',
             birthDate: '',
             gender: GENDERS[0],
-            email: '',
             phone: '',
             address: '',
             city: '',
