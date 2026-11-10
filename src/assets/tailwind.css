@@ -1,4 +1,2 @@
 @import 'tailwindcss';
-@plugin 'tailwindcss-primeui';
-@source "../app";
-@source "../index.html";
+@import 'tailwindcss-primeui';
