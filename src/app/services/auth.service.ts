@@ -2,12 +2,12 @@ import { computed, inject, Injectable, signal } from '@angular/core';
 import { AppUser, AuthResult, NewUserInput, nextSequentialId, STORAGE_KEYS, UpdateUserInput, USER_ROLES, UserRole } from './models';
 import { LogService } from './log.service';
 import { StorageService } from './storage.service';
-import { isValidEmail, validateEmail, validatePassword } from './validators';
+import { normalizeCedula, validateCedula, validatePassword } from './validators';
 
 const DEFAULT_ADMIN: AppUser = {
     id: 'USR-0001',
     fullName: 'Administrador del Sistema',
-    email: 'admin@registro.com',
+    cedula: 'V-00000000',
     password: 'admin123',
     role: 'Administrador',
     active: true,
@@ -39,12 +39,12 @@ export class AuthService {
         this.bootstrap();
     }
 
-    login(email: string, password: string): AuthResult {
-        const normalizedEmail = email.trim().toLowerCase();
-        const user = this._users().find((item) => item.email.toLowerCase() === normalizedEmail);
+    login(cedula: string, password: string): AuthResult {
+        const normalizedCedula = normalizeCedula(cedula);
+        const user = this._users().find((item) => item.cedula === normalizedCedula);
 
         if (!user || user.password !== password) {
-            return { ok: false, message: 'El correo o la contraseña no son correctos.' };
+            return { ok: false, message: 'La cédula o la contraseña no son correctas.' };
         }
 
         if (!user.active) {
@@ -61,17 +61,17 @@ export class AuthService {
         return { ok: true, message: 'Sesión iniciada correctamente.' };
     }
 
-    register(fullName: string, email: string, password: string): AuthResult {
+    register(fullName: string, cedula: string, password: string): AuthResult {
         const name = fullName.trim();
-        const normalizedEmail = email.trim().toLowerCase();
+        const normalizedCedula = normalizeCedula(cedula);
 
         if (name.length < 3) {
             return { ok: false, message: 'Escribe el nombre completo del usuario.' };
         }
 
-        const emailError = validateEmail(normalizedEmail);
-        if (emailError) {
-            return { ok: false, message: emailError };
+        const cedulaError = validateCedula(cedula);
+        if (cedulaError) {
+            return { ok: false, message: cedulaError };
         }
 
         const passwordError = validatePassword(password);
@@ -79,14 +79,14 @@ export class AuthService {
             return { ok: false, message: passwordError };
         }
 
-        if (this._users().some((user) => user.email.toLowerCase() === normalizedEmail)) {
-            return { ok: false, message: 'Ya existe un usuario registrado con ese correo.' };
+        if (this._users().some((user) => user.cedula === normalizedCedula)) {
+            return { ok: false, message: 'Ya existe un usuario registrado con esa cédula.' };
         }
 
         const newUser: AppUser = {
             id: nextSequentialId('USR', this._users().map((user) => user.id)),
             fullName: name,
-            email: normalizedEmail,
+            cedula: normalizedCedula,
             password,
             role: 'Registrador',
             active: true,
@@ -115,15 +115,15 @@ export class AuthService {
         }
 
         const name = input.fullName.trim();
-        const normalizedEmail = input.email.trim().toLowerCase();
+        const normalizedCedula = normalizeCedula(input.cedula);
 
         if (name.length < 3) {
             return { ok: false, message: 'Escribe el nombre completo del usuario.' };
         }
 
-        const emailError = validateEmail(normalizedEmail);
-        if (emailError) {
-            return { ok: false, message: emailError };
+        const cedulaError = validateCedula(input.cedula);
+        if (cedulaError) {
+            return { ok: false, message: cedulaError };
         }
 
         const passwordError = validatePassword(input.password);
@@ -131,15 +131,15 @@ export class AuthService {
             return { ok: false, message: passwordError };
         }
 
-        if (this._users().some((user) => user.email.toLowerCase() === normalizedEmail)) {
-            return { ok: false, message: 'Ya existe un usuario con ese correo.' };
+        if (this._users().some((user) => user.cedula === normalizedCedula)) {
+            return { ok: false, message: 'Ya existe un usuario con esa cédula.' };
         }
 
         const actor = this.currentUser()?.fullName ?? 'Sistema';
         const newUser: AppUser = {
             id: nextSequentialId('USR', this._users().map((user) => user.id)),
             fullName: name,
-            email: normalizedEmail,
+            cedula: normalizedCedula,
             password: input.password,
             role: input.role,
             active: input.active,
@@ -165,19 +165,19 @@ export class AuthService {
         }
 
         const name = input.fullName.trim();
-        const normalizedEmail = input.email.trim().toLowerCase();
+        const normalizedCedula = normalizeCedula(input.cedula);
 
         if (name.length < 3) {
             return { ok: false, message: 'Escribe el nombre completo del usuario.' };
         }
 
-        const emailError = validateEmail(normalizedEmail);
-        if (emailError) {
-            return { ok: false, message: emailError };
+        const cedulaError = validateCedula(input.cedula);
+        if (cedulaError) {
+            return { ok: false, message: cedulaError };
         }
 
-        if (this._users().some((item) => item.id !== id && item.email.toLowerCase() === normalizedEmail)) {
-            return { ok: false, message: 'Ya existe otro usuario con ese correo.' };
+        if (this._users().some((item) => item.id !== id && item.cedula === normalizedCedula)) {
+            return { ok: false, message: 'Ya existe otro usuario con esa cédula.' };
         }
 
         if (input.password) {
@@ -194,7 +194,7 @@ export class AuthService {
         const updated: AppUser = {
             ...user,
             fullName: name,
-            email: normalizedEmail,
+            cedula: normalizedCedula,
             role: input.role,
             active: input.active,
             password: input.password?.trim() ? input.password : user.password
@@ -286,8 +286,22 @@ export class AuthService {
     readonly roleOptions: { label: string; value: UserRole }[] = USER_ROLES.map((role) => ({ label: role, value: role }));
 
     private bootstrap(): void {
-        const users = this.storage.read<AppUser[]>(STORAGE_KEYS.users, []);
-        const normalizedUsers = users.length ? users : [DEFAULT_ADMIN];
+        const users = this.storage.read<Partial<AppUser>[]>(STORAGE_KEYS.users, []);
+        const normalizedUsers: AppUser[] = users.length
+            ? users.map((user) => ({
+                  id: user.id ?? '',
+                  fullName: user.fullName ?? '',
+                  cedula:
+                      user.cedula?.trim() ||
+                      (user.id === DEFAULT_ADMIN.id && user.role === 'Administrador' ? DEFAULT_ADMIN.cedula : ''),
+                  password: user.password ?? '',
+                  role: user.role ?? 'Registrador',
+                  active: user.active ?? false,
+                  createdAt: user.createdAt ?? new Date().toISOString(),
+                  createdBy: user.createdBy ?? 'Sistema',
+                  ...(user.lastLogin ? { lastLogin: user.lastLogin } : {})
+              }))
+            : [DEFAULT_ADMIN];
 
         this._users.set(normalizedUsers);
         this.persistUsers();
@@ -310,7 +324,4 @@ export class AuthService {
         return this._users().filter((user) => user.role === 'Administrador' && user.active && user.id !== id).length === 0;
     }
 
-    private isValidEmail(email: string): boolean {
-        return isValidEmail(email);
-    }
 }

@@ -1,7 +1,5 @@
 import { DOCUMENT_TYPES } from './models';
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/;
-
 const VENEZUELAN_MOBILE_CODES = ['412', '414', '416', '424', '426'];
 
 const NAME_PATTERN = /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]+$/;
@@ -29,25 +27,6 @@ export function validatePersonName(value: string, fieldName = 'nombre'): string 
 
 export function isValidPersonName(value: string): boolean {
     return validatePersonName(value) === null;
-}
-
-export function isValidEmail(value: string): boolean {
-    const email = value.trim();
-    return email.length > 0 && email.length <= 120 && EMAIL_PATTERN.test(email);
-}
-
-export function validateEmail(value: string): string | null {
-    const email = (value || '').trim();
-    if (!email) {
-        return 'El correo electrónico es obligatorio.';
-    }
-    if (email.length > 120) {
-        return 'El correo no puede tener más de 120 caracteres.';
-    }
-    if (!EMAIL_PATTERN.test(email)) {
-        return 'Ingresa un correo electrónico con formato válido (ej. nombre@mpppst.gob.ve).';
-    }
-    return null;
 }
 
 export function isValidVenezuelanPhone(value: string): boolean {
@@ -182,6 +161,17 @@ export function validateDocument(documentType: string, documentNumber: string): 
 export function isValidDocument(documentType: string, documentNumber: string): boolean {
     return validateDocument(documentType, documentNumber) === null;
 }
+
+export function normalizeCedula(value: string): string {
+    const clean = value.trim().replace(/[\s.]/g, '').toUpperCase();
+    const digits = clean.replace(/^V-?/, '');
+    return `V-${digits}`;
+}
+
+export function validateCedula(value: string): string | null {
+    return validateDocument('Cédula de identidad', value);
+}
+
 export function validatePassword(password: string): string | null {
     if (!password) {
         return 'La contraseña es obligatoria.';

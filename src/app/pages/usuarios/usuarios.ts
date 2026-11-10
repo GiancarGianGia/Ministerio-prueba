@@ -15,7 +15,7 @@ import { TagModule } from 'primeng/tag';
 import { ToastModule } from 'primeng/toast';
 import { AuthService } from '@/app/services/auth.service';
 import { AppUser, NewUserInput, TagSeverity, UpdateUserInput } from '@/app/services/models';
-import { validateEmail, validatePassword, validatePersonName } from '@/app/services/validators';
+import { validateCedula, validatePassword, validatePersonName } from '@/app/services/validators';
 
 @Component({
     selector: 'app-usuarios',
@@ -77,7 +77,7 @@ export class Usuarios {
         this.submitted = false;
         this.userForm = {
             fullName: user.fullName,
-            email: user.email,
+            cedula: user.cedula,
             password: '',
             role: user.role,
             active: user.active
@@ -94,8 +94,8 @@ export class Usuarios {
         return this.submitted ? (validatePersonName(this.userForm.fullName, 'nombre completo') ?? '') : '';
     }
 
-    emailError(): string {
-        return this.submitted ? (validateEmail(this.userForm.email) ?? '') : '';
+    cedulaError(): string {
+        return this.submitted ? (validateCedula(this.userForm.cedula) ?? '') : '';
     }
 
     passwordError(): string {
@@ -112,11 +112,11 @@ export class Usuarios {
         this.submitted = true;
 
         const nameErr = validatePersonName(this.userForm.fullName, 'nombre completo');
-        const emailErr = validateEmail(this.userForm.email);
+        const cedulaErr = validateCedula(this.userForm.cedula);
         const passErr = (!this.editing || this.userForm.password) ? validatePassword(this.userForm.password) : null;
 
-        if (nameErr || emailErr || passErr) {
-            const firstError = nameErr || emailErr || passErr;
+        if (nameErr || cedulaErr || passErr) {
+            const firstError = nameErr || cedulaErr || passErr;
             this.messageService.add({
                 severity: 'error',
                 summary: 'Formulario con errores',
@@ -131,7 +131,7 @@ export class Usuarios {
         if (this.editing && this.editingId) {
             const input: UpdateUserInput = {
                 fullName: this.userForm.fullName,
-                email: this.userForm.email,
+                cedula: this.userForm.cedula,
                 role: this.userForm.role,
                 active: this.userForm.active,
                 password: this.userForm.password
@@ -227,7 +227,7 @@ export class Usuarios {
     private emptyUser(): NewUserInput {
         return {
             fullName: '',
-            email: '',
+            cedula: '',
             password: '',
             role: 'Registrador',
             active: true

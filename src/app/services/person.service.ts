@@ -9,7 +9,7 @@ export class PersonService {
 
     private readonly logService = inject(LogService);
 
-    private readonly _persons = signal<Person[]>(this.storage.read<Person[]>(STORAGE_KEYS.persons, []));
+    private readonly _persons = signal<Person[]>(this.loadPersons());
 
     readonly persons = this._persons.asReadonly();
 
@@ -38,6 +38,8 @@ export class PersonService {
     constructor() {
         if (this._persons().length === 0) {
             this.seedDemoPersons();
+        } else {
+            this.persistPersons();
         }
     }
 
@@ -82,38 +84,63 @@ export class PersonService {
         return updated;
     }
 
-    remove(id: string, actor: string): boolean {
+    inactivate(id: string, reason: string, actor: string): { ok: boolean; message: string } {
+        const normalizedReason = reason.trim();
+        if (!normalizedReason) {
+            return { ok: false, message: 'Escribe el motivo de la inhabilitación.' };
+        }
+        if (normalizedReason.length > 500) {
+            return { ok: false, message: 'El motivo no puede superar los 500 caracteres.' };
+        }
+
         const person = this._persons().find((item) => item.id === id);
         if (!person) {
-            return false;
+            return { ok: false, message: 'El trabajador no existe.' };
         }
 
-        this._persons.update((persons) => persons.filter((item) => item.id !== id));
-        this.persistPersons();
-        this.logService.record('Trabajador eliminado', `${actor} eliminó el registro del trabajador ${person.firstName} ${person.lastName} (${person.id}).`, actor, person.id);
+        if (person.status === 'Inactivo') {
+            return { ok: false, message: 'El trabajador ya está inhabilitado.' };
+        }
 
-        return true;
+        const updated: Person = {
+            ...person,
+            status: 'Inactivo',
+            deactivationReason: normalizedReason,
+            updatedAt: new Date().toISOString()
+        };
+        this._persons.update((persons) => persons.map((item) => (item.id === id ? updated : item)));
+        this.persistPersons();
+        this.logService.record(
+            'Trabajador inhabilitado',
+            `${actor} inhabilitó al trabajador ${person.firstName} ${person.lastName} (${person.id}). Motivo: ${normalizedReason}`,
+            actor,
+            person.id
+        );
+
+        return { ok: true, message: 'Trabajador inhabilitado. El motivo quedó guardado en la bitácora.' };
     }
 
-    removeMany(ids: string[], actor: string): number {
-        if (!ids.length) {
-            return 0;
+    activate(id: string, actor: string): { ok: boolean; message: string } {
+        const person = this._persons().find((item) => item.id === id);
+        if (!person) {
+            return { ok: false, message: 'El trabajador no existe.' };
         }
 
-        const idsSet = new Set(ids);
-        const removed = this._persons().filter((person) => idsSet.has(person.id));
-        this._persons.update((persons) => persons.filter((person) => !idsSet.has(person.id)));
+        if (person.status !== 'Inactivo') {
+            return { ok: false, message: 'El trabajador ya está habilitado.' };
+        }
+
+        const updated: Person = { ...person, status: 'Activo', updatedAt: new Date().toISOString() };
+        this._persons.update((persons) => persons.map((item) => (item.id === id ? updated : item)));
         this.persistPersons();
+        this.logService.record(
+            'Trabajador habilitado',
+            `${actor} habilitó nuevamente al trabajador ${person.firstName} ${person.lastName} (${person.id}).`,
+            actor,
+            person.id
+        );
 
-        if (removed.length) {
-            this.logService.record(
-                'Trabajadores eliminados',
-                `${actor} eliminó ${removed.length} registro(s) de trabajadores: ${removed.map((person) => `${person.firstName} ${person.lastName}`).join(', ')}.`,
-                actor
-            );
-        }
-
-        return removed.length;
+        return { ok: true, message: 'Trabajador habilitado nuevamente.' };
     }
 
     documentExists(documentNumber: string, excludeId?: string): boolean {
@@ -125,6 +152,29 @@ export class PersonService {
         this.storage.write(STORAGE_KEYS.persons, this._persons());
     }
 
+    private loadPersons(): Person[] {
+        return this.storage.read<Partial<Person>[]>(STORAGE_KEYS.persons, []).map((person) => ({
+            id: person.id ?? '',
+            firstName: person.firstName ?? '',
+            lastName: person.lastName ?? '',
+            documentType: person.documentType ?? '',
+            documentNumber: person.documentNumber ?? '',
+            birthDate: person.birthDate ?? '',
+            gender: person.gender ?? '',
+            phone: person.phone ?? '',
+            address: person.address ?? '',
+            city: person.city ?? '',
+            department: person.department ?? '',
+            type: person.type ?? '',
+            status: person.status ?? 'Activo',
+            ...(person.deactivationReason ? { deactivationReason: person.deactivationReason } : {}),
+            notes: person.notes ?? '',
+            createdAt: person.createdAt ?? '',
+            updatedAt: person.updatedAt ?? '',
+            createdBy: person.createdBy ?? ''
+        }));
+    }
+
     private cleanInput(input: NewPersonInput): NewPersonInput {
         return {
             firstName: input.firstName.trim(),
@@ -133,7 +183,6 @@ export class PersonService {
             documentNumber: input.documentNumber.trim(),
             birthDate: input.birthDate,
             gender: input.gender,
-            email: input.email.trim().toLowerCase(),
             phone: input.phone.trim(),
             address: input.address.trim(),
             city: input.city.trim(),
@@ -153,7 +202,6 @@ export class PersonService {
                 documentNumber: 'V-18.745.632',
                 birthDate: '1988-03-14',
                 gender: 'Femenino',
-                email: 'daniela.rondon@mpppst.gob.ve',
                 phone: '+58 412-5550101',
                 address: 'Av. Universidad, Esquina San Francisco, Torre Ministerial',
                 city: 'Caracas',
@@ -169,7 +217,6 @@ export class PersonService {
                 documentNumber: 'V-14.238.907',
                 birthDate: '1982-07-22',
                 gender: 'Masculino',
-                email: 'jose.herrera@mpppst.gob.ve',
                 phone: '+58 414-5550202',
                 address: 'Parroquia Altagracia, Av. Este 2, Sede del MPPPST',
                 city: 'Caracas',
@@ -185,7 +232,6 @@ export class PersonService {
                 documentNumber: 'V-20.516.884',
                 birthDate: '1994-11-05',
                 gender: 'Femenino',
-                email: 'maria.rodriguez@mpppst.gob.ve',
                 phone: '+58 424-5550303',
                 address: 'Parroquia El Recreo, Av. Casanova, Torre del Trabajo',
                 city: 'Caracas',
@@ -201,7 +247,6 @@ export class PersonService {
                 documentNumber: 'V-12.903.457',
                 birthDate: '1975-02-18',
                 gender: 'Masculino',
-                email: 'luis.marcano@mpppst.gob.ve',
                 phone: '+58 416-5550404',
                 address: 'Parroquia La Candelaria, Calle Real de Sabana Grande',
                 city: 'Caracas',
@@ -217,7 +262,6 @@ export class PersonService {
                 documentNumber: 'V-16.432.109',
                 birthDate: '1986-06-30',
                 gender: 'Femenino',
-                email: 'carmen.villarroel@mpppst.gob.ve',
                 phone: '+58 412-5550505',
                 address: 'Parroquia San Pedro, Av. Este 4, Residencias Los Jardines',
                 city: 'Caracas',
@@ -233,7 +277,6 @@ export class PersonService {
                 documentNumber: 'V-9.874.321',
                 birthDate: '1970-09-12',
                 gender: 'Masculino',
-                email: 'rafael.suarez@mpppst.gob.ve',
                 phone: '+58 414-5550606',
                 address: 'Parroquia El Valle, Calle Los Jardines, Casa 12',
                 city: 'Caracas',
@@ -249,7 +292,6 @@ export class PersonService {
                 documentNumber: 'V-22.109.876',
                 birthDate: '1998-04-27',
                 gender: 'Femenino',
-                email: 'ana.betancourt@mpppst.gob.ve',
                 phone: '+58 424-5550707',
                 address: 'Parroquia Catia, Av. Sucre, Edificio Caracas',
                 city: 'Caracas',
@@ -265,7 +307,6 @@ export class PersonService {
                 documentNumber: 'V-11.567.890',
                 birthDate: '1978-12-03',
                 gender: 'Masculino',
-                email: 'pedro.colmenares@mpppst.gob.ve',
                 phone: '+58 416-5550808',
                 address: 'Parroquia La Vega, Carretera Vieja Caracas-Los Teques',
                 city: 'Caracas',

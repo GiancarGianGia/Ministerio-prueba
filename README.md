@@ -7,18 +7,19 @@ Aplicación Angular + PrimeNG para registrar, consultar y administrar a los trab
 - Inicio de sesión y auto-registro de cuentas.
 - Roles `Administrador`, `Registrador` y `Consulta`.
 - Panel con estadísticas de trabajadores, distribución por cargo y actividad reciente.
-- Registro, edición, eliminación, filtros y exportación CSV de trabajadores.
+- Registro, edición, inhabilitación con motivo, filtros y exportación de trabajadores.
 - Fecha y hora de registro visibles en el panel, el listado, el formulario y la bitácora.
 - Administración de usuarios (crear, editar, activar/desactivar y eliminar).
 - Bitácora automática de ingresos, registros y cambios.
 - Persistencia local en el navegador (`localStorage`).
-- Datos de ejemplo: 8 trabajadores del Ministerio del Poder Popular para el Proceso Social de Trabajo en Caracas con cédulas `V-`, correos `@mpppst.gob.ve` y teléfonos `+58`.
+- El acceso de usuarios y la identificación de trabajadores se realizan con cédula.
+- Datos de ejemplo: 8 trabajadores del Ministerio del Poder Popular para el Proceso Social de Trabajo en Caracas con cédulas `V-` y teléfonos `+58`.
 
 ## Acceso de prueba
 
-| Correo | Contraseña | Rol |
+| Cédula | Contraseña | Rol |
 | --- | --- | --- |
-| `admin@registro.com` | `admin123` | Administrador |
+| `V-00000000` | `admin123` | Administrador |
 
 También puedes crear una cuenta desde **Crear una cuenta**. El auto-registro asigna el rol `Registrador` y la cuenta aparece de inmediato en la sección **Usuarios**.
 
@@ -64,4 +65,8 @@ Los artefactos se generan en `dist/sakai-ng/`.
 - `src/app/pages/usuarios`: administración de usuarios (solo administradores).
 - `src/app/pages/actividad`: bitácora del sistema.
 - `src/app/services`: modelos, autenticación, trabajadores, bitácora, almacenamiento y guards.
+<<<<<<< HEAD
 - `src/assets/styles.scss`: diseño global blanco y azul
+=======
+- `src/assets/styles.scss`: diseño global blanco y azul.
+>>>>>>> 9d0a4a1 (Update project)

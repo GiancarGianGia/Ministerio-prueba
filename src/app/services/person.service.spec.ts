@@ -10,7 +10,6 @@ function makePersonInput(overrides: Partial<NewPersonInput> = {}): NewPersonInpu
         documentNumber: 'V-11111111',
         birthDate: '1990-01-01',
         gender: GENDERS[0],
-        email: 'ana@test.com',
         phone: '+58 412 0000000',
         address: 'Calle 1',
         city: 'Caracas',
@@ -50,6 +49,21 @@ describe('PersonService', () => {
         expect(service.persons().length).toBe(before + 1);
     });
 
+    it('migrates stored records and removes unsupported fields', () => {
+        localStorage.setItem(
+            'registro.personas.v2',
+            JSON.stringify([{ ...makePersonInput(), id: 'PER-0001', createdAt: '2026-01-01', updatedAt: '2026-01-01', createdBy: 'Tester', legacyField: 'old value' }])
+        );
+        TestBed.resetTestingModule();
+        TestBed.configureTestingModule({});
+
+        const migratedService = TestBed.inject(PersonService);
+        const savedPersons = JSON.parse(localStorage.getItem('registro.personas.v2') ?? '[]');
+
+        expect(migratedService.persons().length).toBe(1);
+        expect(savedPersons[0].legacyField).toBeUndefined();
+    });
+
     it('documentExists() debe retornar true si el documento ya existe', () => {
         service.add(makePersonInput({ documentNumber: 'V-99999003' }), 'Tester');
         expect(service.documentExists('V-99999003')).toBeTrue();
@@ -75,23 +89,42 @@ describe('PersonService', () => {
         expect(result).toBeNull();
     });
 
-    it('remove() debe eliminar una persona existente y retornar true', () => {
+    it('inactivate() debe conservar al trabajador y guardar el motivo', () => {
         const created = service.add(makePersonInput({ documentNumber: 'V-99999006' }), 'Tester');
-        const result = service.remove(created.id, 'Tester');
-        expect(result).toBeTrue();
-        expect(service.documentExists('V-99999006')).toBeFalse();
+        const result = service.inactivate(created.id, 'Fin de la relación laboral', 'Tester');
+
+        expect(result.ok).toBeTrue();
+        expect(service.persons().find((person) => person.id === created.id)?.status).toBe('Inactivo');
+        expect(service.persons().find((person) => person.id === created.id)?.deactivationReason).toBe('Fin de la relación laboral');
+        expect(service.documentExists('V-99999006')).toBeTrue();
+        const savedPersons = JSON.parse(localStorage.getItem('registro.personas.v2') ?? '[]');
+        expect(savedPersons.find((person: { id: string }) => person.id === created.id).deactivationReason).toBe('Fin de la relación laboral');
     });
 
-    it('remove() debe retornar false si el ID no existe', () => {
-        const result = service.remove('PER-INEXISTENTE', 'Tester');
-        expect(result).toBeFalse();
+    it('inactivate() debe exigir un motivo', () => {
+        const created = service.add(makePersonInput({ documentNumber: 'V-99999007' }), 'Tester');
+        const result = service.inactivate(created.id, '  ', 'Tester');
+
+        expect(result.ok).toBeFalse();
+        expect(service.persons().find((person) => person.id === created.id)?.status).toBe('Activo');
     });
 
-    it('removeMany() debe eliminar múltiples personas y retornar el conteo', () => {
-        const p1 = service.add(makePersonInput({ documentNumber: 'V-99999007' }), 'Tester');
-        const p2 = service.add(makePersonInput({ documentNumber: 'V-99999008' }), 'Tester');
-        const count = service.removeMany([p1.id, p2.id], 'Tester');
-        expect(count).toBe(2);
+    it('inactivate() debe rechazar motivos de más de 500 caracteres', () => {
+        const created = service.add(makePersonInput({ documentNumber: 'V-99999010' }), 'Tester');
+        const result = service.inactivate(created.id, 'x'.repeat(501), 'Tester');
+
+        expect(result.ok).toBeFalse();
+        expect(service.persons().find((person) => person.id === created.id)?.status).toBe('Activo');
+    });
+
+    it('activate() debe volver a habilitar un trabajador inactivo', () => {
+        const created = service.add(makePersonInput({ documentNumber: 'V-99999008' }), 'Tester');
+        service.inactivate(created.id, 'Motivo de prueba', 'Tester');
+
+        const result = service.activate(created.id, 'Tester');
+
+        expect(result.ok).toBeTrue();
+        expect(service.persons().find((person) => person.id === created.id)?.status).toBe('Activo');
     });
 
     it('stats() debe reflejar la cantidad de personas activas', () => {
