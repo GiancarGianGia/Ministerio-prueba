@@ -24,8 +24,6 @@ import { AuthService } from '@/app/services/auth.service';
         </div>
 
         <div class="layout-topbar-actions">
-            <p-button label="Nuevo trabajador" icon="pi pi-plus" size="small" routerLink="/registro" styleClass="topbar-new-button" />
-
             @if (auth.currentUser(); as user) {
                 <div class="topbar-user">
                     <span class="person-avatar">{{ initials(user.fullName) }}</span>

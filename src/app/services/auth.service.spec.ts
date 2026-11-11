@@ -99,4 +99,21 @@ describe('AuthService', () => {
         expect(service.roleOptions.length).toBe(1);
         expect(service.roleOptions.map(r => r.value)).toContain('Administrador');
     });
+
+    it('resetPassword() debe actualizar la contraseña de un usuario existente', () => {
+        const res = service.resetPassword('V-00000000', 'nuevaClave123');
+        expect(res.ok).toBeTrue();
+        const loginRes = service.login('V-00000000', 'nuevaClave123');
+        expect(loginRes.ok).toBeTrue();
+    });
+
+    it('resetPassword() debe fallar si la cédula no existe', () => {
+        const res = service.resetPassword('V-99999999', 'nuevaClave123');
+        expect(res.ok).toBeFalse();
+    });
+
+    it('resetPassword() debe fallar con una contraseña inválida', () => {
+        const res = service.resetPassword('V-00000000', '123');
+        expect(res.ok).toBeFalse();
+    });
 });

@@ -171,7 +171,11 @@ export class PersonService {
             notes: person.notes ?? '',
             createdAt: person.createdAt ?? '',
             updatedAt: person.updatedAt ?? '',
-            createdBy: person.createdBy ?? ''
+            createdBy: person.createdBy ?? '',
+            ...(person.familyData ? { familyData: person.familyData } : {}),
+            ...(person.vacationData ? { vacationData: person.vacationData } : {}),
+            ...(person.medicalData ? { medicalData: person.medicalData } : {}),
+            ...(person.housingData ? { housingData: person.housingData } : {})
         }));
     }
 
@@ -189,7 +193,11 @@ export class PersonService {
             department: input.department,
             type: input.type,
             status: input.status,
-            notes: input.notes.trim()
+            notes: input.notes.trim(),
+            ...(input.familyData ? { familyData: input.familyData } : {}),
+            ...(input.vacationData ? { vacationData: input.vacationData } : {}),
+            ...(input.medicalData ? { medicalData: input.medicalData } : {}),
+            ...(input.housingData ? { housingData: input.housingData } : {})
         };
     }
 

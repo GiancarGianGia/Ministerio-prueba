@@ -66,6 +66,21 @@ export const appConfig: ApplicationConfig = {
                     darkModeSelector: '.app-dark'
                 }
             },
+            overlayAppendTo: 'body',
+            overlayOptions: {
+                listener: (_event: unknown, options?: { type?: string }) => {
+                    if (options?.type === 'scroll') {
+                        return false;
+                    }
+                    return true;
+                }
+            },
+            zIndex: {
+                modal: 1100,
+                overlay: 1200,
+                menu: 1200,
+                tooltip: 1300
+            },
             ripple: true
         })
     ]

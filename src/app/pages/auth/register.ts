@@ -26,7 +26,7 @@ import { validateCedula, validatePassword, validatePasswordConfirmation, validat
 
                     <div class="auth-brand-body">
                         <span class="auth-kicker">Nueva cuenta</span>
-                        <h1>Crea tu usuario y empieza a registrar trabajadores.</h1>
+                        <h1>Crea tu usuario administrador y gestiona a los trabajadores.</h1>
                         <p>Las cuentas creadas desde aquí se agregan automáticamente al sistema con el rol de administrador.</p>
 
                         <div class="auth-steps">
@@ -40,7 +40,7 @@ import { validateCedula, validatePassword, validatePasswordConfirmation, validat
                             </div>
                             <div class="auth-step">
                                 <span>3</span>
-                                <div><strong>Registra trabajadores</strong><small>La creación de tu usuario quedará en la bitácora.</small></div>
+                                <div><strong>Gestiona trabajadores</strong><small>Podrás consultar, actualizar información e inhabilitar.</small></div>
                             </div>
                         </div>
                     </div>

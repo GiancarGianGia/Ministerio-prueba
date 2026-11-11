@@ -37,9 +37,8 @@ export class AppMenu {
                 items: [{ label: 'Panel principal', icon: 'pi pi-fw pi-home', routerLink: ['/'] }]
             },
             {
-                label: 'Registro de trabajadores',
+                label: 'Trabajadores',
                 items: [
-                    { label: 'Nuevo trabajador', icon: 'pi pi-fw pi-user-plus', routerLink: ['/registro'] },
                     { label: 'Trabajadores registrados', icon: 'pi pi-fw pi-users', routerLink: ['/personas'] }
                 ]
             },
