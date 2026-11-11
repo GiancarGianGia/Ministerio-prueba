@@ -27,7 +27,7 @@ import { validateCedula, validatePassword, validatePasswordConfirmation, validat
                     <div class="auth-brand-body">
                         <span class="auth-kicker">Nueva cuenta</span>
                         <h1>Crea tu usuario y empieza a registrar trabajadores.</h1>
-                        <p>Las cuentas creadas desde aquí se agregan automáticamente al sistema con el rol de registrador.</p>
+                        <p>Las cuentas creadas desde aquí se agregan automáticamente al sistema con el rol de administrador.</p>
 
                         <div class="auth-steps">
                             <div class="auth-step">
@@ -129,7 +129,7 @@ import { validateCedula, validatePassword, validatePasswordConfirmation, validat
 
                         <div class="auth-note">
                             <i class="pi pi-info-circle"></i>
-                            <span>El auto-registro asigna el rol <strong>Registrador</strong>. Un administrador puede cambiarlo desde la sección Usuarios.</span>
+                            <span>El auto-registro asigna el rol <strong>Administrador</strong> por defecto con acceso completo para gestionar trabajadores y usuarios.</span>
                         </div>
 
                         <p class="auth-switch">¿Ya tienes cuenta? <a routerLink="/auth/login" (click)="goToLogin($event)">Iniciar sesión</a></p>

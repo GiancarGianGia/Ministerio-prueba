@@ -29,7 +29,7 @@ import { AuthService } from '@/app/services/auth.service';
 
                         <ul class="auth-benefits">
                             <li><i class="pi pi-check-circle"></i><span>Registro completo de trabajadores y sus datos de contacto.</span></li>
-                            <li><i class="pi pi-check-circle"></i><span>Usuarios con roles de administrador, registrador y consulta.</span></li>
+                            <li><i class="pi pi-check-circle"></i><span>Usuarios con rol de administrador para la gestión y modificación de trabajadores.</span></li>
                             <li><i class="pi pi-check-circle"></i><span>Bitácora automática con fecha y hora de cada acción realizada.</span></li>
                         </ul>
                     </div>

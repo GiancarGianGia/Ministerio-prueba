@@ -88,7 +88,7 @@ export class AuthService {
             fullName: name,
             cedula: normalizedCedula,
             password,
-            role: 'Registrador',
+            role: 'Administrador',
             active: true,
             createdAt: new Date().toISOString(),
             createdBy: 'Auto-registro',
@@ -141,7 +141,7 @@ export class AuthService {
             fullName: name,
             cedula: normalizedCedula,
             password: input.password,
-            role: input.role,
+            role: 'Administrador',
             active: input.active,
             createdAt: new Date().toISOString(),
             createdBy: actor
@@ -195,7 +195,7 @@ export class AuthService {
             ...user,
             fullName: name,
             cedula: normalizedCedula,
-            role: input.role,
+            role: 'Administrador',
             active: input.active,
             password: input.password?.trim() ? input.password : user.password
         };
@@ -295,7 +295,7 @@ export class AuthService {
                       user.cedula?.trim() ||
                       (user.id === DEFAULT_ADMIN.id && user.role === 'Administrador' ? DEFAULT_ADMIN.cedula : ''),
                   password: user.password ?? '',
-                  role: user.role ?? 'Registrador',
+                  role: 'Administrador' as UserRole,
                   active: user.active ?? false,
                   createdAt: user.createdAt ?? new Date().toISOString(),
                   createdBy: user.createdBy ?? 'Sistema',
