@@ -9,7 +9,6 @@ import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { DialogModule } from 'primeng/dialog';
 import { InputTextModule } from 'primeng/inputtext';
 import { PasswordModule } from 'primeng/password';
-import { SelectModule } from 'primeng/select';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { ToastModule } from 'primeng/toast';
@@ -30,7 +29,6 @@ import { validateCedula, validatePassword, validatePersonName } from '@/app/serv
         DialogModule,
         InputTextModule,
         PasswordModule,
-        SelectModule,
         TableModule,
         TagModule,
         ToastModule
@@ -50,8 +48,6 @@ export class Usuarios {
     readonly activeUsers = this.auth.activeUsers;
 
     readonly adminUsers = this.auth.adminUsers;
-
-    readonly roleOptions = this.auth.roleOptions;
 
     userDialog = false;
 
@@ -79,7 +75,7 @@ export class Usuarios {
             fullName: user.fullName,
             cedula: user.cedula,
             password: '',
-            role: user.role,
+            role: 'Administrador',
             active: user.active
         };
         this.userDialog = true;
@@ -132,12 +128,13 @@ export class Usuarios {
             const input: UpdateUserInput = {
                 fullName: this.userForm.fullName,
                 cedula: this.userForm.cedula,
-                role: this.userForm.role,
+                role: 'Administrador',
                 active: this.userForm.active,
                 password: this.userForm.password
             };
             result = this.auth.updateUser(this.editingId, input);
         } else {
+            this.userForm.role = 'Administrador';
             result = this.auth.createUser(this.userForm);
         }
 
@@ -229,7 +226,7 @@ export class Usuarios {
             fullName: '',
             cedula: '',
             password: '',
-            role: 'Registrador',
+            role: 'Administrador',
             active: true
         };
     }

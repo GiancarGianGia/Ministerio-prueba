@@ -74,7 +74,7 @@ export const STORAGE_KEYS = {
     logs: 'registro.actividad.v2'
 } as const;
 
-export const USER_ROLES: UserRole[] = ['Administrador', 'Registrador', 'Consulta'];
+export const USER_ROLES: UserRole[] = ['Administrador'];
 
 export const DOCUMENT_TYPES = ['Cédula de identidad', 'Pasaporte', 'Cédula de extranjería', 'RIF'];
 

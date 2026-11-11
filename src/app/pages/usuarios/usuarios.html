@@ -5,7 +5,7 @@
             <div>
                 <span class="page-eyebrow">Administración</span>
                 <h1>Usuarios del sistema</h1>
-                <p>Crea usuarios, asigna roles y controla quién puede acceder al sistema.</p>
+                <p>Crea administradores y controla quién puede acceder al sistema.</p>
             </div>
             <div class="page-actions">
                 <p-button label="Nuevo usuario" icon="pi pi-user-plus" (onClick)="openNew()" />
@@ -41,7 +41,7 @@
                     <div class="table-caption">
                         <div>
                             <h2>Cuentas registradas</h2>
-                            <p>Roles disponibles: Administrador, Registrador y Consulta.</p>
+                            <p>Todas las cuentas cuentan con rol de Administrador.</p>
                         </div>
                         <span class="badge-soft">{{ users().length }} usuarios</span>
                     </div>
@@ -139,12 +139,7 @@
                     }
                 </div>
 
-                <div class="form-field">
-                    <label for="userRole">Rol *</label>
-                    <p-select id="userRole" [options]="roleOptions" optionLabel="label" optionValue="value" [(ngModel)]="userForm.role" styleClass="w-full" />
-                </div>
-
-                <div class="form-field">
+                <div class="form-field form-field-full">
                     <label>Estado de la cuenta</label>
                     <div class="checkbox-field">
                         <p-checkbox [(ngModel)]="userForm.active" [binary]="true" inputId="userActive" />

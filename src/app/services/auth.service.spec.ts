@@ -43,6 +43,7 @@ describe('AuthService', () => {
         const result = service.register('Pedro López', '18745678', 'clave123');
         expect(result.ok).toBeTrue();
         expect(service.currentUser()?.cedula).toBe('V-18745678');
+        expect(service.currentUser()?.role).toBe('Administrador');
     });
 
     it('register() debe fallar si la cédula ya está registrada', () => {
@@ -94,8 +95,8 @@ describe('AuthService', () => {
         expect(savedUsers[1].legacyField).toBeUndefined();
     });
 
-    it('roleOptions debe ser una propiedad con los 3 roles disponibles', () => {
-        expect(service.roleOptions.length).toBe(3);
+    it('roleOptions debe incluir el rol Administrador', () => {
+        expect(service.roleOptions.length).toBe(1);
         expect(service.roleOptions.map(r => r.value)).toContain('Administrador');
     });
 });
