@@ -109,6 +109,36 @@ export class AuthService {
         return { ok: true, message: 'Cuenta creada. Ya puedes usar el sistema.' };
     }
 
+    resetPassword(cedula: string, newPassword: string): AuthResult {
+        const normalizedCedula = normalizeCedula(cedula);
+        const user = this._users().find((item) => item.cedula === normalizedCedula);
+
+        if (!user) {
+            return { ok: false, message: 'No se encontró ningún usuario con esa cédula.' };
+        }
+
+        if (!user.active) {
+            return { ok: false, message: 'Este usuario está inactivo. Contacta a un administrador.' };
+        }
+
+        const passwordError = validatePassword(newPassword);
+        if (passwordError) {
+            return { ok: false, message: passwordError };
+        }
+
+        const updated: AppUser = { ...user, password: newPassword };
+        this._users.update((users) => users.map((item) => (item.id === updated.id ? updated : item)));
+        this.persistUsers();
+        this.logService.record(
+            'Contraseña restablecida',
+            `${updated.fullName} restableció su contraseña de acceso.`,
+            updated.fullName,
+            updated.id
+        );
+
+        return { ok: true, message: 'Contraseña restablecida correctamente. Ya puedes iniciar sesión.' };
+    }
+
     createUser(input: NewUserInput): AuthResult {
         if (!this.isAdmin()) {
             return { ok: false, message: 'Solo un administrador puede crear usuarios.' };

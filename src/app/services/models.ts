@@ -30,6 +30,56 @@ export interface UpdateUserInput {
     password?: string;
 }
 
+export interface ChildData {
+    name: string;
+    birthDate: string;
+    documentNumber?: string;
+}
+
+export interface FamilyData {
+    maritalStatus: string;
+    spouseName?: string;
+    spouseDocumentNumber?: string;
+    spousePhone?: string;
+    numberOfChildren: number;
+    children?: ChildData[];
+}
+
+export interface VacationData {
+    status: string;
+    lastVacationStart?: string;
+    lastVacationEnd?: string;
+    pendingDays?: number;
+    observations?: string;
+}
+
+export interface MedicalData {
+    emergencyContactName?: string;
+    emergencyContactPhone?: string;
+    emergencyContactRelationship?: string;
+    bloodType?: string;
+    allergies?: string;
+    hasDisability: boolean;
+    disabilityDescription?: string;
+    hasPathology: boolean;
+    pathologyDescription?: string;
+    pathologyMedication?: string;
+    observations?: string;
+}
+
+export interface HousingData {
+    housingType?: string;
+    housingCondition?: string;
+    sector?: string;
+    municipality?: string;
+    zipCode?: string;
+    yearsAtAddress?: number;
+    numberOfRooms?: number;
+    numberOfPeopleInHouse?: number;
+    hasBasicServices: boolean;
+    observations?: string;
+}
+
 export interface Person {
     id: string;
     firstName: string;
@@ -49,6 +99,10 @@ export interface Person {
     createdAt: string;
     updatedAt: string;
     createdBy: string;
+    familyData?: FamilyData;
+    vacationData?: VacationData;
+    medicalData?: MedicalData;
+    housingData?: HousingData;
 }
 
 export type NewPersonInput = Omit<Person, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'deactivationReason'>;
@@ -153,6 +207,53 @@ export const DEPARTMENTS = [
     'Yaracuy',
     'Zulia'
 ];
+
+export const CITIES_BY_DEPARTMENT: Record<string, readonly string[]> = {
+    Amazonas: ['Puerto Ayacucho', 'Maroa', 'San Fernando de Atabapo', 'La Esmeralda'],
+    Anzoátegui: ['Barcelona', 'Puerto La Cruz', 'Lechería', 'Guanta', 'El Tigre', 'Anaco', 'Cantaura', 'Pariaguán'],
+    Apure: ['San Fernando de Apure', 'Guasdualito', 'Biruaca', 'Achaguas', 'Elorza'],
+    Aragua: ['Maracay', 'Turmero', 'Cagua', 'La Victoria', 'Palo Negro', 'El Limón', 'Villa de Cura'],
+    Barinas: ['Barinas', 'Barinitas', 'Socopó', 'Sabaneta', 'Santa Bárbara'],
+    Bolívar: ['Ciudad Bolívar', 'Ciudad Guayana', 'Puerto Ordaz', 'Upata', 'Caicara del Orinoco', 'Tumeremo'],
+    Carabobo: ['Valencia', 'Puerto Cabello', 'Guacara', 'Mariara', 'Tocuyito', 'Naguanagua', 'San Diego'],
+    Cojedes: ['San Carlos', 'Tinaquillo', 'El Baúl', 'Tinaco', 'El Pao'],
+    'Delta Amacuro': ['Tucupita', 'Pedernales', 'Curiapo', 'Sierra Imataca'],
+    'Distrito Capital': ['Caracas'],
+    Falcón: ['Coro', 'Punto Fijo', 'Pueblo Nuevo', 'La Vela de Coro', 'Churuguara', 'Dabajuro'],
+    Guárico: ['San Juan de los Morros', 'Calabozo', 'Valle de la Pascua', 'Zaraza', 'Altagracia de Orituco', 'Tucupido'],
+    'La Guaira': ['La Guaira', 'Catia La Mar', 'Maiquetía', 'Caraballeda', 'Macuto', 'Naiguatá'],
+    Lara: ['Barquisimeto', 'Cabudare', 'Carora', 'El Tocuyo', 'Quíbor', 'Duaca'],
+    Mérida: ['Mérida', 'El Vigía', 'Ejido', 'Tovar', 'Nueva Bolivia', 'Lagunillas'],
+    Miranda: ['Los Teques', 'Guarenas', 'Guatire', 'Petare', 'Cúa', 'Charallave', 'Santa Teresa del Tuy', 'Higuerote'],
+    Monagas: ['Maturín', 'Punta de Mata', 'Caripito', 'Temblador', 'Caripe', 'Barrancas del Orinoco'],
+    'Nueva Esparta': ['La Asunción', 'Porlamar', 'Pampatar', 'Juan Griego', 'El Valle del Espíritu Santo'],
+    Portuguesa: ['Guanare', 'Acarigua', 'Araure', 'Turén', 'Biscucuy', 'Ospino'],
+    Sucre: ['Cumaná', 'Carúpano', 'Güiria', 'Cumanacoa', 'Cariaco', 'Río Caribe'],
+    Táchira: ['San Cristóbal', 'San Antonio del Táchira', 'Táriba', 'Rubio', 'La Fría', 'La Grita', 'San Juan de Colón'],
+    Trujillo: ['Trujillo', 'Valera', 'Boconó', 'Carache', 'Sabana de Mendoza', 'La Puerta'],
+    Yaracuy: ['San Felipe', 'Yaritagua', 'Chivacoa', 'Nirgua', 'Cocorote', 'Urachiche'],
+    Zulia: ['Maracaibo', 'Cabimas', 'Ciudad Ojeda', 'Santa Rita', 'Machiques', 'Villa del Rosario', 'La Concepción']
+};
+
+export const MARITAL_STATUSES = [
+    'Soltero/a',
+    'Casado/a',
+    'Unión estable de hecho / Concubinato',
+    'Divorciado/a',
+    'Viudo/a',
+    'Separado/a de hecho',
+    'Separado/a legalmente',
+    'Comprometido/a',
+    'Otro'
+];
+
+export const VACATION_STATUSES = ['No ha tomado vacaciones', 'Vacaciones tomadas', 'Solicitadas pendientes', 'Vacaciones parciales'];
+
+export const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+
+export const HOUSING_TYPES = ['Casa', 'Apartamento', 'Habitación', 'Rancho', 'Otro'];
+
+export const HOUSING_CONDITIONS = ['Propia', 'Alquilada', 'Familiar', 'Prestada', 'Otra'];
 
 export function createEntityId(prefix: string): string {
     const random = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID().slice(0, 8) : Math.random().toString(36).slice(2, 10);

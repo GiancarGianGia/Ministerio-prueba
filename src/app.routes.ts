@@ -16,7 +16,7 @@ export const appRoutes: Routes = [
         children: [
             { path: '', component: Dashboard },
             { path: 'personas', component: Personas },
-            { path: 'registro', component: RegistroPersona },
+            { path: 'registro', redirectTo: 'personas', pathMatch: 'full' },
             { path: 'usuarios', component: Usuarios, canActivate: [adminGuard] },
             { path: 'actividad', component: Actividad }
         ]

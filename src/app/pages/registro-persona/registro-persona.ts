@@ -10,6 +10,7 @@ import { TextareaModule } from 'primeng/textarea';
 import { ToastModule } from 'primeng/toast';
 import { AuthService } from '@/app/services/auth.service';
 import {
+    CITIES_BY_DEPARTMENT,
     DEPARTMENTS,
     DOCUMENT_TYPES,
     GENDERS,
@@ -39,6 +40,8 @@ export class RegistroPersona {
 
     person: NewPersonInput = this.emptyPerson();
 
+    citySelection = '';
+
     submitted = false;
 
     savedPerson = signal<Person | null>(null);
@@ -52,6 +55,13 @@ export class RegistroPersona {
     readonly genderOptions = GENDERS.map((value) => ({ label: value, value }));
 
     readonly departmentOptions = DEPARTMENTS.map((value) => ({ label: value, value }));
+
+    get cityOptions(): { label: string; value: string }[] {
+        return [
+            ...(CITIES_BY_DEPARTMENT[this.person.department] ?? []).map((value) => ({ label: value, value })),
+            { label: 'Otro', value: 'Otro' }
+        ];
+    }
 
     readonly typeOptions = PERSON_TYPES.map((value) => ({ label: value, value }));
 
@@ -150,12 +160,23 @@ export class RegistroPersona {
 
     resetForm(): void {
         this.person = this.emptyPerson();
+        this.citySelection = '';
         this.submitted = false;
     }
 
     registerAnother(): void {
         this.savedPerson.set(null);
         this.resetForm();
+    }
+
+    onDepartmentChange(): void {
+        this.person.city = '';
+        this.citySelection = '';
+    }
+
+    onCitySelectionChange(value: string): void {
+        this.citySelection = value;
+        this.person.city = value === 'Otro' ? '' : value;
     }
 
     initials(firstName: string, lastName: string): string {

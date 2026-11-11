@@ -4,27 +4,41 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
+import { CheckboxModule } from 'primeng/checkbox';
 import { DialogModule } from 'primeng/dialog';
 import { IconFieldModule } from 'primeng/iconfield';
 import { InputIconModule } from 'primeng/inputicon';
+import { InputNumberModule } from 'primeng/inputnumber';
 import { InputTextModule } from 'primeng/inputtext';
 import { RippleModule } from 'primeng/ripple';
 import { SelectModule } from 'primeng/select';
 import { TableModule } from 'primeng/table';
+import { TabsModule } from 'primeng/tabs';
 import { TagModule } from 'primeng/tag';
 import { TextareaModule } from 'primeng/textarea';
 import { ToastModule } from 'primeng/toast';
 import { strToU8, zipSync } from 'fflate';
 import { AuthService } from '@/app/services/auth.service';
 import {
+    BLOOD_TYPES,
+    CITIES_BY_DEPARTMENT,
+    ChildData,
     DEPARTMENTS,
     DOCUMENT_TYPES,
+    FamilyData,
     GENDERS,
+    HousingData,
+    HOUSING_CONDITIONS,
+    HOUSING_TYPES,
+    MARITAL_STATUSES,
+    MedicalData,
     NewPersonInput,
     Person,
     PERSON_STATUSES,
     PERSON_TYPES,
-    TagSeverity
+    TagSeverity,
+    VACATION_STATUSES,
+    VacationData
 } from '@/app/services/models';
 import { PersonService } from '@/app/services/person.service';
 import { validateBirthDate, validateDocument, validatePersonName, validatePhone } from '@/app/services/validators';
@@ -41,12 +55,15 @@ import { validateBirthDate, validateDocument, validatePersonName, validatePhone 
         RippleModule,
         ToastModule,
         InputTextModule,
+        InputNumberModule,
         TextareaModule,
         SelectModule,
         DialogModule,
         TagModule,
         InputIconModule,
-        IconFieldModule
+        IconFieldModule,
+        TabsModule,
+        CheckboxModule
     ],
     providers: [MessageService],
     templateUrl: './personas.html'
@@ -101,9 +118,30 @@ export class Personas {
 
     readonly departmentOptions = DEPARTMENTS.map((value) => ({ label: value, value }));
 
+    get cityOptions(): { label: string; value: string }[] {
+        return [
+            ...(CITIES_BY_DEPARTMENT[this.person.department] ?? []).map((value) => ({ label: value, value })),
+            { label: 'Otro', value: 'Otro' }
+        ];
+    }
+
+    readonly maritalStatusOptions = MARITAL_STATUSES.map((value) => ({ label: value, value }));
+
+    readonly vacationStatusOptions = VACATION_STATUSES.map((value) => ({ label: value, value }));
+
+    readonly bloodTypeOptions = BLOOD_TYPES.map((value) => ({ label: value, value }));
+
+    readonly housingTypeOptions = HOUSING_TYPES.map((value) => ({ label: value, value }));
+
+    readonly housingConditionOptions = HOUSING_CONDITIONS.map((value) => ({ label: value, value }));
+
+    activeEditTab = '0';
+
     personDialog = false;
 
     person: Person = this.emptyPerson();
+
+    citySelection = '';
 
     submitted = false;
 
@@ -128,14 +166,36 @@ export class Personas {
     }
 
     editPerson(person: Person): void {
-        this.person = { ...person };
+        this.person = {
+            ...person,
+            familyData: person.familyData ? { ...person.familyData, children: person.familyData.children ? [...person.familyData.children.map(c => ({ ...c }))] : [] } : this.emptyFamilyData(),
+            vacationData: person.vacationData ? { ...person.vacationData } : this.emptyVacationData(),
+            medicalData: person.medicalData ? { ...person.medicalData } : this.emptyMedicalData(),
+            housingData: person.housingData ? { ...person.housingData } : this.emptyHousingData()
+        };
+        this.citySelection = (CITIES_BY_DEPARTMENT[this.person.department] ?? []).includes(this.person.city)
+            ? this.person.city
+            : this.person.city
+              ? 'Otro'
+              : '';
         this.submitted = false;
+        this.activeEditTab = '0';
         this.personDialog = true;
     }
 
     hideDialog(): void {
         this.personDialog = false;
         this.submitted = false;
+    }
+
+    onDepartmentChange(): void {
+        this.person.city = '';
+        this.citySelection = '';
+    }
+
+    onCitySelectionChange(value: string): void {
+        this.citySelection = value;
+        this.person.city = value === 'Otro' ? '' : value;
     }
 
     openStatusDialog(person: Person): void {
@@ -180,6 +240,22 @@ export class Personas {
         }
     }
 
+    private emptyFamilyData(): FamilyData {
+        return { maritalStatus: MARITAL_STATUSES[0], numberOfChildren: 0, children: [] };
+    }
+
+    private emptyVacationData(): VacationData {
+        return { status: VACATION_STATUSES[0] };
+    }
+
+    private emptyMedicalData(): MedicalData {
+        return { hasDisability: false, hasPathology: false };
+    }
+
+    private emptyHousingData(): HousingData {
+        return { hasBasicServices: false };
+    }
+
     private emptyPerson(): Person {
         return {
             id: '',
@@ -198,8 +274,51 @@ export class Personas {
             notes: '',
             createdAt: '',
             updatedAt: '',
-            createdBy: ''
+            createdBy: '',
+            familyData: this.emptyFamilyData(),
+            vacationData: this.emptyVacationData(),
+            medicalData: this.emptyMedicalData(),
+            housingData: this.emptyHousingData()
         };
+    }
+
+    addChild(): void {
+        if (!this.person.familyData) {
+            this.person.familyData = this.emptyFamilyData();
+        }
+        if (!this.person.familyData.children) {
+            this.person.familyData.children = [];
+        }
+        this.person.familyData.children.push({ name: '', birthDate: '', documentNumber: '' });
+        if (this.person.familyData.children.length > (this.person.familyData.numberOfChildren || 0)) {
+            this.person.familyData.numberOfChildren = this.person.familyData.children.length;
+        }
+    }
+
+    removeChild(index: number): void {
+        this.person.familyData?.children?.splice(index, 1);
+        if (this.person.familyData && (this.person.familyData.children?.length ?? 0) < this.person.familyData.numberOfChildren) {
+            this.person.familyData.numberOfChildren = this.person.familyData.children?.length ?? 0;
+        }
+    }
+
+    trackByIndex(index: number): number {
+        return index;
+    }
+
+    hasSpouseFields(): boolean {
+        const status = this.person.familyData?.maritalStatus;
+        const hasExistingSpouse = !!this.person.familyData?.spouseName?.trim();
+        const partnerStatuses = [
+            'Casado/a',
+            'Unión estable',
+            'Unión estable de hecho / Concubinato',
+            'Separado/a',
+            'Separado/a de hecho',
+            'Separado/a legalmente',
+            'Comprometido/a'
+        ];
+        return hasExistingSpouse || (!!status && partnerStatuses.includes(status));
     }
 
     firstNameError(): string {
@@ -326,7 +445,11 @@ export class Personas {
             department: this.person.department,
             type: this.person.type,
             status: this.person.status,
-            notes: this.person.notes
+            notes: this.person.notes,
+            familyData: this.person.familyData,
+            vacationData: this.person.vacationData,
+            medicalData: this.person.medicalData,
+            housingData: this.person.housingData
         };
 
         const updated = this.personService.update(this.person.id, input, this.actor);

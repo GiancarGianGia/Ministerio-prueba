@@ -114,10 +114,6 @@
 
                         <div class="form-grid">
                             <div class="form-field">
-                                <label for="city">Ciudad</label>
-                                <input pInputText id="city" name="city" [(ngModel)]="person.city" placeholder="Ej. Caracas" />
-                            </div>
-                            <div class="form-field">
                                 <label for="department">Estado</label>
                                 <p-select
                                     id="department"
@@ -127,9 +123,32 @@
                                     optionValue="value"
                                     placeholder="Seleccione el estado"
                                     [(ngModel)]="person.department"
+                                    (ngModelChange)="onDepartmentChange()"
                                     styleClass="w-full"
                                 />
                             </div>
+                            <div class="form-field">
+                                <label for="city">Ciudad</label>
+                                <p-select
+                                    id="city"
+                                    name="citySelection"
+                                    [options]="cityOptions"
+                                    optionLabel="label"
+                                    optionValue="value"
+                                    placeholder="Seleccione primero el estado"
+                                    [disabled]="!person.department"
+                                    [(ngModel)]="citySelection"
+                                    (ngModelChange)="onCitySelectionChange($event)"
+                                    styleClass="w-full"
+                                />
+                                <small>Si no encuentra la ciudad, seleccione «Otro» para escribirla.</small>
+                            </div>
+                            @if (citySelection === 'Otro') {
+                                <div class="form-field">
+                                    <label for="otherCity">Escriba la ciudad</label>
+                                    <input pInputText id="otherCity" name="otherCity" [(ngModel)]="person.city" placeholder="Ingrese el nombre de la ciudad" />
+                                </div>
+                            }
                         </div>
                     </div>
 
