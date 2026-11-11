@@ -1,68 +1,94 @@
-# MPPPST · Sistema de Registro de Trabajadores
+# MPPPST · Gestión de Trabajadores
 
-Aplicación Angular + PrimeNG para registrar, consultar y administrar a los trabajadores del Ministerio del Poder Popular para el Proceso Social de Trabajo en Caracas, Venezuela. Incluye control de usuarios por roles, bitácora de actividad y un diseño con paleta blanca y azul.
+Aplicación web desarrollada con Angular 21 y PrimeNG para registrar, consultar y administrar a los trabajadores del Ministerio del Poder Popular para el Proceso Social de Trabajo en Caracas, Venezuela. La app permite llevar el control del Talento Humano, la actividad del sistema y la administración de usuarios desde un único panel.
 
-## Funcionalidades
+## ¿Qué incluye el proyecto?
 
-- Inicio de sesión y auto-registro de cuentas.
-- Roles `Administrador`, `Registrador` y `Consulta`.
-- Panel con estadísticas de trabajadores, distribución por cargo y actividad reciente.
-- Registro, edición, inhabilitación con motivo, filtros y exportación de trabajadores.
-- Fecha y hora de registro visibles en el panel, el listado, el formulario y la bitácora.
-- Administración de usuarios (crear, editar, activar/desactivar y eliminar).
-- Bitácora automática de ingresos, registros y cambios.
-- Persistencia local en el navegador (`localStorage`).
-- El acceso de usuarios y la identificación de trabajadores se realizan con cédula.
-- Datos de ejemplo: 8 trabajadores del Ministerio del Poder Popular para el Proceso Social de Trabajo en Caracas con cédulas `V-` y teléfonos `+58`.
+- Inicio de sesión con validación de cédula y contraseña.
+- Registro de usuarios desde la interfaz, con acceso demo para pruebas.
+- Panel principal con métricas de trabajadores, actividad reciente y distribución por cargo.
+- Registro y actualización de información personal de cada trabajador.
+- Filtros por estado, documento, departamento y cargo.
+- Inhabilitación y reactivación de trabajadores con motivo de baja.
+- Gestión de usuarios activos/inactivos.
+- Bitácora automática de acciones del sistema.
+- Exportación de datos en CSV y Excel desde la sección de trabajadores.
+- Persistencia local del estado en el navegador mediante `localStorage`.
+- Datos demo cargados al iniciar la aplicación para probar el flujo completo.
 
-## Acceso de prueba
+## Roles y acceso
+
+El modelo del proyecto contempla roles como:
+
+- `Administrador`
+- `Registrador`
+- `Consulta`
+
+En la versión actual se prioriza el flujo administrativo con un usuario de prueba predeterminado y la creación de cuentas desde la propia app.
+
+## Credenciales de prueba
 
 | Cédula | Contraseña | Rol |
 | --- | --- | --- |
 | `V-00000000` | `admin123` | Administrador |
 
-También puedes crear una cuenta desde **Crear una cuenta**. El auto-registro asigna el rol `Registrador` y la cuenta aparece de inmediato en la sección **Usuarios**.
+También puedes usar la opción de registro desde la pantalla de acceso para crear una nueva cuenta desde la interfaz.
 
-## Cargos o puestos de trabajo
+## Stack tecnológico
 
-Los cargos disponibles en el selector **Cargo o puesto de trabajo** se definen en:
+- Angular 21
+- PrimeNG
+- PrimeIcons
+- Tailwind CSS
+- TypeScript
+- localStorage para persistencia en frontend
 
-```
-src/app/services/models.ts
-```
+## Iniciar el proyecto
 
-Busca la constante `PERSON_TYPES` y agrega, edita o elimina los puestos según la estructura del ministerio:
-
-```ts
-export const PERSON_TYPES = ['Analista', 'Asistente administrativo', 'Supervisor', 'Director', 'Abogado', 'Trabajador obrero', 'Pasante'];
-```
-
-Los estados de Venezuela del selector **Estado** se encuentran en `DEPARTMENTS`, en el mismo archivo.
-
-## Servidor de desarrollo
+Desde la carpeta del proyecto:
 
 ```bash
+cd Formularo
 npm install
 npm start
 ```
 
-Abre `http://localhost:4200/`. La aplicación se recarga automáticamente al modificar los archivos.
+La app quedará disponible en:
 
-## Compilación
+```text
+http://localhost:4200/
+```
+
+## Compilar para producción
 
 ```bash
+cd Formularo
 npm run build
 ```
 
-Los artefactos se generan en `dist/sakai-ng/`.
+La salida se genera normalmente en `dist/sakai-ng/`.
 
 ## Estructura principal
 
-- `src/app/pages/auth`: inicio de sesión y registro de usuarios.
-- `src/app/pages/dashboard`: panel principal del ministerio.
-- `src/app/pages/personas`: listado y edición de trabajadores.
-- `src/app/pages/registro-persona`: formulario de registro de trabajadores.
-- `src/app/pages/usuarios`: administración de usuarios (solo administradores).
-- `src/app/pages/actividad`: bitácora del sistema.
-- `src/app/services`: modelos, autenticación, trabajadores, bitácora, almacenamiento y guards.
-- `src/assets/styles.scss`: diseño global blanco y azul.
+- `src/app/pages/auth`: inicio de sesión, registro y acceso.
+- `src/app/pages/dashboard`: panel principal con estadísticas.
+- `src/app/pages/personas`: listado, filtros, edición y exportación de trabajadores.
+- `src/app/pages/registro-persona`: formulario para registrar nuevos trabajadores.
+- `src/app/pages/usuarios`: administración de usuarios.
+- `src/app/pages/actividad`: historial y bitácora de eventos.
+- `src/app/services`: modelos, autenticación, datos, persistencia y validadores.
+- `src/assets/styles.scss`: estilos globales y sistema visual del proyecto.
+
+## Personalización de cargos y departamentos
+
+Los cargos y departamentos están definidos en:
+
+```ts
+src/app/services/models.ts
+```
+
+Puedes ajustar las constantes `PERSON_TYPES`, `DEPARTMENTS` y otros catálogos según la estructura real del ministerio o del proceso que quieras administrar.
+
+## Nota
+
+La aplicación está pensada para funcionar como sistema de gestión local en frontend, con almacenamiento del estado en el navegador y datos demo listos para probar el flujo sin requerir backend externo.
