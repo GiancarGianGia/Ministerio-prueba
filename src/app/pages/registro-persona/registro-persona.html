@@ -55,11 +55,11 @@
 
                             <div class="form-field">
                                 <label for="documentType">Tipo de documento *</label>
-                                <p-select id="documentType" name="documentType" [options]="documentTypeOptions" optionLabel="label" optionValue="value" [(ngModel)]="person.documentType" styleClass="w-full" />
+                                <p-select id="documentType" name="documentType" [options]="documentTypeOptions" optionLabel="label" optionValue="value" [(ngModel)]="person.documentType" (ngModelChange)="onDocumentTypeChange()" styleClass="w-full" />
                             </div>
                             <div class="form-field">
                                 <label for="documentNumber">Número de documento *</label>
-                                <input pInputText id="documentNumber" name="documentNumber" [(ngModel)]="person.documentNumber" placeholder="Ej. V-18745632 o 18745632" />
+                                <input pInputText id="documentNumber" name="documentNumber" [(ngModel)]="person.documentNumber" (ngModelChange)="onDocumentNumberChange()" placeholder="Ej. V-18745632 o 18745632" />
                                 @if (documentError()) {
                                     <small class="field-error">{{ documentError() }}</small>
                                 }
@@ -67,7 +67,18 @@
 
                             <div class="form-field">
                                 <label for="birthDate">Fecha de nacimiento *</label>
-                                <input pInputText id="birthDate" name="birthDate" type="date" [max]="today" [min]="minBirthDate" [(ngModel)]="person.birthDate" />
+                                <p-datepicker
+                                    inputId="birthDate"
+                                    name="birthDate"
+                                    [(ngModel)]="birthDatePicker"
+                                    (ngModelChange)="onBirthDatePickerChange($event)"
+                                    [minDate]="minBirthDate"
+                                    [maxDate]="today"
+                                    dateFormat="dd/mm/yy"
+                                    [showIcon]="true"
+                                    [readonlyInput]="true"
+                                    styleClass="w-full"
+                                />
                                 @if (birthDateError()) {
                                     <small class="field-error">{{ birthDateError() }}</small>
                                 }
@@ -91,7 +102,7 @@
                         <div class="form-grid">
                             <div class="form-field">
                                 <label for="phone">Teléfono *</label>
-                                <input pInputText id="phone" name="phone" [(ngModel)]="person.phone" placeholder="Ej. +58 412 1234567" />
+                                <input pInputText id="phone" name="phone" [(ngModel)]="person.phone" (ngModelChange)="onPhoneChange()" placeholder="Ej. +58 412 1234567" />
                                 @if (phoneError()) {
                                     <small class="field-error">{{ phoneError() }}</small>
                                 }

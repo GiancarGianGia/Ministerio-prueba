@@ -22,7 +22,7 @@ export class PersonService {
             active: persons.filter((person) => person.status === 'Activo').length,
             pending: persons.filter((person) => person.status === 'Pendiente').length,
             thisMonth: persons.filter((person) => {
-                const date = new Date(person.createdAt);
+                const date = new Date(person.updatedAt || person.createdAt);
                 return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
             }).length
         };
@@ -175,7 +175,9 @@ export class PersonService {
             ...(person.familyData ? { familyData: person.familyData } : {}),
             ...(person.vacationData ? { vacationData: person.vacationData } : {}),
             ...(person.medicalData ? { medicalData: person.medicalData } : {}),
-            ...(person.housingData ? { housingData: person.housingData } : {})
+            ...(person.housingData ? { housingData: person.housingData } : {}),
+            ...(person.additionalData ? { additionalData: person.additionalData } : {}),
+            ...(person.academicData ? { academicData: person.academicData } : {})
         }));
     }
 
@@ -197,7 +199,9 @@ export class PersonService {
             ...(input.familyData ? { familyData: input.familyData } : {}),
             ...(input.vacationData ? { vacationData: input.vacationData } : {}),
             ...(input.medicalData ? { medicalData: input.medicalData } : {}),
-            ...(input.housingData ? { housingData: input.housingData } : {})
+            ...(input.housingData ? { housingData: input.housingData } : {}),
+            ...(input.additionalData ? { additionalData: input.additionalData } : {}),
+            ...(input.academicData ? { academicData: input.academicData } : {})
         };
     }
 

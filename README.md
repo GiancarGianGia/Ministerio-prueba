@@ -1,19 +1,19 @@
-# MPPPST · Sistema de Registro de Trabajadores
+# MPPPST · Sistema de Administración y Actualización de Trabajadores
 
-Aplicación Angular + PrimeNG para registrar, consultar y administrar a los trabajadores del Ministerio del Poder Popular para el Proceso Social de Trabajo en Caracas, Venezuela. Incluye control de usuarios por roles, bitácora de actividad y un diseño con paleta blanca y azul.
+Aplicación Angular + PrimeNG para actualizar y administrar a los trabajadores del Ministerio del Poder Popular para el Proceso Social de Trabajo en Caracas, Venezuela. El sistema está enfocado en la actualización y administración de datos de trabajadores ya existentes (cargados desde base de datos o precargados).
+
+> **Nota importante:** En esta plataforma únicamente se registran los usuarios con rol de **Administrador**. Los trabajadores no se registran desde la interfaz pública, sino que se gestionan, consultan, actualizan e inhabilitan.
 
 ## Funcionalidades
 
-- Inicio de sesión y auto-registro de cuentas.
-- Roles `Administrador`, `Registrador` y `Consulta`.
-- Panel con estadísticas de trabajadores, distribución por cargo y actividad reciente.
-- Registro, edición, inhabilitación con motivo, filtros y exportación de trabajadores.
-- Fecha y hora de registro visibles en el panel, el listado, el formulario y la bitácora.
-- Administración de usuarios (crear, editar, activar/desactivar y eliminar).
-- Bitácora automática de ingresos, registros y cambios.
-- Persistencia local en el navegador (`localStorage`).
-- El acceso de usuarios y la identificación de trabajadores se realizan con cédula.
-- Datos de ejemplo: 8 trabajadores del Ministerio del Poder Popular para el Proceso Social de Trabajo en Caracas con cédulas `V-` y teléfonos `+58`.
+- Inicio de sesión y registro exclusivo para usuarios **Administradores**.
+- Panel con estadísticas de trabajadores, distribución por cargo y últimas actualizaciones.
+- Gestión integral de trabajadores: actualización de datos personales, familiares, vacaciones, médicos, habitacionales y adicionales.
+- Inhabilitación de trabajadores con motivo obligatorio y registro en bitácora.
+- Exportación en formatos CSV y Excel con fecha de última actualización.
+- Administración de usuarios administradores (crear, editar, activar/desactivar y restablecer contraseñas).
+- Bitácora automática de ingresos, actualizaciones y cambios de estado.
+- Persistencia local en el navegador (`localStorage`) preparada para futura integración con API/BD.
 
 ## Acceso de prueba
 
@@ -21,23 +21,7 @@ Aplicación Angular + PrimeNG para registrar, consultar y administrar a los trab
 | --- | --- | --- |
 | `V-00000000` | `admin123` | Administrador |
 
-También puedes crear una cuenta desde **Crear una cuenta**. El auto-registro asigna el rol `Registrador` y la cuenta aparece de inmediato en la sección **Usuarios**.
-
-## Cargos o puestos de trabajo
-
-Los cargos disponibles en el selector **Cargo o puesto de trabajo** se definen en:
-
-```
-src/app/services/models.ts
-```
-
-Busca la constante `PERSON_TYPES` y agrega, edita o elimina los puestos según la estructura del ministerio:
-
-```ts
-export const PERSON_TYPES = ['Analista', 'Asistente administrativo', 'Supervisor', 'Director', 'Abogado', 'Trabajador obrero', 'Pasante'];
-```
-
-Los estados de Venezuela del selector **Estado** se encuentran en `DEPARTMENTS`, en el mismo archivo.
+También puedes registrar una nueva cuenta desde **Crear una cuenta**. Todas las cuentas creadas se registran automáticamente como **Administrador**.
 
 ## Servidor de desarrollo
 
@@ -46,7 +30,7 @@ npm install
 npm start
 ```
 
-Abre `http://localhost:4200/`. La aplicación se recarga automáticamente al modificar los archivos.
+Abre `http://localhost:4200/`.
 
 ## Compilación
 
@@ -54,19 +38,12 @@ Abre `http://localhost:4200/`. La aplicación se recarga automáticamente al mod
 npm run build
 ```
 
-Los artefactos se generan en `dist/sakai-ng/`.
-
 ## Estructura principal
 
-- `src/app/pages/auth`: inicio de sesión y registro de usuarios.
-- `src/app/pages/dashboard`: panel principal del ministerio.
-- `src/app/pages/personas`: listado y edición de trabajadores.
-- `src/app/pages/registro-persona`: formulario de registro de trabajadores.
-- `src/app/pages/usuarios`: administración de usuarios (solo administradores).
-- `src/app/pages/actividad`: bitácora del sistema.
-- `src/app/services`: modelos, autenticación, trabajadores, bitácora, almacenamiento y guards.
-<<<<<<< HEAD
-- `src/assets/styles.scss`: diseño global blanco y azul
-=======
-- `src/assets/styles.scss`: diseño global blanco y azul.
->>>>>>> 9d0a4a1 (Update project)
+- `src/app/pages/auth`: inicio de sesión y registro de administradores.
+- `src/app/pages/dashboard`: panel principal con últimos trabajadores actualizados.
+- `src/app/pages/personas`: listado, filtros, inhabilitación y formulario modal por pestañas para actualizar trabajadores.
+- `src/app/pages/usuarios`: administración de usuarios administradores.
+- `src/app/pages/actividad`: bitácora de auditoría del sistema.
+- `src/app/services`: modelos de datos, servicios de trabajadores, autenticación y bitácora.
+- `src/assets/styles.scss`: diseño global blanco y azul institucional.

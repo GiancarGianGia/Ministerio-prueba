@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
+import { DatePickerModule } from 'primeng/datepicker';
 import { InputTextModule } from 'primeng/inputtext';
 import { SelectModule } from 'primeng/select';
 import { TextareaModule } from 'primeng/textarea';
@@ -20,12 +21,12 @@ import {
     PERSON_TYPES
 } from '@/app/services/models';
 import { PersonService } from '@/app/services/person.service';
-import { isValidVenezuelanPhone, validateBirthDate, validateDocument, validatePersonName, validatePhone } from '@/app/services/validators';
+import { validateBirthDate, validateDocument, validatePersonName, validatePhone } from '@/app/services/validators';
 
 @Component({
     selector: 'app-registro-persona',
     standalone: true,
-    imports: [CommonModule, FormsModule, RouterModule, ButtonModule, InputTextModule, SelectModule, TextareaModule, ToastModule],
+    imports: [CommonModule, FormsModule, RouterModule, ButtonModule, DatePickerModule, InputTextModule, SelectModule, TextareaModule, ToastModule],
     providers: [MessageService],
     templateUrl: './registro-persona.html'
 })
@@ -40,15 +41,17 @@ export class RegistroPersona {
 
     person: NewPersonInput = this.emptyPerson();
 
+    birthDatePicker: Date | null = null;
+
     citySelection = '';
 
     submitted = false;
 
     savedPerson = signal<Person | null>(null);
 
-    readonly today = this.toDateInputValue(new Date());
+    readonly today = this.startOfDay(new Date());
 
-    readonly minBirthDate = this.toDateInputValue(new Date(new Date().getFullYear() - 100, new Date().getMonth(), new Date().getDate()));
+    readonly minBirthDate = this.startOfDay(new Date(new Date().getFullYear() - 100, new Date().getMonth(), new Date().getDate()));
 
     readonly documentTypeOptions = DOCUMENT_TYPES.map((value) => ({ label: value, value }));
 
@@ -148,7 +151,9 @@ export class RegistroPersona {
         const created = this.personService.add(this.person, this.auth.currentUser()?.fullName ?? 'Sistema');
         this.savedPerson.set(created);
         this.person = this.emptyPerson();
+        this.birthDatePicker = null;
         this.submitted = false;
+        this.clearValidationState();
 
         this.messageService.add({
             severity: 'success',
@@ -160,8 +165,10 @@ export class RegistroPersona {
 
     resetForm(): void {
         this.person = this.emptyPerson();
+        this.birthDatePicker = null;
         this.citySelection = '';
         this.submitted = false;
+        this.clearValidationState();
     }
 
     registerAnother(): void {
@@ -179,6 +186,25 @@ export class RegistroPersona {
         this.person.city = value === 'Otro' ? '' : value;
     }
 
+    onDocumentTypeChange(): void {
+        this.validateDocumentOnChange();
+    }
+
+    onDocumentNumberChange(): void {
+        this.validateDocumentOnChange();
+    }
+
+    onPhoneChange(): void {
+        this.touchedFields.add('phone');
+        this.notifyValidationError('phone', validatePhone(this.person.phone), 'Teléfono inválido');
+    }
+
+    onBirthDatePickerChange(value: Date | null): void {
+        this.person.birthDate = this.toStoredDate(value);
+        this.touchedFields.add('birthDate');
+        this.notifyValidationError('birthDate', validateBirthDate(this.person.birthDate), 'Fecha de nacimiento inválida');
+    }
+
     initials(firstName: string, lastName: string): string {
         return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
     }
@@ -192,29 +218,63 @@ export class RegistroPersona {
     }
 
     documentError(): string {
-        if (!this.submitted) {
+        if (!this.submitted && !this.touchedFields.has('document')) {
             return '';
         }
         return validateDocument(this.person.documentType, this.person.documentNumber) ?? '';
     }
 
     birthDateError(): string {
-        return this.submitted ? (validateBirthDate(this.person.birthDate) ?? '') : '';
+        return this.submitted || this.touchedFields.has('birthDate') ? (validateBirthDate(this.person.birthDate) ?? '') : '';
     }
 
     phoneError(): string {
-        if (!this.submitted) {
+        if (!this.submitted && !this.touchedFields.has('phone')) {
             return '';
         }
         return validatePhone(this.person.phone) ?? '';
     }
 
-    private toDateInputValue(date: Date): string {
+    private validateDocumentOnChange(): void {
+        this.touchedFields.add('document');
+        this.notifyValidationError('document', validateDocument(this.person.documentType, this.person.documentNumber), 'Documento inválido');
+    }
+
+    private notifyValidationError(field: string, error: string | null, summary: string): void {
+        if (!error) {
+            this.notifiedValidationErrors.delete(field);
+            return;
+        }
+        if (this.notifiedValidationErrors.get(field) === error) {
+            return;
+        }
+        this.notifiedValidationErrors.set(field, error);
+        this.messageService.add({ severity: 'error', summary, detail: error, life: 4000 });
+    }
+
+    private clearValidationState(): void {
+        this.touchedFields.clear();
+        this.notifiedValidationErrors.clear();
+    }
+
+    private startOfDay(date: Date): Date {
+        date.setHours(0, 0, 0, 0);
+        return date;
+    }
+
+    private toStoredDate(date: Date | null): string {
+        if (!date) {
+            return '';
+        }
         const year = date.getFullYear();
         const month = `${date.getMonth() + 1}`.padStart(2, '0');
         const day = `${date.getDate()}`.padStart(2, '0');
         return `${year}-${month}-${day}`;
     }
+
+    private readonly touchedFields = new Set<string>();
+
+    private readonly notifiedValidationErrors = new Map<string, string>();
 
     private emptyPerson(): NewPersonInput {
         return {

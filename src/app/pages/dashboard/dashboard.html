@@ -19,7 +19,7 @@
                 </div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon stat-icon-green"><i class="pi pi-user-check"></i></div>
+                <div class="stat-icon stat-icon-green" aria-hidden="true"><i class="pi pi-check-circle"></i></div>
                 <div class="stat-content">
                     <span>Trabajadores activos</span>
                     <strong>{{ stats().active }}</strong>
@@ -30,9 +30,9 @@
             <div class="stat-card">
                 <div class="stat-icon stat-icon-orange"><i class="pi pi-calendar-plus"></i></div>
                 <div class="stat-content">
-                    <span>Nuevos este mes</span>
+                    <span>Actualizados este mes</span>
                     <strong>{{ stats().thisMonth }}</strong>
-                    <small>Trabajadores registrados</small>
+                    <small>Trabajadores con cambios este mes</small>
                 </div>
             </div>
 
@@ -51,8 +51,8 @@
                 <div class="card h-full">
                     <div class="card-header">
                         <div>
-                            <h2>Últimos trabajadores registrados</h2>
-                            <p>Los registros más recientes aparecen primero.</p>
+                            <h2>Últimos trabajadores y cambios actualizados</h2>
+                            <p>Trabajadores con modificaciones o actualizaciones recientes.</p>
                         </div>
                         <a routerLink="/personas" class="text-link">Ver todos <i class="pi pi-arrow-right"></i></a>
                     </div>
@@ -64,7 +64,7 @@
                                 <th>Documento</th>
                                 <th>Cargo</th>
                                 <th>Estado</th>
-                                <th>Fecha y hora de registro</th>
+                                <th>Última actualización</th>
                             </tr>
                         </ng-template>
                         <ng-template #body let-person>
@@ -89,12 +89,12 @@
                                 <td>
                                     <p-tag [value]="person.status" [severity]="getStatusSeverity(person.status)" />
                                 </td>
-                                <td>{{ person.createdAt | date: 'dd/MM/yyyy HH:mm' }}</td>
+                                <td>{{ (person.updatedAt || person.createdAt) | date: 'dd/MM/yyyy HH:mm' }}</td>
                             </tr>
                         </ng-template>
                         <ng-template #emptymessage>
                             <tr>
-                                <td colspan="5">Todavía no hay trabajadores registrados.</td>
+                                <td colspan="5">Todavía no hay trabajadores en el sistema.</td>
                             </tr>
                         </ng-template>
                     </p-table>

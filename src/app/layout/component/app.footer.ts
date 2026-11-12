@@ -4,7 +4,7 @@ import { Component } from '@angular/core';
     standalone: true,
     selector: 'app-footer',
     template: `<div class="layout-footer">
-        <span>Sistema de Registro de Trabajadores · Ministerio del Poder Popular para el Proceso Social de Trabajo</span>
+        <span>Sistema de Administración y Actualización de Trabajadores · Ministerio del Poder Popular para el Proceso Social de Trabajo</span>
         <span class="layout-footer-separator">·</span>
         <span>{{ year }} · Caracas, Venezuela</span>
     </div>`

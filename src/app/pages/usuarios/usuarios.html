@@ -110,7 +110,7 @@
             </p-table>
         </div>
 
-        <p-dialog [(visible)]="userDialog" [style]="{ width: '560px' }" [header]="editing ? 'Editar usuario' : 'Nuevo usuario'" [modal]="true">
+        <p-dialog [(visible)]="userDialog" [style]="{ width: '600px', maxWidth: '95vw' }" styleClass="user-dialog" [header]="editing ? 'Editar usuario' : 'Nuevo usuario'" [modal]="true">
             <div class="form-grid">
                 <div class="form-field form-field-full">
                     <label for="userFullName">Nombre completo *</label>
@@ -122,7 +122,7 @@
 
                 <div class="form-field form-field-full">
                     <label for="userCedula">Cédula *</label>
-                    <input pInputText id="userCedula" type="text" [(ngModel)]="userForm.cedula" placeholder="V-12345678" />
+                    <input pInputText id="userCedula" type="text" [(ngModel)]="userForm.cedula" (ngModelChange)="cedulaTouched = true" placeholder="V-12345678" />
                     @if (cedulaError()) {
                         <small class="field-error">{{ cedulaError() }}</small>
                     }
@@ -146,10 +146,50 @@
                         <label for="userActive">{{ userForm.active ? 'Activo (puede iniciar sesión)' : 'Inactivo (sin acceso)' }}</label>
                     </div>
                 </div>
-            </div>
 
+                <section class="form-field form-field-full security-questions-section" aria-labelledby="security-questions-title">
+                    <h2 id="security-questions-title" class="security-questions-title">
+                        <i class="pi pi-shield" aria-hidden="true"></i>
+                        Preguntas de seguridad
+                    </h2>
+                    <p class="security-questions-description">
+                        Configura hasta 3 preguntas de seguridad. Se usarán para verificar la identidad al recuperar la contraseña.
+                    </p>
+
+                    @for (sq of securityQuestionsForm; track $index) {
+                        <div class="security-question-card">
+                            <label class="security-question-label" [for]="'securityQuestion' + $index">
+                                Pregunta {{ $index + 1 }} {{ $index === 0 ? '(recomendada)' : '(opcional)' }}
+                            </label>
+                            <p-select
+                                [inputId]="'securityQuestion' + $index"
+                                [options]="availableQuestionsFor($index)"
+                                optionLabel="label"
+                                optionValue="value"
+                                placeholder="Selecciona una pregunta..."
+                                [(ngModel)]="securityQuestionsForm[$index].question"
+                                appendTo="body"
+                                [showClear]="true"
+                                styleClass="w-full"
+                            />
+                            <label class="security-question-label security-answer-label" [for]="'securityAnswer' + $index">Respuesta</label>
+                            <input
+                                pInputText
+                                [id]="'securityAnswer' + $index"
+                                [(ngModel)]="securityQuestionsForm[$index].answer"
+                                [disabled]="!securityQuestionsForm[$index].question"
+                                placeholder="Selecciona una pregunta y escribe tu respuesta"
+                            />
+                            @if (securityQuestionError($index)) {
+                                <small class="field-error">{{ securityQuestionError($index) }}</small>
+                            }
+                        </div>
+                    }
+                </section>
+            </div>
+                                             
             <ng-template #footer>
-                <p-button label="Cancelar" icon="pi pi-times" text (click)="hideDialog()" />
+                <p-button label="Cancelar" icon="pi pi-times" severity="secondary" [outlined]="true" styleClass="btn-cancelar" (click)="hideDialog()" />
                 <p-button [label]="editing ? 'Guardar cambios' : 'Crear usuario'" icon="pi pi-check" (click)="saveUser()" />
             </ng-template>
         </p-dialog>

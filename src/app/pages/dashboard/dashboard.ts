@@ -28,7 +28,11 @@ export class Dashboard {
 
     readonly recentLogs = this.logService.recentLogs;
 
-    readonly recentPersons = computed(() => this.personService.persons().slice(0, 5));
+    readonly recentPersons = computed(() =>
+        [...this.personService.persons()]
+            .sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime())
+            .slice(0, 5)
+    );
 
     initials(firstName: string, lastName: string): string {
         return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();

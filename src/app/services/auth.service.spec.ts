@@ -116,4 +116,28 @@ describe('AuthService', () => {
         const res = service.resetPassword('V-00000000', '123');
         expect(res.ok).toBeFalse();
     });
+
+    it('incluye al administrador que desactivó la cuenta en el mensaje de acceso', () => {
+        service.login('V-00000000', 'admin123');
+        const created = service.createUser({
+            fullName: 'Gian Pérez',
+            cedula: 'V-12345678',
+            password: 'clave123',
+            role: 'Administrador',
+            active: true,
+            securityQuestions: [{ question: '¿En qué ciudad naciste?', answer: 'Caracas' }]
+        });
+        expect(created.ok).toBeTrue();
+
+        const gian = service.users().find((user) => user.cedula === 'V-12345678');
+        expect(gian).toBeDefined();
+        const deactivated = service.toggleUser(gian!.id);
+        expect(deactivated.ok).toBeTrue();
+
+        const expectedMessage = 'Esta cuenta fue desactivada por Administrador del Sistema. Contacta a un administrador.';
+        expect(service.login('V-12345678', 'clave123').message).toBe(expectedMessage);
+        expect(service.getSecurityQuestions('V-12345678').message).toBe(expectedMessage);
+        expect(service.verifySecurityQuestions('V-12345678', [{ question: '¿En qué ciudad naciste?', answer: 'Caracas' }]).message).toBe(expectedMessage);
+        expect(service.resetPassword('V-12345678', 'nuevaClave123').message).toBe(expectedMessage);
+    });
 });

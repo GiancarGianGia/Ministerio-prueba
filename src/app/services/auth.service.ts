@@ -1,5 +1,5 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { AppUser, AuthResult, NewUserInput, nextSequentialId, STORAGE_KEYS, UpdateUserInput, USER_ROLES, UserRole } from './models';
+import { AppUser, AuthResult, NewUserInput, nextSequentialId, SecurityQuestion, STORAGE_KEYS, UpdateUserInput, USER_ROLES, UserRole } from './models';
 import { LogService } from './log.service';
 import { StorageService } from './storage.service';
 import { normalizeCedula, validateCedula, validatePassword } from './validators';
@@ -48,7 +48,7 @@ export class AuthService {
         }
 
         if (!user.active) {
-            return { ok: false, message: 'Este usuario está desactivado. Contacta a un administrador.' };
+            return { ok: false, message: this.deactivatedUserMessage(user) };
         }
 
         const updated: AppUser = { ...user, lastLogin: new Date().toISOString() };
@@ -109,7 +109,7 @@ export class AuthService {
         return { ok: true, message: 'Cuenta creada. Ya puedes usar el sistema.' };
     }
 
-    resetPassword(cedula: string, newPassword: string): AuthResult {
+    resetPassword(cedula: string, newPassword: string, answeredQuestions?: { question: string; answer: string }[]): AuthResult {
         const normalizedCedula = normalizeCedula(cedula);
         const user = this._users().find((item) => item.cedula === normalizedCedula);
 
@@ -118,7 +118,21 @@ export class AuthService {
         }
 
         if (!user.active) {
-            return { ok: false, message: 'Este usuario está inactivo. Contacta a un administrador.' };
+            return { ok: false, message: this.deactivatedUserMessage(user) };
+        }
+
+        // Validate security questions if the user has them
+        if (user.securityQuestions && user.securityQuestions.length > 0) {
+            if (!answeredQuestions || answeredQuestions.length === 0) {
+                return { ok: false, message: 'Debes responder las preguntas de seguridad.' };
+            }
+            const allCorrect = user.securityQuestions.every((sq) => {
+                const answered = answeredQuestions.find((aq) => aq.question === sq.question);
+                return answered && answered.answer.trim().toLowerCase() === sq.answer.trim().toLowerCase();
+            });
+            if (!allCorrect) {
+                return { ok: false, message: 'Una o más respuestas de seguridad son incorrectas.' };
+            }
         }
 
         const passwordError = validatePassword(newPassword);
@@ -137,6 +151,48 @@ export class AuthService {
         );
 
         return { ok: true, message: 'Contraseña restablecida correctamente. Ya puedes iniciar sesión.' };
+    }
+
+    verifySecurityQuestions(cedula: string, answeredQuestions: { question: string; answer: string }[]): AuthResult {
+        const normalizedCedula = normalizeCedula(cedula);
+        const user = this._users().find((item) => item.cedula === normalizedCedula);
+
+        if (!user) {
+            return { ok: false, message: 'No se encontró ningún usuario con esa cédula.' };
+        }
+        if (!user.active) {
+            return { ok: false, message: this.deactivatedUserMessage(user) };
+        }
+        if (!user.securityQuestions?.length) {
+            return { ok: false, message: 'Este usuario no tiene preguntas de seguridad configuradas.' };
+        }
+        if (!answeredQuestions.length) {
+            return { ok: false, message: 'Debes responder todas las preguntas de seguridad.' };
+        }
+
+        const allCorrect = user.securityQuestions.every((securityQuestion) => {
+            const answered = answeredQuestions.find((item) => item.question === securityQuestion.question);
+            return answered?.answer.trim().toLowerCase() === securityQuestion.answer.trim().toLowerCase();
+        });
+
+        return allCorrect
+            ? { ok: true, message: 'Respuestas verificadas correctamente.' }
+            : { ok: false, message: 'Una o más respuestas de seguridad son incorrectas.' };
+    }
+
+    getSecurityQuestions(cedula: string): { ok: boolean; questions: string[]; message: string } {
+        const normalizedCedula = normalizeCedula(cedula);
+        const user = this._users().find((item) => item.cedula === normalizedCedula);
+        if (!user) {
+            return { ok: false, questions: [], message: 'No se encontró ningún usuario con esa cédula.' };
+        }
+        if (!user.active) {
+            return { ok: false, questions: [], message: this.deactivatedUserMessage(user) };
+        }
+        if (!user.securityQuestions || user.securityQuestions.length === 0) {
+            return { ok: true, questions: [], message: 'Este usuario no tiene preguntas de seguridad configuradas.' };
+        }
+        return { ok: true, questions: user.securityQuestions.map((sq) => sq.question), message: '' };
     }
 
     createUser(input: NewUserInput): AuthResult {
@@ -174,7 +230,8 @@ export class AuthService {
             role: 'Administrador',
             active: input.active,
             createdAt: new Date().toISOString(),
-            createdBy: actor
+            createdBy: actor,
+            securityQuestions: input.securityQuestions ?? []
         };
 
         this._users.update((users) => [...users, newUser]);
@@ -221,13 +278,22 @@ export class AuthService {
             return { ok: false, message: 'No puedes quitar el acceso al último administrador activo.' };
         }
 
+        const actor = this.currentUser()?.fullName ?? 'Sistema';
         const updated: AppUser = {
             ...user,
             fullName: name,
             cedula: normalizedCedula,
             role: 'Administrador',
             active: input.active,
-            password: input.password?.trim() ? input.password : user.password
+            password: input.password?.trim() ? input.password : user.password,
+            securityQuestions: input.securityQuestions !== undefined ? input.securityQuestions : user.securityQuestions,
+            ...(input.active
+                ? { deactivatedBy: undefined }
+                : user.active
+                  ? { deactivatedBy: actor }
+                  : user.deactivatedBy
+                    ? { deactivatedBy: user.deactivatedBy }
+                    : {})
         };
 
         this._users.update((users) => users.map((item) => (item.id === id ? updated : item)));
@@ -237,7 +303,6 @@ export class AuthService {
             this._currentUser.set(updated);
         }
 
-        const actor = this.currentUser()?.fullName ?? 'Sistema';
         this.logService.record('Usuario actualizado', `${actor} actualizó los datos del usuario ${updated.fullName}.`, actor, updated.id);
 
         return { ok: true, message: 'Usuario actualizado correctamente.' };
@@ -261,11 +326,13 @@ export class AuthService {
             return { ok: false, message: 'No puedes desactivar al último administrador activo.' };
         }
 
-        const updated: AppUser = { ...user, active: !user.active };
+        const actor = this.currentUser()?.fullName ?? 'Sistema';
+        const updated: AppUser = user.active
+            ? { ...user, active: false, deactivatedBy: actor }
+            : { ...user, active: true, deactivatedBy: undefined };
         this._users.update((users) => users.map((item) => (item.id === id ? updated : item)));
         this.persistUsers();
 
-        const actor = this.currentUser()?.fullName ?? 'Sistema';
         this.logService.record(
             updated.active ? 'Usuario activado' : 'Usuario desactivado',
             `${actor} ${updated.active ? 'activó' : 'desactivó'} al usuario ${updated.fullName}.`,
@@ -329,7 +396,9 @@ export class AuthService {
                   active: user.active ?? false,
                   createdAt: user.createdAt ?? new Date().toISOString(),
                   createdBy: user.createdBy ?? 'Sistema',
-                  ...(user.lastLogin ? { lastLogin: user.lastLogin } : {})
+                  ...(user.deactivatedBy ? { deactivatedBy: user.deactivatedBy } : {}),
+                  ...(user.lastLogin ? { lastLogin: user.lastLogin } : {}),
+                  ...(user.securityQuestions ? { securityQuestions: user.securityQuestions } : {})
               }))
             : [DEFAULT_ADMIN];
 
@@ -348,6 +417,11 @@ export class AuthService {
 
     private persistUsers(): void {
         this.storage.write(STORAGE_KEYS.users, this._users());
+    }
+
+    private deactivatedUserMessage(user: AppUser): string {
+        const deactivatedBy = user.deactivatedBy ?? 'un administrador';
+        return `Esta cuenta fue desactivada por ${deactivatedBy}. Contacta a un administrador.`;
     }
 
     private isLastActiveAdmin(id: string): boolean {

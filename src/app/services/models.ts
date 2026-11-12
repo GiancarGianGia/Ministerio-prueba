@@ -2,6 +2,22 @@ export type UserRole = 'Administrador' | 'Registrador' | 'Consulta';
 
 export type TagSeverity = 'success' | 'secondary' | 'info' | 'warn' | 'danger' | 'contrast';
 
+export interface SecurityQuestion {
+    question: string;
+    answer: string;
+}
+
+export const SECURITY_QUESTIONS = [
+    '¿Cuál es el nombre de tu primera mascota?',
+    '¿En qué ciudad naciste?',
+    '¿Cuál es el nombre de tu madre?',
+    '¿Cuál era el nombre de tu escuela primaria?',
+    '¿Cuál es tu comida favorita?',
+    '¿Cuál es el apellido de soltera de tu abuela materna?',
+    '¿Cuál fue tu primer trabajo?',
+    '¿Cuál es el nombre de tu mejor amigo de la infancia?'
+];
+
 export interface AppUser {
     id: string;
     fullName: string;
@@ -11,7 +27,9 @@ export interface AppUser {
     active: boolean;
     createdAt: string;
     createdBy: string;
+    deactivatedBy?: string;
     lastLogin?: string;
+    securityQuestions?: SecurityQuestion[];
 }
 
 export interface NewUserInput {
@@ -20,6 +38,7 @@ export interface NewUserInput {
     password: string;
     role: UserRole;
     active: boolean;
+    securityQuestions?: SecurityQuestion[];
 }
 
 export interface UpdateUserInput {
@@ -28,6 +47,7 @@ export interface UpdateUserInput {
     role: UserRole;
     active: boolean;
     password?: string;
+    securityQuestions?: SecurityQuestion[];
 }
 
 export interface ChildData {
@@ -41,6 +61,8 @@ export interface FamilyData {
     spouseName?: string;
     spouseDocumentNumber?: string;
     spousePhone?: string;
+    spouseWorksAtMpppst?: boolean;
+    spouseMpppstDepartment?: string;
     numberOfChildren: number;
     children?: ChildData[];
 }
@@ -58,12 +80,18 @@ export interface MedicalData {
     emergencyContactPhone?: string;
     emergencyContactRelationship?: string;
     bloodType?: string;
-    allergies?: string;
+    laterality?: string;
+    hasOccupationalDisease: boolean;
+    occupationalDiseaseDescription?: string;
     hasDisability: boolean;
+    disabilityType?: string;
+    disabilityGrade?: string;
+    conapdisCode?: string;
     disabilityDescription?: string;
     hasPathology: boolean;
     pathologyDescription?: string;
     pathologyMedication?: string;
+    allergies?: string;
     observations?: string;
 }
 
@@ -80,7 +108,29 @@ export interface HousingData {
     observations?: string;
 }
 
+export interface AdditionalData {
+    militaryRegistration?: string;
+    militaryRegistrationNumber?: string;
+    shirtSize?: string;
+    pantsSize?: string;
+    shoeSize?: string;
+    jacketSize?: string;
+    observations?: string;
+}
+
+export interface AcademicData {
+    academicLevel?: string;
+    specialty?: string;
+    graduated?: boolean;
+    university?: string;
+    completionYear?: string;
+    continueStudies?: string;
+    studyOptions?: string;
+    wantsToFacilitate?: boolean;
+}
+
 export interface Person {
+    academicData?: AcademicData;
     id: string;
     firstName: string;
     lastName: string;
@@ -103,6 +153,7 @@ export interface Person {
     vacationData?: VacationData;
     medicalData?: MedicalData;
     housingData?: HousingData;
+    additionalData?: AdditionalData;
 }
 
 export type NewPersonInput = Omit<Person, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'deactivationReason'>;
@@ -254,6 +305,35 @@ export const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 export const HOUSING_TYPES = ['Casa', 'Apartamento', 'Habitación', 'Rancho', 'Otro'];
 
 export const HOUSING_CONDITIONS = ['Propia', 'Alquilada', 'Familiar', 'Prestada', 'Otra'];
+
+export const LATERALITY_OPTIONS = ['Diestro', 'Zurdo', 'Ambidiestro'];
+
+export const DISABILITY_TYPES = [
+    'Física / Motora',
+    'Visual',
+    'Auditiva',
+    'Intelectual',
+    'Psicosocial / Mental',
+    'Múltiple',
+    'Otra'
+];
+
+export const DISABILITY_GRADES = ['Leve', 'Moderada', 'Severa', 'Grave / Completa'];
+
+export const MILITARY_REGISTRATION_OPTIONS = [
+    'Inscrito',
+    'No inscrito',
+    'En trámite',
+    'Exento'
+];
+
+export const SHIRT_SIZES = ['SS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
+
+export const PANTS_SIZES = ['26', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', '48'];
+
+export const SHOE_SIZES = ['34', '35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46'];
+
+export const JACKET_SIZES = ['SS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
 
 export function createEntityId(prefix: string): string {
     const random = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID().slice(0, 8) : Math.random().toString(36).slice(2, 10);

@@ -39,7 +39,7 @@ export class AppMenu {
             {
                 label: 'Trabajadores',
                 items: [
-                    { label: 'Trabajadores registrados', icon: 'pi pi-fw pi-users', routerLink: ['/personas'] }
+                    { label: 'Trabajadores', icon: 'pi pi-fw pi-users', routerLink: ['/personas'] }
                 ]
             },
             {

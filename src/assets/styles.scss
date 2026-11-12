@@ -1,8 +1,8 @@
 @import 'primeicons/primeicons.css';
 
 :root {
-    --registro-blue: #2563eb;
-    --registro-blue-dark: #1d4ed8;
+    --registro-blue: #0850eb;
+    --registro-blue-dark: #002daa;
     --registro-blue-soft: #eff6ff;
     --registro-border: #e2e8f0;
     --registro-text: #0f172a;
@@ -431,8 +431,9 @@ select {
 }
 
 .stat-icon-green {
-    background: #ecfdf5;
-    color: #059669;
+    background: #dcfce7;
+    color: #047857;
+    font-size: 1.45rem;
 }
 
 .stat-icon-orange {
@@ -597,6 +598,12 @@ select {
     color: var(--registro-text);
     font-size: 0.82rem;
     font-weight: 800;
+    transition: color 0.15s;
+}
+
+.person-cell[style*="cursor: pointer"]:hover strong {
+    color: var(--registro-blue, #0850eb);
+    text-decoration: underline;
 }
 
 .person-cell small {
@@ -1533,5 +1540,157 @@ select {
 
     .card {
         padding: 1.1rem;
+    }
+}
+
+.person-dialog {
+    max-width: 95vw !important;
+
+    .p-dialog-content {
+        max-height: 75vh;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: 1rem 1.25rem 1.5rem;
+    }
+
+    .p-tabs {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .p-tablist {
+        max-width: 100%;
+        overflow-x: auto;
+    }
+
+    .p-tabpanel {
+        padding: 0.75rem 0 0.5rem 0;
+    }
+
+    /* Modo solo lectura: campos deshabilitados con estilo limpio */
+    fieldset[disabled] {
+        opacity: 1;
+
+        input,
+        textarea,
+        .p-inputtext,
+        .p-select,
+        .p-inputnumber,
+        .p-checkbox {
+            opacity: 0.75;
+            pointer-events: none;
+            cursor: default;
+        }
+
+        .p-button {
+            display: none;
+        }
+    }
+}
+
+.btn-cancelar {
+    background-color: #ffffff !important;
+    color: #475569 !important;
+    border: 1px solid #cbd5e1 !important;
+
+    &:hover {
+        background-color: #f8fafc !important;
+        border-color: #94a3b8 !important;
+        color: #0f172a !important;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .person-dialog {
+        width: 96vw !important;
+        margin: 0.5rem auto;
+
+        .p-dialog-content {
+            padding: 0.85rem;
+            max-height: 80vh;
+        }
+
+        .form-grid {
+            grid-template-columns: 1fr !important;
+            gap: 0.75rem;
+        }
+    }
+}
+
+.p-select-overlay {
+    z-index: 1300 !important;
+}
+
+.user-dialog {
+    max-width: 95vw !important;
+
+    .p-dialog-content {
+        max-height: 75vh;
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+
+    .security-questions-section {
+        gap: 0.6rem;
+        margin-top: 0.5rem;
+        border-top: 1px solid var(--registro-border);
+        padding-top: 1rem;
+    }
+
+    .security-questions-title {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin: 0;
+        color: #1d4ed8;
+        font-size: 0.95rem;
+        font-weight: 800;
+    }
+
+    .security-questions-description {
+        margin: 0 0 0.25rem;
+        color: #475569;
+        font-size: 0.78rem;
+        line-height: 1.5;
+    }
+
+    .security-question-card {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        min-width: 0;
+        margin-bottom: 0.25rem;
+        padding: 0.85rem;
+        border: 1px solid #dbe3ee;
+        border-radius: 0.75rem;
+        background: #f8fafc;
+
+        .p-select,
+        .p-inputtext {
+            width: 100%;
+        }
+
+        .p-inputtext:disabled {
+            opacity: 1;
+            background: #eef2f7;
+            color: #64748b;
+        }
+    }
+
+    .security-question-label {
+        color: #334155;
+        font-size: 0.78rem;
+        font-weight: 700;
+    }
+
+    .security-answer-label {
+        margin-top: 0.1rem;
+    }
+}
+
+@media screen and (max-width: 640px) {
+    .user-dialog .p-dialog-content {
+        max-height: 72vh;
+        padding: 0.85rem;
     }
 }

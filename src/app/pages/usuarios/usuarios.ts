@@ -9,11 +9,12 @@ import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { DialogModule } from 'primeng/dialog';
 import { InputTextModule } from 'primeng/inputtext';
 import { PasswordModule } from 'primeng/password';
+import { SelectModule } from 'primeng/select';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { ToastModule } from 'primeng/toast';
 import { AuthService } from '@/app/services/auth.service';
-import { AppUser, NewUserInput, TagSeverity, UpdateUserInput } from '@/app/services/models';
+import { AppUser, NewUserInput, SECURITY_QUESTIONS, SecurityQuestion, TagSeverity, UpdateUserInput } from '@/app/services/models';
 import { validateCedula, validatePassword, validatePersonName } from '@/app/services/validators';
 
 @Component({
@@ -29,6 +30,7 @@ import { validateCedula, validatePassword, validatePersonName } from '@/app/serv
         DialogModule,
         InputTextModule,
         PasswordModule,
+        SelectModule,
         TableModule,
         TagModule,
         ToastModule
@@ -49,21 +51,37 @@ export class Usuarios {
 
     readonly adminUsers = this.auth.adminUsers;
 
+    readonly securityQuestionOptions = SECURITY_QUESTIONS.map((q) => ({ label: q, value: q }));
+
     userDialog = false;
 
     editing = false;
 
     submitted = false;
 
+    cedulaTouched = false;
+
     editingId: string | null = null;
 
     userForm: NewUserInput = this.emptyUser();
+
+    securityQuestionsForm: { question: string; answer: string }[] = [
+        { question: '', answer: '' },
+        { question: '', answer: '' },
+        { question: '', answer: '' }
+    ];
 
     openNew(): void {
         this.editing = false;
         this.editingId = null;
         this.submitted = false;
+        this.cedulaTouched = false;
         this.userForm = this.emptyUser();
+        this.securityQuestionsForm = [
+            { question: '', answer: '' },
+            { question: '', answer: '' },
+            { question: '', answer: '' }
+        ];
         this.userDialog = true;
     }
 
@@ -71,6 +89,7 @@ export class Usuarios {
         this.editing = true;
         this.editingId = user.id;
         this.submitted = false;
+        this.cedulaTouched = false;
         this.userForm = {
             fullName: user.fullName,
             cedula: user.cedula,
@@ -78,12 +97,18 @@ export class Usuarios {
             role: 'Administrador',
             active: user.active
         };
+        const existing = user.securityQuestions ?? [];
+        this.securityQuestionsForm = [0, 1, 2].map((i) => ({
+            question: existing[i]?.question ?? '',
+            answer: existing[i]?.answer ?? ''
+        }));
         this.userDialog = true;
     }
 
     hideDialog(): void {
         this.userDialog = false;
         this.submitted = false;
+        this.cedulaTouched = false;
     }
 
     fullNameError(): string {
@@ -91,17 +116,29 @@ export class Usuarios {
     }
 
     cedulaError(): string {
-        return this.submitted ? (validateCedula(this.userForm.cedula) ?? '') : '';
+        return this.submitted || this.cedulaTouched ? (validateCedula(this.userForm.cedula) ?? '') : '';
     }
 
     passwordError(): string {
-        if (!this.submitted) {
-            return '';
-        }
-        if (this.editing && !this.userForm.password) {
-            return '';
-        }
+        if (!this.submitted) return '';
+        if (this.editing && !this.userForm.password) return '';
         return validatePassword(this.userForm.password) ?? '';
+    }
+
+    securityQuestionError(index: number): string {
+        if (!this.submitted) return '';
+        const q = this.securityQuestionsForm[index];
+        if (q.question && !q.answer.trim()) return 'Escribe la respuesta para esta pregunta.';
+        if (!q.question && q.answer.trim()) return 'Selecciona una pregunta de seguridad.';
+        return '';
+    }
+
+    availableQuestionsFor(index: number): { label: string; value: string }[] {
+        const usedQuestions = this.securityQuestionsForm
+            .filter((_, i) => i !== index)
+            .map((q) => q.question)
+            .filter(Boolean);
+        return this.securityQuestionOptions.filter((opt) => !usedQuestions.includes(opt.value));
     }
 
     saveUser(): void {
@@ -111,8 +148,12 @@ export class Usuarios {
         const cedulaErr = validateCedula(this.userForm.cedula);
         const passErr = (!this.editing || this.userForm.password) ? validatePassword(this.userForm.password) : null;
 
-        if (nameErr || cedulaErr || passErr) {
-            const firstError = nameErr || cedulaErr || passErr;
+        const sqErr = this.securityQuestionsForm.some((q) =>
+            (q.question && !q.answer.trim()) || (!q.question && q.answer.trim())
+        );
+
+        if (nameErr || cedulaErr || passErr || sqErr) {
+            const firstError = nameErr || cedulaErr || passErr || (sqErr ? 'Completa o limpia las preguntas de seguridad incompletas.' : null);
             this.messageService.add({
                 severity: 'error',
                 summary: 'Formulario con errores',
@@ -122,6 +163,10 @@ export class Usuarios {
             return;
         }
 
+        const securityQuestions: SecurityQuestion[] = this.securityQuestionsForm
+            .filter((q) => q.question && q.answer.trim())
+            .map((q) => ({ question: q.question, answer: q.answer.trim() }));
+
         let result;
 
         if (this.editing && this.editingId) {
@@ -130,11 +175,13 @@ export class Usuarios {
                 cedula: this.userForm.cedula,
                 role: 'Administrador',
                 active: this.userForm.active,
-                password: this.userForm.password
+                password: this.userForm.password,
+                securityQuestions
             };
             result = this.auth.updateUser(this.editingId, input);
         } else {
             this.userForm.role = 'Administrador';
+            this.userForm.securityQuestions = securityQuestions;
             result = this.auth.createUser(this.userForm);
         }
 
@@ -212,12 +259,9 @@ export class Usuarios {
 
     getRoleSeverity(role: string): TagSeverity {
         switch (role) {
-            case 'Administrador':
-                return 'contrast';
-            case 'Registrador':
-                return 'info';
-            default:
-                return 'secondary';
+            case 'Administrador': return 'contrast';
+            case 'Registrador': return 'info';
+            default: return 'secondary';
         }
     }
 

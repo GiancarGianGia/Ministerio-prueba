@@ -5,6 +5,7 @@ import { RouterModule } from '@angular/router';
 import { MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
 import { CheckboxModule } from 'primeng/checkbox';
+import { DatePickerModule } from 'primeng/datepicker';
 import { DialogModule } from 'primeng/dialog';
 import { IconFieldModule } from 'primeng/iconfield';
 import { InputIconModule } from 'primeng/inputicon';
@@ -20,28 +21,37 @@ import { ToastModule } from 'primeng/toast';
 import { strToU8, zipSync } from 'fflate';
 import { AuthService } from '@/app/services/auth.service';
 import {
+    AdditionalData,
     BLOOD_TYPES,
     CITIES_BY_DEPARTMENT,
     ChildData,
     DEPARTMENTS,
+    DISABILITY_GRADES,
+    DISABILITY_TYPES,
     DOCUMENT_TYPES,
     FamilyData,
     GENDERS,
     HousingData,
     HOUSING_CONDITIONS,
     HOUSING_TYPES,
+    JACKET_SIZES,
+    LATERALITY_OPTIONS,
     MARITAL_STATUSES,
     MedicalData,
+    MILITARY_REGISTRATION_OPTIONS,
     NewPersonInput,
+    PANTS_SIZES,
     Person,
     PERSON_STATUSES,
     PERSON_TYPES,
+    SHIRT_SIZES,
+    SHOE_SIZES,
     TagSeverity,
     VACATION_STATUSES,
     VacationData
 } from '@/app/services/models';
 import { PersonService } from '@/app/services/person.service';
-import { validateBirthDate, validateDocument, validatePersonName, validatePhone } from '@/app/services/validators';
+import { validateAcademicCompletionYear, validateAcademicInstitution, validateBirthDate, validateCedula, validateChildBirthDate, validateDocument, validatePersonName, validatePhone } from '@/app/services/validators';
 
 @Component({
     selector: 'app-personas',
@@ -52,6 +62,7 @@ import { validateBirthDate, validateDocument, validatePersonName, validatePhone 
         FormsModule,
         TableModule,
         ButtonModule,
+        DatePickerModule,
         RippleModule,
         ToastModule,
         InputTextModule,
@@ -87,24 +98,40 @@ export class Personas {
 
     readonly filteredPersons = computed(() =>
         this.persons().filter((person) => {
-            const search = this.normalizeSearchText(this.searchTerm());
-            const searchableText = this.normalizeSearchText(
-                [
-                    person.firstName,
-                    person.lastName,
-                    person.documentNumber,
-                    person.documentType,
-                    person.phone,
-                    person.city,
-                    person.department,
-                    person.type,
-                    person.status
-                ].join(' ')
-            );
             const matchesType = !this.filterType() || person.type === this.filterType();
             const matchesStatus = !this.filterStatus() || person.status === this.filterStatus();
-            const matchesSearch = !search || searchableText.includes(search);
-            return matchesType && matchesStatus && matchesSearch;
+
+            if (!matchesType || !matchesStatus) {
+                return false;
+            }
+
+            const rawSearch = this.searchTerm().trim();
+            if (!rawSearch) {
+                return true;
+            }
+
+            // Búsqueda estricta por cédula: la cédula debe COMENZAR por los dígitos o formato ingresado
+            const searchDigits = rawSearch.replace(/\D/g, '');
+            const docDigits = (person.documentNumber ?? '').replace(/\D/g, '');
+            const searchNormalized = this.normalizeSearchText(rawSearch);
+            const docNormalized = this.normalizeSearchText(person.documentNumber ?? '');
+
+            const matchesDoc =
+                searchDigits.length > 0 &&
+                (docDigits.startsWith(searchDigits) || docNormalized.startsWith(searchNormalized));
+
+            if (matchesDoc) {
+                return true;
+            }
+
+            // Búsqueda estricta por nombre y apellido: excluye teléfono y todos los demás campos
+            const personFullName = this.normalizeSearchWords(`${person.firstName ?? ''} ${person.lastName ?? ''}`);
+            const searchWords = this.normalizeSearchWords(rawSearch).split(' ').filter(Boolean);
+
+            const matchesName =
+                searchWords.length > 0 && searchWords.every((word) => personFullName.includes(word));
+
+            return matchesName;
         })
     );
 
@@ -131,6 +158,45 @@ export class Personas {
 
     readonly bloodTypeOptions = BLOOD_TYPES.map((value) => ({ label: value, value }));
 
+    readonly lateralityOptions = LATERALITY_OPTIONS.map((value) => ({ label: value, value }));
+
+    readonly disabilityTypeOptions = DISABILITY_TYPES.map((value) => ({ label: value, value }));
+
+    readonly disabilityGradeOptions = DISABILITY_GRADES.map((value) => ({ label: value, value }));
+
+    readonly militaryRegistrationOptions = MILITARY_REGISTRATION_OPTIONS.map((value) => ({ label: value, value }));
+
+    readonly shirtSizeOptions = SHIRT_SIZES.map((value) => ({ label: value, value }));
+
+    readonly pantsSizeOptions = PANTS_SIZES.map((value) => ({ label: value, value }));
+
+    readonly shoeSizeOptions = SHOE_SIZES.map((value) => ({ label: value, value }));
+
+    readonly jacketSizeOptions = JACKET_SIZES.map((value) => ({ label: value, value }));
+
+    // Academic data options
+    readonly academicLevelOptions = [
+        { label: 'Primario', value: 'Primario' },
+        { label: 'Secundario', value: 'Secundario' },
+        { label: 'Técnico', value: 'Técnico' },
+        { label: 'Universitario', value: 'Universitario' },
+        { label: 'Postgrado', value: 'Postgrado' }
+    ];
+    readonly yesNoOptions = [
+        { label: 'Sí', value: true },
+        { label: 'No', value: false }
+    ];
+    readonly continueStudyOptions = [
+        { label: 'Sí', value: 'Sí' },
+        { label: 'No', value: 'No' }
+    ];
+    readonly studyOptionList = [
+        { label: 'Bachillerato', value: 'Bachillerato' },
+        { label: 'Licenciatura', value: 'Licenciatura' },
+        { label: 'Maestría', value: 'Maestría' },
+        { label: 'Doctorado', value: 'Doctorado' }
+    ];
+
     readonly housingTypeOptions = HOUSING_TYPES.map((value) => ({ label: value, value }));
 
     readonly housingConditionOptions = HOUSING_CONDITIONS.map((value) => ({ label: value, value }));
@@ -139,11 +205,29 @@ export class Personas {
 
     personDialog = false;
 
+    viewMode = false;
+
     person: Person = this.emptyPerson();
+
+    birthDatePicker: Date | null = null;
+
+    childBirthDatePickers: (Date | null)[] = [];
+
+    vacationStartPicker: Date | null = null;
+
+    vacationEndPicker: Date | null = null;
+
+    readonly todayDate = this.startOfDay(new Date());
+
+    readonly minBirthDate = this.startOfDay(new Date(new Date().getFullYear() - 100, new Date().getMonth(), new Date().getDate()));
 
     citySelection = '';
 
     submitted = false;
+
+    private readonly touchedFields = new Set<string>();
+
+    private readonly notifiedValidationErrors = new Map<string, string>();
 
     statusDialog = false;
 
@@ -165,27 +249,66 @@ export class Personas {
             .replace(/[^a-z0-9]/g, '');
     }
 
+    private normalizeSearchWords(value: string): string {
+        return value
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .replace(/[^a-z0-9\s]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
     editPerson(person: Person): void {
+        this.viewMode = false;
+        this.openPersonDialog(person);
+    }
+
+    viewPerson(person: Person): void {
+        this.viewMode = true;
+        this.openPersonDialog(person);
+    }
+
+    private openPersonDialog(person: Person): void {
         this.person = {
             ...person,
             familyData: person.familyData ? { ...person.familyData, children: person.familyData.children ? [...person.familyData.children.map(c => ({ ...c }))] : [] } : this.emptyFamilyData(),
             vacationData: person.vacationData ? { ...person.vacationData } : this.emptyVacationData(),
             medicalData: person.medicalData ? { ...person.medicalData } : this.emptyMedicalData(),
-            housingData: person.housingData ? { ...person.housingData } : this.emptyHousingData()
+            housingData: person.housingData ? { ...person.housingData } : this.emptyHousingData(),
+            additionalData: person.additionalData ? { ...person.additionalData } : this.emptyAdditionalData(),
+            academicData: {
+                academicLevel: '',
+                specialty: '',
+                graduated: false,
+                university: '',
+                continueStudies: '',
+                studyOptions: '',
+                wantsToFacilitate: false,
+                ...person.academicData,
+                completionYear: String(person.academicData?.completionYear ?? '')
+            }
         };
+        this.birthDatePicker = this.fromStoredDate(this.person.birthDate);
+        this.childBirthDatePickers = (this.person.familyData?.children ?? []).map((child) => this.fromStoredDate(child.birthDate));
+        this.vacationStartPicker = this.fromStoredDate(this.person.vacationData?.lastVacationStart);
+        this.vacationEndPicker = this.fromStoredDate(this.person.vacationData?.lastVacationEnd);
         this.citySelection = (CITIES_BY_DEPARTMENT[this.person.department] ?? []).includes(this.person.city)
             ? this.person.city
             : this.person.city
               ? 'Otro'
               : '';
         this.submitted = false;
+        this.clearValidationState();
         this.activeEditTab = '0';
         this.personDialog = true;
     }
 
     hideDialog(): void {
         this.personDialog = false;
+        this.viewMode = false;
         this.submitted = false;
+        this.clearValidationState();
     }
 
     onDepartmentChange(): void {
@@ -249,11 +372,15 @@ export class Personas {
     }
 
     private emptyMedicalData(): MedicalData {
-        return { hasDisability: false, hasPathology: false };
+        return { hasDisability: false, hasOccupationalDisease: false, hasPathology: false };
     }
 
     private emptyHousingData(): HousingData {
         return { hasBasicServices: false };
+    }
+
+    private emptyAdditionalData(): AdditionalData {
+        return { militaryRegistration: MILITARY_REGISTRATION_OPTIONS[1] };
     }
 
     private emptyPerson(): Person {
@@ -278,7 +405,18 @@ export class Personas {
             familyData: this.emptyFamilyData(),
             vacationData: this.emptyVacationData(),
             medicalData: this.emptyMedicalData(),
-            housingData: this.emptyHousingData()
+            housingData: this.emptyHousingData(),
+            additionalData: this.emptyAdditionalData(),
+            academicData: {
+                academicLevel: '',
+                specialty: '',
+                graduated: false,
+                university: '',
+                completionYear: '',
+                continueStudies: '',
+                studyOptions: '',
+                wantsToFacilitate: false
+            }
         };
     }
 
@@ -290,6 +428,7 @@ export class Personas {
             this.person.familyData.children = [];
         }
         this.person.familyData.children.push({ name: '', birthDate: '', documentNumber: '' });
+        this.childBirthDatePickers.push(null);
         if (this.person.familyData.children.length > (this.person.familyData.numberOfChildren || 0)) {
             this.person.familyData.numberOfChildren = this.person.familyData.children.length;
         }
@@ -297,6 +436,8 @@ export class Personas {
 
     removeChild(index: number): void {
         this.person.familyData?.children?.splice(index, 1);
+        this.childBirthDatePickers.splice(index, 1);
+        this.clearChildValidationState();
         if (this.person.familyData && (this.person.familyData.children?.length ?? 0) < this.person.familyData.numberOfChildren) {
             this.person.familyData.numberOfChildren = this.person.familyData.children?.length ?? 0;
         }
@@ -322,32 +463,219 @@ export class Personas {
     }
 
     firstNameError(): string {
-        return this.submitted ? (validatePersonName(this.person.firstName, 'nombres') ?? '') : '';
+        return this.submitted || this.touchedFields.has('firstName') ? (validatePersonName(this.person.firstName, 'nombres') ?? '') : '';
     }
 
     lastNameError(): string {
-        return this.submitted ? (validatePersonName(this.person.lastName, 'apellidos') ?? '') : '';
+        return this.submitted || this.touchedFields.has('lastName') ? (validatePersonName(this.person.lastName, 'apellidos') ?? '') : '';
     }
 
     documentError(): string {
-        if (!this.submitted) {
+        if (!this.submitted && !this.touchedFields.has('document')) {
             return '';
         }
         return validateDocument(this.person.documentType, this.person.documentNumber) ?? '';
     }
 
     birthDateError(): string {
-        if (!this.submitted || !this.person.birthDate) {
+        if ((!this.submitted && !this.touchedFields.has('birthDate')) || !this.person.birthDate) {
             return '';
         }
         return validateBirthDate(this.person.birthDate) ?? '';
     }
 
+    childNameError(index: number): string {
+        const child = this.person.familyData?.children?.[index];
+        if (!child || (!this.submitted && !this.touchedFields.has(`childName:${index}`))) {
+            return '';
+        }
+        return validatePersonName(child.name, 'nombre del hijo/a') ?? '';
+    }
+
+    childBirthDateError(index: number): string {
+        const child = this.person.familyData?.children?.[index];
+        if (!child || (!this.submitted && !this.touchedFields.has(`childBirthDate:${index}`))) {
+            return '';
+        }
+        return validateChildBirthDate(child.birthDate) ?? '';
+    }
+
+    universityError(): string {
+        return this.submitted || this.touchedFields.has('university') ? (validateAcademicInstitution(this.person.academicData?.university ?? '') ?? '') : '';
+    }
+
+    completionYearError(): string {
+        return this.submitted || this.touchedFields.has('completionYear') ? (validateAcademicCompletionYear(this.person.academicData?.completionYear ?? '') ?? '') : '';
+    }
+
     phoneError(): string {
-        if (!this.submitted || !this.person.phone) {
+        if ((!this.submitted && !this.touchedFields.has('phone')) || !this.person.phone) {
             return '';
         }
         return validatePhone(this.person.phone) ?? '';
+    }
+
+    optionalCedulaError(field: string, value: string | undefined): string {
+        if ((!this.submitted && !this.touchedFields.has(field)) || !value?.trim()) {
+            return '';
+        }
+        return validateCedula(value) ?? '';
+    }
+
+    optionalPhoneError(field: string, value: string | undefined): string {
+        if ((!this.submitted && !this.touchedFields.has(field)) || !value?.trim()) {
+            return '';
+        }
+        return validatePhone(value) ?? '';
+    }
+
+    onFirstNameChange(): void {
+        this.validateNameOnChange('firstName', this.person.firstName, 'nombres');
+    }
+
+    onLastNameChange(): void {
+        this.validateNameOnChange('lastName', this.person.lastName, 'apellidos');
+    }
+
+    onDocumentTypeChange(): void {
+        this.validateDocumentOnChange();
+    }
+
+    onDocumentNumberChange(): void {
+        this.validateDocumentOnChange();
+    }
+
+    onPhoneChange(): void {
+        this.touchedFields.add('phone');
+        this.notifyValidationError('phone', this.person.phone ? validatePhone(this.person.phone) : null, 'Teléfono inválido');
+    }
+
+    onOptionalCedulaChange(field: string, value: string | undefined): void {
+        this.touchedFields.add(field);
+        this.notifyValidationError(field, value?.trim() ? validateCedula(value) : null, 'Cédula inválida');
+    }
+
+    onOptionalPhoneChange(field: string, value: string | undefined): void {
+        this.touchedFields.add(field);
+        this.notifyValidationError(field, value?.trim() ? validatePhone(value) : null, 'Teléfono inválido');
+    }
+
+    onBirthDateChange(): void {
+        this.touchedFields.add('birthDate');
+        this.notifyValidationError('birthDate', this.person.birthDate ? validateBirthDate(this.person.birthDate) : null, 'Fecha de nacimiento inválida');
+    }
+
+    onBirthDatePickerChange(value: Date | null): void {
+        this.person.birthDate = this.toStoredDate(value);
+        this.onBirthDateChange();
+    }
+
+    onChildNameChange(index: number): void {
+        this.touchedFields.add(`childName:${index}`);
+        const child = this.person.familyData?.children?.[index];
+        this.notifyValidationError(`childName:${index}`, child ? validatePersonName(child.name, 'nombre del hijo/a') : null, 'Nombre del hijo/a inválido');
+    }
+
+    onChildBirthDateChange(index: number): void {
+        this.touchedFields.add(`childBirthDate:${index}`);
+        const child = this.person.familyData?.children?.[index];
+        this.notifyValidationError(`childBirthDate:${index}`, child ? validateChildBirthDate(child.birthDate) : null, 'Fecha de nacimiento del hijo/a inválida');
+    }
+
+    onChildBirthDatePickerChange(index: number, value: Date | null): void {
+        const child = this.person.familyData?.children?.[index];
+        if (child) {
+            child.birthDate = this.toStoredDate(value);
+        }
+        this.onChildBirthDateChange(index);
+    }
+
+    onVacationStartChange(value: Date | null): void {
+        if (this.person.vacationData) {
+            this.person.vacationData.lastVacationStart = this.toStoredDate(value);
+        }
+    }
+
+    onVacationEndChange(value: Date | null): void {
+        if (this.person.vacationData) {
+            this.person.vacationData.lastVacationEnd = this.toStoredDate(value);
+        }
+    }
+
+    onCompletionYearChange(): void {
+        this.touchedFields.add('completionYear');
+        this.notifyValidationError('completionYear', validateAcademicCompletionYear(this.person.academicData?.completionYear ?? ''), 'Año de culminación inválido');
+    }
+
+    private validateNameOnChange(field: 'firstName' | 'lastName', value: string, label: string): void {
+        this.touchedFields.add(field);
+        const error = validatePersonName(value, label);
+        this.notifyValidationError(field, error, `${label.charAt(0).toUpperCase()}${label.slice(1)} inválidos`);
+    }
+
+    private validateDocumentOnChange(): void {
+        this.touchedFields.add('document');
+        this.notifyValidationError('document', validateDocument(this.person.documentType, this.person.documentNumber), 'Documento inválido');
+    }
+
+    private notifyValidationError(field: string, error: string | null, summary: string): void {
+        if (!error) {
+            this.notifiedValidationErrors.delete(field);
+            return;
+        }
+        if (this.notifiedValidationErrors.get(field) === error) {
+            return;
+        }
+        this.notifiedValidationErrors.set(field, error);
+        this.messageService.add({ severity: 'error', summary, detail: error, life: 4000 });
+    }
+
+    private clearValidationState(): void {
+        this.touchedFields.clear();
+        this.notifiedValidationErrors.clear();
+    }
+
+    private clearChildValidationState(): void {
+        for (const field of this.touchedFields) {
+            if (field.startsWith('childName:') || field.startsWith('childBirthDate:')) {
+                this.touchedFields.delete(field);
+            }
+        }
+        for (const field of this.notifiedValidationErrors.keys()) {
+            if (field.startsWith('childName:') || field.startsWith('childBirthDate:')) {
+                this.notifiedValidationErrors.delete(field);
+            }
+        }
+    }
+
+    private startOfDay(date: Date): Date {
+        date.setHours(0, 0, 0, 0);
+        return date;
+    }
+
+    private fromStoredDate(value: string | undefined): Date | null {
+        const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value ?? '');
+        if (!match) {
+            return null;
+        }
+        const [, yearText, monthText, dayText] = match;
+        const year = Number(yearText);
+        const month = Number(monthText);
+        const day = Number(dayText);
+        const date = new Date(0);
+        date.setFullYear(year, month - 1, day);
+        date.setHours(0, 0, 0, 0);
+        return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day ? date : null;
+    }
+
+    private toStoredDate(date: Date | null): string {
+        if (!date) {
+            return '';
+        }
+        const year = date.getFullYear();
+        const month = `${date.getMonth() + 1}`.padStart(2, '0');
+        const day = `${date.getDate()}`.padStart(2, '0');
+        return `${year}-${month}-${day}`;
     }
 
     savePerson(): void {
@@ -396,6 +724,26 @@ export class Personas {
             return;
         }
 
+        const spouseCedula = this.person.familyData?.spouseDocumentNumber?.trim();
+        if (spouseCedula) {
+            const spouseCedulaError = validateCedula(spouseCedula);
+            if (spouseCedulaError) {
+                this.activeEditTab = '1';
+                this.messageService.add({ severity: 'error', summary: 'Cédula del cónyuge inválida', detail: spouseCedulaError, life: 4000 });
+                return;
+            }
+        }
+
+        const spousePhone = this.person.familyData?.spousePhone?.trim();
+        if (spousePhone) {
+            const spousePhoneError = validatePhone(spousePhone);
+            if (spousePhoneError) {
+                this.activeEditTab = '1';
+                this.messageService.add({ severity: 'error', summary: 'Teléfono del cónyuge inválido', detail: spousePhoneError, life: 4000 });
+                return;
+            }
+        }
+
         if (this.person.birthDate) {
             const birthErr = validateBirthDate(this.person.birthDate);
             if (birthErr) {
@@ -409,6 +757,65 @@ export class Personas {
             }
         }
 
+        for (const child of this.person.familyData?.children ?? []) {
+            const childNameErr = validatePersonName(child.name, 'nombre del hijo/a');
+            if (childNameErr) {
+                this.activeEditTab = '1';
+                this.messageService.add({
+                    severity: 'error',
+                    summary: 'Nombre del hijo/a inválido',
+                    detail: childNameErr,
+                    life: 4000
+                });
+                return;
+            }
+
+            const childBirthDateErr = validateChildBirthDate(child.birthDate);
+            if (childBirthDateErr) {
+                this.activeEditTab = '1';
+                this.messageService.add({
+                    severity: 'error',
+                    summary: 'Fecha de nacimiento del hijo/a inválida',
+                    detail: childBirthDateErr,
+                    life: 4000
+                });
+                return;
+            }
+
+            if (child.documentNumber?.trim()) {
+                const childCedulaErr = validateCedula(child.documentNumber);
+                if (childCedulaErr) {
+                    this.activeEditTab = '1';
+                    this.messageService.add({ severity: 'error', summary: 'Cédula del hijo/a inválida', detail: childCedulaErr, life: 4000 });
+                    return;
+                }
+            }
+        }
+
+        const universityErr = validateAcademicInstitution(this.person.academicData?.university ?? '');
+        if (universityErr) {
+            this.activeEditTab = '6';
+            this.messageService.add({
+                severity: 'error',
+                summary: 'Universidad inválida',
+                detail: universityErr,
+                life: 4000
+            });
+            return;
+        }
+
+        const completionYearErr = validateAcademicCompletionYear(this.person.academicData?.completionYear ?? '');
+        if (completionYearErr) {
+            this.activeEditTab = '6';
+            this.messageService.add({
+                severity: 'error',
+                summary: 'Año de culminación inválido',
+                detail: completionYearErr,
+                life: 4000
+            });
+            return;
+        }
+
         if (this.person.phone) {
             const phoneErr = validatePhone(this.person.phone);
             if (phoneErr) {
@@ -418,6 +825,16 @@ export class Personas {
                     detail: phoneErr,
                     life: 4000
                 });
+                return;
+            }
+        }
+
+        const emergencyPhone = this.person.medicalData?.emergencyContactPhone?.trim();
+        if (emergencyPhone) {
+            const emergencyPhoneError = validatePhone(emergencyPhone);
+            if (emergencyPhoneError) {
+                this.activeEditTab = '3';
+                this.messageService.add({ severity: 'error', summary: 'Teléfono de emergencia inválido', detail: emergencyPhoneError, life: 4000 });
                 return;
             }
         }
@@ -449,7 +866,9 @@ export class Personas {
             familyData: this.person.familyData,
             vacationData: this.person.vacationData,
             medicalData: this.person.medicalData,
-            housingData: this.person.housingData
+            housingData: this.person.housingData,
+            additionalData: this.person.additionalData,
+            academicData: this.person.academicData
         };
 
         const updated = this.personService.update(this.person.id, input, this.actor);
@@ -474,7 +893,7 @@ export class Personas {
     }
 
     exportCsv(): void {
-        const header = ['Código', 'Nombres', 'Apellidos', 'Tipo de documento', 'Documento', 'Teléfono', 'Ciudad', 'Estado', 'Cargo', 'Estado del trabajador', 'Fecha y hora de registro'];
+        const header = ['Código', 'Nombres', 'Apellidos', 'Tipo de documento', 'Documento', 'Teléfono', 'Ciudad', 'Estado', 'Cargo', 'Estado del trabajador', 'Última actualización'];
         const rows = this.filteredPersons().map((person) => [
             person.id,
             person.firstName,
@@ -486,7 +905,7 @@ export class Personas {
             person.department,
             person.type,
             person.status,
-            new Date(person.createdAt).toLocaleString('es-VE')
+            new Date(person.updatedAt || person.createdAt).toLocaleString('es-VE')
         ]);
 
         const csv = [header, ...rows]
@@ -509,6 +928,7 @@ export class Personas {
             'Apellidos',
             'Tipo de documento',
             'Documento',
+            'Cantidad de hijos',
             'Fecha de nacimiento',
             'Género',
             'Teléfono',
@@ -520,7 +940,15 @@ export class Personas {
             'Observaciones',
             'Fecha de registro',
             'Última actualización',
-            'Registrado por'
+            'Registrado por',
+            'Nivel académico',
+            'Especialidad',
+            '¿Graduado(a)?',
+            'Universidad',
+            'Año de culminación (real o estimado)',
+            '¿Desea continuar sus estudios?',
+            'Opciones de estudio',
+            '¿Desea participar como facilitador?'
         ];
         const rows = this.filteredPersons().map((person) => [
             person.id,
@@ -528,6 +956,7 @@ export class Personas {
             person.lastName,
             person.documentType,
             person.documentNumber,
+            person.familyData?.numberOfChildren ?? person.familyData?.children?.length ?? 0,
             person.birthDate,
             person.gender,
             person.phone,
@@ -539,7 +968,15 @@ export class Personas {
             person.notes,
             new Date(person.createdAt).toLocaleString('es-VE'),
             new Date(person.updatedAt).toLocaleString('es-VE'),
-            person.createdBy
+            person.createdBy,
+            person.academicData?.academicLevel ?? '',
+            person.academicData?.specialty ?? '',
+            person.academicData?.graduated === undefined ? '' : person.academicData.graduated ? 'Sí' : 'No',
+            person.academicData?.university ?? '',
+            person.academicData?.completionYear ?? '',
+            person.academicData?.continueStudies ?? '',
+            person.academicData?.studyOptions ?? '',
+            person.academicData?.wantsToFacilitate === undefined ? '' : person.academicData.wantsToFacilitate ? 'Sí' : 'No'
         ]);
         const worksheetRows = [headers, ...rows];
         const columnName = (index: number): string => {

@@ -72,8 +72,8 @@ import { validateCedula, validatePassword, validatePasswordConfirmation, validat
                             }
 
                             <label for="cedula">Cédula *</label>
-                            <input pInputText id="cedula" name="cedula" type="text" [(ngModel)]="cedula" placeholder="V-12345678" autocomplete="username" />
-                            @if (submitted && cedulaError()) {
+                            <input pInputText id="cedula" name="cedula" type="text" [(ngModel)]="cedula" (ngModelChange)="cedulaTouched = true" placeholder="V-12345678" autocomplete="username" />
+                            @if ((submitted || cedulaTouched) && cedulaError()) {
                                 <small class="field-error">{{ cedulaError() }}</small>
                             }
 
@@ -157,6 +157,8 @@ export class Register {
     loading = false;
 
     submitted = false;
+
+    cedulaTouched = false;
 
     constructor() {
         if (this.auth.currentUser()) {
