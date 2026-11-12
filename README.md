@@ -9,8 +9,10 @@ Aplicación Angular + PrimeNG para actualizar y administrar a los trabajadores d
 - Inicio de sesión y registro exclusivo para usuarios **Administradores**.
 - Panel con estadísticas de trabajadores, distribución por cargo y últimas actualizaciones.
 - Gestión integral de trabajadores: actualización de datos personales, familiares, vacaciones, médicos, habitacionales y adicionales.
+- Calendarios en formato día/mes/año y validación de fechas imposibles.
+- Validación de cédulas y teléfonos con estructura venezolana en los formularios.
 - Inhabilitación de trabajadores con motivo obligatorio y registro en bitácora.
-- Exportación en formatos CSV y Excel con fecha de última actualización.
+- Exportación en formatos CSV y Excel; el Excel incluye la cantidad de hijos sin exportar sus datos individuales.
 - Administración de usuarios administradores (crear, editar, activar/desactivar y restablecer contraseñas).
 - Bitácora automática de ingresos, actualizaciones y cambios de estado.
 - Persistencia local en el navegador (`localStorage`) preparada para futura integración con API/BD.
@@ -36,6 +38,12 @@ Abre `http://localhost:4200/`.
 
 ```bash
 npm run build
+```
+
+## Pruebas
+
+```bash
+npm test -- --watch=false
 ```
 
 ## Estructura principal
