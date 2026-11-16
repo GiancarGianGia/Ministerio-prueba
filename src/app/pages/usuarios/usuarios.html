@@ -121,23 +121,36 @@
                 </div>
 
                 <div class="form-field form-field-full">
-                    <label for="userCedula">Cédula *</label>
-                    <input pInputText id="userCedula" type="text" [(ngModel)]="userForm.cedula" (ngModelChange)="cedulaTouched = true" placeholder="V-12345678" />
-                    @if (cedulaError()) {
-                        <small class="field-error">{{ cedulaError() }}</small>
+                    <label for="userCedula">Documento de identidad *</label>
+                    @if (editing) {
+                        <input pInputText id="userCedula" type="text" [value]="displayCedula" disabled />
+                        <small class="field-hint">La cédula no se puede modificar: proviene de la base de datos cuando el usuario crea su cuenta.</small>
+                    } @else {
+                        <div class="doc-input-row">
+                            <app-document-prefix-select [(ngModel)]="cedulaPrefix" (ngModelChange)="cedulaTouched = true" />
+                            <input pInputText id="userCedula" type="text" [(ngModel)]="userForm.cedula" (ngModelChange)="cedulaTouched = true" placeholder="12345678" />
+                        </div>
+                        @if (cedulaError()) {
+                            <small class="field-error">{{ cedulaError() }}</small>
+                        }
+                        @if (!cedulaError()) {
+                            <small class="field-hint">La cédula debe llevar el tipo de documento y el número sin puntos (ej. V-18745632).</small>
+                        }
                     }
                 </div>
 
-                <div class="form-field form-field-full">
-                    <label for="userPassword">{{ editing ? 'Nueva contraseña' : 'Contraseña *' }}</label>
-                    <p-password id="userPassword" [(ngModel)]="userForm.password" [toggleMask]="true" [feedback]="false" [fluid]="true" [placeholder]="editing ? 'Déjala vacía para conservar la actual' : 'Mínimo 6 caracteres (letras y números)'" />
-                    @if (editing) {
-                        <small class="field-hint">Si no escribes una contraseña, se conserva la actual.</small>
-                    }
-                    @if (passwordError()) {
-                        <small class="field-error">{{ passwordError() }}</small>
-                    }
-                </div>
+                @if (manageCredentials) {
+                    <div class="form-field form-field-full">
+                        <label for="userPassword">{{ editing ? 'Nueva contraseña' : 'Contraseña *' }}</label>
+                        <p-password id="userPassword" [ngModel]="userForm.password" (ngModelChange)="userForm.password = $event.toUpperCase()" [toggleMask]="true" [feedback]="false" [fluid]="true" [placeholder]="editing ? 'Déjala vacía para conservar la actual' : 'Mínimo 6 caracteres (letras y números)'" />
+                        @if (editing) {
+                            <small class="field-hint">Si no escribes una contraseña, se conserva la actual.</small>
+                        }
+                        @if (passwordError()) {
+                            <small class="field-error">{{ passwordError() }}</small>
+                        }
+                    </div>
+                }
 
                 <div class="form-field form-field-full">
                     <label>Estado de la cuenta</label>
@@ -147,7 +160,8 @@
                     </div>
                 </div>
 
-                <section class="form-field form-field-full security-questions-section" aria-labelledby="security-questions-title">
+                @if (editingSelf) {
+                    <section class="form-field form-field-full security-questions-section" aria-labelledby="security-questions-title">
                     <h2 id="security-questions-title" class="security-questions-title">
                         <i class="pi pi-shield" aria-hidden="true"></i>
                         Preguntas de seguridad
@@ -157,7 +171,7 @@
                     </p>
 
                     @for (sq of securityQuestionsForm; track $index) {
-                        <div class="security-question-card">
+                        <div class="security-question-card" [class.is-invalid]="!!securityQuestionError($index)">
                             <label class="security-question-label" [for]="'securityQuestion' + $index">
                                 Pregunta {{ $index + 1 }} {{ $index === 0 ? '(recomendada)' : '(opcional)' }}
                             </label>
@@ -173,21 +187,41 @@
                                 styleClass="w-full"
                             />
                             <label class="security-question-label security-answer-label" [for]="'securityAnswer' + $index">Respuesta</label>
-                            <input
-                                pInputText
-                                [id]="'securityAnswer' + $index"
-                                [(ngModel)]="securityQuestionsForm[$index].answer"
-                                [disabled]="!securityQuestionsForm[$index].question"
-                                placeholder="Selecciona una pregunta y escribe tu respuesta"
-                            />
+                            <div class="secret-input">
+                                <input
+                                    pInputText
+                                    [id]="'securityAnswer' + $index"
+                                    [type]="securityAnswerVisible[$index] ? 'text' : 'password'"
+                                    [ngModel]="securityQuestionsForm[$index].answer"
+                                    (ngModelChange)="onSecurityAnswerChange($index, $event)"
+                                    [disabled]="!securityQuestionsForm[$index].question"
+                                    placeholder="Selecciona una pregunta y escribe tu respuesta"
+                                    autocomplete="off"
+                                />
+                                <button
+                                    type="button"
+                                    class="secret-input-toggle"
+                                    [attr.aria-label]="securityAnswerVisible[$index] ? 'Ocultar respuesta' : 'Mostrar respuesta'"
+                                    [attr.title]="securityAnswerVisible[$index] ? 'Ocultar respuesta' : 'Mostrar respuesta'"
+                                    [disabled]="!securityQuestionsForm[$index].answer"
+                                    (click)="toggleSecurityAnswerVisibility($index)"
+                                >
+                                    <i class="pi" [class.pi-eye]="!securityAnswerVisible[$index]" [class.pi-eye-slash]="securityAnswerVisible[$index]"></i>
+                                </button>
+                            </div>
                             @if (securityQuestionError($index)) {
                                 <small class="field-error">{{ securityQuestionError($index) }}</small>
                             }
                         </div>
                     }
                 </section>
+                } @else {
+                    <div class="form-field form-field-full">
+                        <small class="field-hint">Las preguntas de seguridad son personales: cada usuario solo puede verlas y editarlas desde su propia cuenta, al igual que su contraseña.</small>
+                    </div>
+                }
             </div>
-                                             
+
             <ng-template #footer>
                 <p-button label="Cancelar" icon="pi pi-times" severity="secondary" [outlined]="true" styleClass="btn-cancelar" (click)="hideDialog()" />
                 <p-button [label]="editing ? 'Guardar cambios' : 'Crear usuario'" icon="pi pi-check" (click)="saveUser()" />

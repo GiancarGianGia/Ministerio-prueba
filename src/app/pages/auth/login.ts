@@ -9,12 +9,13 @@ import { InputTextModule } from 'primeng/inputtext';
 import { PasswordModule } from 'primeng/password';
 import { ToastModule } from 'primeng/toast';
 import { AuthService } from '@/app/services/auth.service';
-import { validateCedula, validatePassword, validatePasswordConfirmation } from '@/app/services/validators';
+import { PASSWORD_CONFIRMATION_LABEL, PASSWORD_REQUIREMENTS, composeDocumentNumber, missingPasswordRequirements, stripDocumentPrefix, validateIdentityDocument, validatePassword, validatePasswordConfirmation } from '@/app/services/validators';
+import { DocumentPrefixSelect } from '@/app/components/document-prefix-select/document-prefix-select';
 
 @Component({
     selector: 'app-login',
     standalone: true,
-    imports: [CommonModule, FormsModule, RouterModule, ButtonModule, DialogModule, InputTextModule, PasswordModule, ToastModule],
+    imports: [CommonModule, FormsModule, RouterModule, ButtonModule, DialogModule, DocumentPrefixSelect, InputTextModule, PasswordModule, ToastModule],
     providers: [MessageService],
     template: `
         <p-toast />
@@ -57,18 +58,21 @@ import { validateCedula, validatePassword, validatePasswordConfirmation } from '
                         </div>
 
                         <form class="auth-form" (ngSubmit)="submit()">
-                            <label for="cedula">Cédula</label>
-                            <input
-                                pInputText
-                                id="cedula"
-                                name="cedula"
-                                type="text"
-                                [(ngModel)]="cedula"
-                                (ngModelChange)="cedulaTouched = true"
-                                placeholder="V-12345678"
-                                autocomplete="username"
-                                required
-                            />
+                            <label for="cedula">Documento de identidad</label>
+                            <div class="doc-input-row">
+                                <app-document-prefix-select name="cedulaPrefix" [(ngModel)]="cedulaPrefix" (ngModelChange)="cedulaTouched = true" />
+                                <input
+                                    pInputText
+                                    id="cedula"
+                                    name="cedula"
+                                    type="text"
+                                    [(ngModel)]="cedula"
+                                    (ngModelChange)="cedulaTouched = true"
+                                    placeholder="12345678"
+                                    autocomplete="username"
+                                    required
+                                />
+                            </div>
                             @if (cedulaTouched && cedulaError()) {
                                 <small class="field-error">{{ cedulaError() }}</small>
                             }
@@ -77,7 +81,8 @@ import { validateCedula, validatePassword, validatePasswordConfirmation } from '
                             <p-password
                                 inputId="password"
                                 name="password"
-                                [(ngModel)]="password"
+                                [ngModel]="password"
+                                (ngModelChange)="password = $event.toUpperCase()"
                                 [toggleMask]="true"
                                 [feedback]="false"
                                 [fluid]="true"
@@ -101,7 +106,7 @@ import { validateCedula, validatePassword, validatePasswordConfirmation } from '
 
                         <div class="auth-demo">
                             <span class="auth-demo-title">Acceso de prueba</span>
-                            <div><strong>V-00000000</strong> / <strong>admin123</strong></div>
+                            <div><strong>V-00000000</strong> / <strong>ADMIN123</strong></div>
                             <button type="button" class="auth-link" (click)="loginDemo()">Usar credenciales de administrador</button>
                         </div>
 
@@ -118,18 +123,21 @@ import { validateCedula, validatePassword, validatePasswordConfirmation } from '
                 <!-- PASO 1: Ingresar cédula -->
                 @if (forgotStep === 1) {
                     <p style="font-size: 0.85rem; color: #64748b; margin: 0 0 0.5rem;">
-                        Ingresa tu cédula para verificar tu identidad.
+                        Selecciona el tipo de documento e ingresa tu número para verificar tu identidad.
                     </p>
                     <div>
-                        <label for="forgotCedula">Cédula *</label>
-                        <input
-                            pInputText
-                            id="forgotCedula"
-                            [(ngModel)]="forgotCedula"
-                            (ngModelChange)="forgotCedulaTouched = true"
-                            placeholder="V-12345678"
-                            style="width: 100%"
-                        />
+                        <label for="forgotCedula">Documento de identidad *</label>
+                        <div class="doc-input-row">
+                            <app-document-prefix-select [(ngModel)]="forgotCedulaPrefix" (ngModelChange)="forgotCedulaTouched = true" />
+                            <input
+                                pInputText
+                                id="forgotCedula"
+                                [(ngModel)]="forgotCedula"
+                                (ngModelChange)="forgotCedulaTouched = true"
+                                placeholder="12345678"
+                                style="width: 100%"
+                            />
+                        </div>
                         @if (forgotCedulaTouched && forgotCedulaError()) {
                             <small class="field-error">{{ forgotCedulaError() }}</small>
                         }
@@ -142,14 +150,28 @@ import { validateCedula, validatePassword, validatePasswordConfirmation } from '
                         Responde tus preguntas de seguridad para continuar.
                     </p>
                     @for (q of forgotQuestions; track $index) {
-                        <div style="margin-bottom: 0.75rem;">
-                            <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 0.3rem;">{{ q }}</label>
-                            <input
-                                pInputText
-                                [(ngModel)]="forgotAnswers[$index]"
-                                placeholder="Tu respuesta..."
-                                style="width: 100%"
-                            />
+                        <div class="security-question-field" [class.is-incorrect]="isForgotQuestionIncorrect(q)">
+                            <label>{{ q }}</label>
+                            <div class="secret-input">
+                                <input
+                                    pInputText
+                                    [type]="forgotAnswerVisible[$index] ? 'text' : 'password'"
+                                    [ngModel]="forgotAnswers[$index]"
+                                    (ngModelChange)="onForgotAnswerChange($index, $event)"
+                                    placeholder="Tu respuesta..."
+                                    autocomplete="off"
+                                />
+                                <button
+                                    type="button"
+                                    class="secret-input-toggle"
+                                    [attr.aria-label]="forgotAnswerVisible[$index] ? 'Ocultar respuesta' : 'Mostrar respuesta'"
+                                    [attr.title]="forgotAnswerVisible[$index] ? 'Ocultar respuesta' : 'Mostrar respuesta'"
+                                    [disabled]="!forgotAnswers[$index]"
+                                    (click)="toggleForgotAnswerVisibility($index)"
+                                >
+                                    <i class="pi" [class.pi-eye]="!forgotAnswerVisible[$index]" [class.pi-eye-slash]="forgotAnswerVisible[$index]"></i>
+                                </button>
+                            </div>
                         </div>
                     }
                 }
@@ -163,7 +185,8 @@ import { validateCedula, validatePassword, validatePasswordConfirmation } from '
                         <label for="forgotNewPassword">Nueva contraseña *</label>
                         <p-password
                             inputId="forgotNewPassword"
-                            [(ngModel)]="forgotNewPassword"
+                            [ngModel]="forgotNewPassword"
+                            (ngModelChange)="forgotNewPassword = $event.toUpperCase()"
                             [toggleMask]="true"
                             [feedback]="false"
                             [fluid]="true"
@@ -174,7 +197,8 @@ import { validateCedula, validatePassword, validatePasswordConfirmation } from '
                         <label for="forgotConfirmPassword">Confirmar contraseña *</label>
                         <p-password
                             inputId="forgotConfirmPassword"
-                            [(ngModel)]="forgotConfirmPassword"
+                            [ngModel]="forgotConfirmPassword"
+                            (ngModelChange)="forgotConfirmPassword = $event.toUpperCase()"
                             [toggleMask]="true"
                             [feedback]="false"
                             [fluid]="true"
@@ -214,6 +238,7 @@ export class Login {
     private readonly messageService = inject(MessageService);
 
     cedula = '';
+    cedulaPrefix = '';
     cedulaTouched = false;
     password = '';
     error = '';
@@ -222,9 +247,12 @@ export class Login {
     forgotDialog = false;
     forgotStep = 1;
     forgotCedula = '';
+    forgotCedulaPrefix = '';
     forgotCedulaTouched = false;
     forgotQuestions: string[] = [];
     forgotAnswers: string[] = [];
+    forgotAnswerVisible: boolean[] = [];
+    forgotIncorrectQuestions = new Set<string>();
     forgotNewPassword = '';
     forgotConfirmPassword = '';
     forgotError = '';
@@ -246,26 +274,34 @@ export class Login {
     }
 
     cedulaError(): string {
-        return validateCedula(this.cedula) ?? '';
+        return validateIdentityDocument(this.cedulaPrefix, this.cedula) ?? '';
     }
 
     forgotCedulaError(): string {
-        return validateCedula(this.forgotCedula) ?? '';
+        return validateIdentityDocument(this.forgotCedulaPrefix, this.forgotCedula) ?? '';
+    }
+
+    private currentDocument(): string {
+        return composeDocumentNumber(this.cedulaPrefix, this.cedula);
+    }
+
+    private forgotDocument(): string {
+        return composeDocumentNumber(this.forgotCedulaPrefix, this.forgotCedula);
     }
 
     submit(): void {
         this.error = '';
-        if (!this.cedula.trim() || !this.password) {
-            this.error = 'Escribe tu cédula y contraseña.';
+        if (!this.cedulaPrefix || !this.cedula.trim() || !this.password) {
+            this.error = 'Selecciona el tipo de documento, escribe tu cédula y tu contraseña.';
             return;
         }
-        const cedulaError = validateCedula(this.cedula);
+        const cedulaError = validateIdentityDocument(this.cedulaPrefix, this.cedula);
         if (cedulaError) {
             this.error = cedulaError;
             return;
         }
         this.loading = true;
-        const result = this.auth.login(this.cedula, this.password);
+        const result = this.auth.login(this.currentDocument(), this.password);
         if (!result.ok) {
             this.error = result.message;
             this.loading = false;
@@ -275,23 +311,28 @@ export class Login {
     }
 
     loginDemo(): void {
-        this.cedula = 'V-00000000';
-        this.password = 'admin123';
+        this.cedulaPrefix = 'V';
+        this.cedula = '00000000';
+        this.password = 'ADMIN123';
         this.submit();
     }
 
     openForgotDialog(): void {
         this.resetForgotState();
-        this.forgotCedula = this.cedula || '';
+        this.forgotCedulaPrefix = this.cedulaPrefix;
+        this.forgotCedula = stripDocumentPrefix(this.cedula);
         this.forgotDialog = true;
     }
 
     resetForgotState(): void {
         this.forgotStep = 1;
         this.forgotCedula = '';
+        this.forgotCedulaPrefix = '';
         this.forgotCedulaTouched = false;
         this.forgotQuestions = [];
         this.forgotAnswers = [];
+        this.forgotAnswerVisible = [];
+        this.forgotIncorrectQuestions.clear();
         this.forgotNewPassword = '';
         this.forgotConfirmPassword = '';
         this.forgotError = '';
@@ -301,11 +342,11 @@ export class Login {
     forgotStep1(): void {
         this.forgotError = '';
         this.forgotCedulaTouched = true;
-        const cedulaErr = validateCedula(this.forgotCedula);
+        const cedulaErr = this.forgotCedulaError();
         if (cedulaErr) { this.forgotError = cedulaErr; return; }
 
         this.forgotLoading = true;
-        const result = this.auth.getSecurityQuestions(this.forgotCedula);
+        const result = this.auth.getSecurityQuestions(this.forgotDocument());
         this.forgotLoading = false;
 
         if (!result.ok) { this.forgotError = result.message; return; }
@@ -313,10 +354,13 @@ export class Login {
         if (result.questions.length === 0) {
             this.forgotQuestions = [];
             this.forgotAnswers = [];
+            this.forgotAnswerVisible = [];
             this.forgotStep = 3;
         } else {
             this.forgotQuestions = result.questions;
             this.forgotAnswers = result.questions.map(() => '');
+            this.forgotAnswerVisible = result.questions.map(() => false);
+            this.forgotIncorrectQuestions.clear();
             this.forgotStep = 2;
         }
     }
@@ -333,15 +377,30 @@ export class Login {
             question,
             answer: this.forgotAnswers[index]
         }));
-        const result = this.auth.verifySecurityQuestions(this.forgotCedula, answeredQuestions);
+        const result = this.auth.verifySecurityQuestions(this.forgotDocument(), answeredQuestions);
         this.forgotLoading = false;
 
         if (!result.ok) {
             this.forgotError = result.message;
+            this.forgotIncorrectQuestions = new Set(result.incorrectQuestions ?? []);
             return;
         }
 
+        this.forgotIncorrectQuestions.clear();
         this.forgotStep = 3;
+    }
+
+    toggleForgotAnswerVisibility(index: number): void {
+        this.forgotAnswerVisible[index] = !this.forgotAnswerVisible[index];
+    }
+
+    isForgotQuestionIncorrect(question: string): boolean {
+        return this.forgotIncorrectQuestions.has(question);
+    }
+
+    onForgotAnswerChange(index: number, value: string): void {
+        this.forgotAnswers[index] = (value ?? '').toUpperCase();
+        this.forgotIncorrectQuestions.delete(this.forgotQuestions[index]);
     }
 
     forgotStep3(): void {
@@ -361,7 +420,7 @@ export class Login {
         }));
 
         const result = this.auth.resetPassword(
-            this.forgotCedula,
+            this.forgotDocument(),
             this.forgotNewPassword,
             answeredQuestions.length > 0 ? answeredQuestions : undefined
         );
@@ -370,14 +429,15 @@ export class Login {
 
         if (!result.ok) {
             this.forgotError = result.message;
+            this.forgotIncorrectQuestions = new Set(result.incorrectQuestions ?? []);
             if (this.forgotQuestions.length > 0) {
                 this.forgotStep = 2;
-                this.forgotAnswers = this.forgotQuestions.map(() => '');
             }
             return;
         }
 
-        this.cedula = this.forgotCedula;
+        this.cedulaPrefix = this.forgotCedulaPrefix;
+        this.cedula = stripDocumentPrefix(this.forgotCedula);
         this.password = '';
         this.forgotDialog = false;
         this.messageService.add({

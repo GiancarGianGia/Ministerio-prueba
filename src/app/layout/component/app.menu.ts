@@ -32,20 +32,10 @@ export class AppMenu {
             : [];
 
         this.model = [
-            {
-                label: 'Principal',
-                items: [{ label: 'Panel principal', icon: 'pi pi-fw pi-home', routerLink: ['/'] }]
-            },
-            {
-                label: 'Trabajadores',
-                items: [
-                    { label: 'Trabajadores', icon: 'pi pi-fw pi-users', routerLink: ['/personas'] }
-                ]
-            },
-            {
-                label: 'Administración',
-                items: [...adminItems, { label: 'Registro de actividad', icon: 'pi pi-fw pi-history', routerLink: ['/actividad'] }]
-            },
+            { label: 'Panel principal', icon: 'pi pi-fw pi-home', routerLink: ['/'] },
+            { label: 'Trabajadores', icon: 'pi pi-fw pi-users', routerLink: ['/personas'] },
+            ...adminItems,
+            { label: 'Registro de actividad', icon: 'pi pi-fw pi-history', routerLink: ['/actividad'] },
             {
                 label: 'Cerrar sesión',
                 icon: 'pi pi-fw pi-sign-out',

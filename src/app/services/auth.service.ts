@@ -1,5 +1,5 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { AppUser, AuthResult, NewUserInput, nextSequentialId, SecurityQuestion, STORAGE_KEYS, UpdateUserInput, USER_ROLES, UserRole } from './models';
+import { AppUser, AuthResult, NewUserInput, nextSequentialId, STORAGE_KEYS, UpdateUserInput, USER_ROLES, UserRole } from './models';
 import { LogService } from './log.service';
 import { StorageService } from './storage.service';
 import { normalizeCedula, validateCedula, validatePassword } from './validators';
@@ -8,7 +8,7 @@ const DEFAULT_ADMIN: AppUser = {
     id: 'USR-0001',
     fullName: 'Administrador del Sistema',
     cedula: 'V-00000000',
-    password: 'admin123',
+    password: 'ADMIN123',
     role: 'Administrador',
     active: true,
     createdAt: new Date().toISOString(),
@@ -43,7 +43,7 @@ export class AuthService {
         const normalizedCedula = normalizeCedula(cedula);
         const user = this._users().find((item) => item.cedula === normalizedCedula);
 
-        if (!user || user.password !== password) {
+        if (!user || user.password.toUpperCase() !== password.toUpperCase()) {
             return { ok: false, message: 'La cédula o la contraseña no son correctas.' };
         }
 
@@ -87,7 +87,7 @@ export class AuthService {
             id: nextSequentialId('USR', this._users().map((user) => user.id)),
             fullName: name,
             cedula: normalizedCedula,
-            password,
+            password: password.toUpperCase(),
             role: 'Administrador',
             active: true,
             createdAt: new Date().toISOString(),
@@ -126,12 +126,14 @@ export class AuthService {
             if (!answeredQuestions || answeredQuestions.length === 0) {
                 return { ok: false, message: 'Debes responder las preguntas de seguridad.' };
             }
-            const allCorrect = user.securityQuestions.every((sq) => {
-                const answered = answeredQuestions.find((aq) => aq.question === sq.question);
-                return answered && answered.answer.trim().toLowerCase() === sq.answer.trim().toLowerCase();
-            });
-            if (!allCorrect) {
-                return { ok: false, message: 'Una o más respuestas de seguridad son incorrectas.' };
+            const incorrectQuestions = user.securityQuestions
+                .filter((sq) => {
+                    const answered = answeredQuestions.find((aq) => aq.question === sq.question);
+                    return !answered || answered.answer.trim().toLowerCase() !== sq.answer.trim().toLowerCase();
+                })
+                .map((sq) => sq.question);
+            if (incorrectQuestions.length > 0) {
+                return { ok: false, message: 'Una o más respuestas de seguridad son incorrectas.', incorrectQuestions };
             }
         }
 
@@ -140,7 +142,7 @@ export class AuthService {
             return { ok: false, message: passwordError };
         }
 
-        const updated: AppUser = { ...user, password: newPassword };
+        const updated: AppUser = { ...user, password: newPassword.toUpperCase() };
         this._users.update((users) => users.map((item) => (item.id === updated.id ? updated : item)));
         this.persistUsers();
         this.logService.record(
@@ -170,14 +172,16 @@ export class AuthService {
             return { ok: false, message: 'Debes responder todas las preguntas de seguridad.' };
         }
 
-        const allCorrect = user.securityQuestions.every((securityQuestion) => {
-            const answered = answeredQuestions.find((item) => item.question === securityQuestion.question);
-            return answered?.answer.trim().toLowerCase() === securityQuestion.answer.trim().toLowerCase();
-        });
+        const incorrectQuestions = user.securityQuestions
+            .filter((securityQuestion) => {
+                const answered = answeredQuestions.find((item) => item.question === securityQuestion.question);
+                return !answered || answered.answer.trim().toLowerCase() !== securityQuestion.answer.trim().toLowerCase();
+            })
+            .map((securityQuestion) => securityQuestion.question);
 
-        return allCorrect
+        return incorrectQuestions.length === 0
             ? { ok: true, message: 'Respuestas verificadas correctamente.' }
-            : { ok: false, message: 'Una o más respuestas de seguridad son incorrectas.' };
+            : { ok: false, message: 'Una o más respuestas de seguridad son incorrectas.', incorrectQuestions };
     }
 
     getSecurityQuestions(cedula: string): { ok: boolean; questions: string[]; message: string } {
@@ -226,12 +230,15 @@ export class AuthService {
             id: nextSequentialId('USR', this._users().map((user) => user.id)),
             fullName: name,
             cedula: normalizedCedula,
-            password: input.password,
+            password: input.password.toUpperCase(),
             role: 'Administrador',
             active: input.active,
             createdAt: new Date().toISOString(),
             createdBy: actor,
-            securityQuestions: input.securityQuestions ?? []
+            securityQuestions: (input.securityQuestions ?? []).map((question) => ({
+                question: question.question,
+                answer: question.answer.toUpperCase()
+            }))
         };
 
         this._users.update((users) => [...users, newUser]);
@@ -263,6 +270,20 @@ export class AuthService {
             return { ok: false, message: cedulaError };
         }
 
+        if (normalizedCedula !== user.cedula) {
+            return { ok: false, message: 'La cédula de un usuario no se puede modificar.' };
+        }
+
+        const isSelf = this._currentUser()?.id === id;
+
+        if (input.password?.trim() && !isSelf) {
+            return { ok: false, message: 'Solo el propio usuario puede cambiar su contraseña.' };
+        }
+
+        if (input.securityQuestions !== undefined && !isSelf) {
+            return { ok: false, message: 'Solo el propio usuario puede ver o cambiar sus preguntas de seguridad.' };
+        }
+
         if (this._users().some((item) => item.id !== id && item.cedula === normalizedCedula)) {
             return { ok: false, message: 'Ya existe otro usuario con esa cédula.' };
         }
@@ -285,8 +306,14 @@ export class AuthService {
             cedula: normalizedCedula,
             role: 'Administrador',
             active: input.active,
-            password: input.password?.trim() ? input.password : user.password,
-            securityQuestions: input.securityQuestions !== undefined ? input.securityQuestions : user.securityQuestions,
+            password: input.password?.trim() ? input.password.toUpperCase() : user.password,
+            securityQuestions:
+                input.securityQuestions !== undefined
+                    ? input.securityQuestions.map((question) => ({
+                          question: question.question,
+                          answer: question.answer.toUpperCase()
+                      }))
+                    : user.securityQuestions,
             ...(input.active
                 ? { deactivatedBy: undefined }
                 : user.active
@@ -388,9 +415,11 @@ export class AuthService {
             ? users.map((user) => ({
                   id: user.id ?? '',
                   fullName: user.fullName ?? '',
-                  cedula:
-                      user.cedula?.trim() ||
-                      (user.id === DEFAULT_ADMIN.id && user.role === 'Administrador' ? DEFAULT_ADMIN.cedula : ''),
+                  cedula: user.cedula?.trim()
+                      ? normalizeCedula(user.cedula)
+                      : user.id === DEFAULT_ADMIN.id && user.role === 'Administrador'
+                        ? DEFAULT_ADMIN.cedula
+                        : '',
                   password: user.password ?? '',
                   role: 'Administrador' as UserRole,
                   active: user.active ?? false,

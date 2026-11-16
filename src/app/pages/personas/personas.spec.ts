@@ -30,9 +30,10 @@ describe('Personas Component - Búsqueda de trabajadores', () => {
         const p1 = personService.add(
             {
                 firstName: 'Esperanza',
-                lastName: 'Gómez Valero',
+                lastName: 'Gómez',
+                secondLastName: 'Valero',
                 documentType: DOCUMENT_TYPES[0],
-                documentNumber: 'V-77.888.999',
+                documentNumber: 'V-77888999',
                 birthDate: '1988-03-14',
                 gender: GENDERS[0],
                 phone: '+58 412 1111111',
@@ -50,9 +51,10 @@ describe('Personas Component - Búsqueda de trabajadores', () => {
         const p2 = personService.add(
             {
                 firstName: 'Leonardo',
-                lastName: 'Pérez Silva',
+                lastName: 'Pérez',
+                secondLastName: 'Silva',
                 documentType: DOCUMENT_TYPES[0],
-                documentNumber: 'V-24.123.456',
+                documentNumber: 'V-24123456',
                 birthDate: '1992-05-10',
                 gender: GENDERS[1],
                 phone: '+58 414 7788899', // Dígitos que coinciden parcialmente con la cédula de Esperanza
@@ -83,7 +85,7 @@ describe('Personas Component - Búsqueda de trabajadores', () => {
     });
 
     it('no debe incluir un trabajador cuyo teléfono coincida con los dígitos buscados', () => {
-        // Buscamos '7788899' que está en el teléfono de Leonardo (0414 7788899), pero en la cédula de Esperanza (V-77.888.999)
+        // Buscamos '7788899' que está en el teléfono de Leonardo (0414 7788899), pero en la cédula de Esperanza (V-77888999)
         component.searchTerm.set('7788899');
         const results = component.filteredPersons();
 
@@ -115,16 +117,16 @@ describe('Personas Component - Búsqueda de trabajadores', () => {
         component.searchTerm.set('2');
         const results = component.filteredPersons();
 
-        // Debe incluir los que empiezan por 2 (por ejemplo V-24.123.456, V-20.516.884, V-22.109.876)
+        // Debe incluir los que empiezan por 2 (por ejemplo V-24123456, V-20516884, V-22109876)
         expect(results.length).toBeGreaterThan(0);
         for (const person of results) {
             const digits = person.documentNumber.replace(/\D/g, '');
             expect(digits.startsWith('2')).toBeTrue();
         }
 
-        // Cédulas como V-18.745.632 (termina en 2) o V-14.238.907 (tiene 2 en el medio) NO deben aparecer
-        expect(results.some((p) => p.documentNumber === 'V-18.745.632')).toBeFalse();
-        expect(results.some((p) => p.documentNumber === 'V-14.238.907')).toBeFalse();
+        // Cédulas como V-18745632 (termina en 2) o V-14238907 (tiene 2 en el medio) NO deben aparecer
+        expect(results.some((p) => p.documentNumber === 'V-18745632')).toBeFalse();
+        expect(results.some((p) => p.documentNumber === 'V-14238907')).toBeFalse();
     });
 
     it('al buscar "22", solo debe retornar cédulas que EMPIECEN por 22', () => {
@@ -137,21 +139,21 @@ describe('Personas Component - Búsqueda de trabajadores', () => {
             expect(digits.startsWith('22')).toBeTrue();
         }
 
-        // Cédula V-24.123.456 o V-20.516.884 empiezan por 24 y 20, no por 22
-        expect(results.some((p) => p.documentNumber === 'V-24.123.456')).toBeFalse();
-        expect(results.some((p) => p.documentNumber === 'V-20.516.884')).toBeFalse();
-        // Cédula V-22.109.876 sí empieza por 22
-        expect(results.some((p) => p.documentNumber === 'V-22.109.876')).toBeTrue();
+        // Cédula V-24123456 o V-20516884 empiezan por 24 y 20, no por 22
+        expect(results.some((p) => p.documentNumber === 'V-24123456')).toBeFalse();
+        expect(results.some((p) => p.documentNumber === 'V-20516884')).toBeFalse();
+        // Cédula V-22109876 sí empieza por 22
+        expect(results.some((p) => p.documentNumber === 'V-22109876')).toBeTrue();
     });
 
     it('al buscar "10", no debe coincidir si 10 está en el medio de la cédula', () => {
         component.searchTerm.set('10');
         const results = component.filteredPersons();
 
-        // V-22.109.876 tiene '10' en el medio, pero NO empieza por 10: NO debe aparecer
-        expect(results.some((p) => p.documentNumber === 'V-22.109.876')).toBeFalse();
-        // V-16.432.109 tiene '10' al final, NO debe aparecer
-        expect(results.some((p) => p.documentNumber === 'V-16.432.109')).toBeFalse();
+        // V-22109876 tiene '10' en el medio, pero NO empieza por 10: NO debe aparecer
+        expect(results.some((p) => p.documentNumber === 'V-22109876')).toBeFalse();
+        // V-16432109 tiene '10' al final, NO debe aparecer
+        expect(results.some((p) => p.documentNumber === 'V-16432109')).toBeFalse();
     });
 
     it('debe avisar inmediatamente cuando el nombre personal es inválido', () => {
@@ -165,7 +167,7 @@ describe('Personas Component - Búsqueda de trabajadores', () => {
         expect(notify).toHaveBeenCalledWith(
             jasmine.objectContaining({
                 severity: 'error',
-                summary: 'Nombres inválidos'
+                summary: 'Primer nombre inválido'
             })
         );
     });
@@ -191,6 +193,8 @@ describe('Personas Component - Búsqueda de trabajadores', () => {
         const person = personService.persons()[0];
         component.editPerson(person);
         component.person.familyData!.children = [{ name: 'Hijo válido', birthDate: '2020-02-31' }];
+        component.person.familyData!.maritalStatus = 'Soltero/a';
+        component.person.email = 'hijo@dominio.com';
 
         component.onChildBirthDateChange(0);
 
@@ -205,19 +209,29 @@ describe('Personas Component - Búsqueda de trabajadores', () => {
         component.savePerson();
 
         expect(component.personDialog).toBeTrue();
-        expect(component.activeEditTab).toBe('1');
+        expect(component.activeEditTab).toBe('8');
         expect(personService.persons().find((item) => item.id === person.id)?.firstName).toBe(person.firstName);
     });
 
     it('debe guardar los cambios del trabajador', () => {
         const person = personService.persons()[0];
         component.editPerson(person);
-        component.person.firstName = 'Nombre actualizado';
+        component.person.firstName = 'Actualizado';
+        component.person.familyData!.maritalStatus = 'Soltero/a';
+        component.person.email = 'persona@dominio.com';
+        component.person.laborData!.administrativeState = 'Distrito Capital';
+        component.person.laborData!.physicalLocation = 'Torre Ministerial, piso 3';
+        component.person.laborData!.officePhoneCode = '0212';
+        component.person.laborData!.officePhone = '5551234';
+        component.person.housingData!.municipality = 'Libertador';
+        component.person.housingData!.parish = 'El Recreo';
+        component.person.housingData!.thoroughfareType = 'Avenida';
+        component.person.housingData!.referencePoint = 'Frente a la plaza Bolívar';
 
         component.savePerson();
 
         expect(component.personDialog).toBeFalse();
-        expect(personService.persons().find((item) => item.id === person.id)?.firstName).toBe('Nombre actualizado');
+        expect(personService.persons().find((item) => item.id === person.id)?.firstName).toBe('Actualizado');
     });
 
     it('debe exportar únicamente la cantidad de hijos en Excel', async () => {

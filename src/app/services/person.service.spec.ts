@@ -51,17 +51,62 @@ describe('PersonService', () => {
 
     it('migrates stored records and removes unsupported fields', () => {
         localStorage.setItem(
-            'registro.personas.v2',
-            JSON.stringify([{ ...makePersonInput(), id: 'PER-0001', createdAt: '2026-01-01', updatedAt: '2026-01-01', createdBy: 'Tester', legacyField: 'old value' }])
+            'registro.personas.v3',
+            JSON.stringify([
+                {
+                    ...makePersonInput(),
+                    status: 'Inactivo',
+                    deactivationReason: 'Motivo antiguo',
+                    id: 'PER-0001',
+                    createdAt: '2026-01-01',
+                    updatedAt: '2026-01-01',
+                    createdBy: 'Tester',
+                    legacyField: 'old value'
+                },
+                {
+                    ...makePersonInput({ documentNumber: 'V-22222222', status: 'Egresado' }),
+                    id: 'PER-0002',
+                    createdAt: '2026-01-02',
+                    updatedAt: '2026-01-02',
+                    createdBy: 'Tester'
+                }
+            ])
         );
         TestBed.resetTestingModule();
         TestBed.configureTestingModule({});
 
         const migratedService = TestBed.inject(PersonService);
-        const savedPersons = JSON.parse(localStorage.getItem('registro.personas.v2') ?? '[]');
+        const savedPersons = JSON.parse(localStorage.getItem('registro.personas.v3') ?? '[]');
 
-        expect(migratedService.persons().length).toBe(1);
+        expect(migratedService.persons().length).toBe(2);
+        expect(migratedService.persons()[0].status).toBe('Egresado');
+        expect(migratedService.persons()[1].status).toBe('Egresado');
+        expect(migratedService.stats().egresados).toBe(2);
         expect(savedPersons[0].legacyField).toBeUndefined();
+        expect(savedPersons[0].deactivationReason).toBeUndefined();
+    });
+
+    it('migra las cédulas almacenadas con puntos a formato sin puntos', () => {
+        localStorage.setItem(
+            'registro.personas.v3',
+            JSON.stringify([
+                {
+                    ...makePersonInput({ documentNumber: 'V-18.745.632' }),
+                    id: 'PER-0001',
+                    createdAt: '2026-01-01',
+                    updatedAt: '2026-01-01',
+                    createdBy: 'Tester'
+                }
+            ])
+        );
+        TestBed.resetTestingModule();
+        TestBed.configureTestingModule({});
+
+        const migratedService = TestBed.inject(PersonService);
+
+        expect(migratedService.persons()[0].documentNumber).toBe('V-18745632');
+        expect(migratedService.documentExists('V-18745632')).toBeTrue();
+        expect(migratedService.documentExists('V-18.745.632')).toBeTrue();
     });
 
     it('documentExists() debe retornar true si el documento ya existe', () => {
@@ -89,42 +134,9 @@ describe('PersonService', () => {
         expect(result).toBeNull();
     });
 
-    it('inactivate() debe conservar al trabajador y guardar el motivo', () => {
-        const created = service.add(makePersonInput({ documentNumber: 'V-99999006' }), 'Tester');
-        const result = service.inactivate(created.id, 'Fin de la relación laboral', 'Tester');
-
-        expect(result.ok).toBeTrue();
-        expect(service.persons().find((person) => person.id === created.id)?.status).toBe('Inactivo');
-        expect(service.persons().find((person) => person.id === created.id)?.deactivationReason).toBe('Fin de la relación laboral');
-        expect(service.documentExists('V-99999006')).toBeTrue();
-        const savedPersons = JSON.parse(localStorage.getItem('registro.personas.v2') ?? '[]');
-        expect(savedPersons.find((person: { id: string }) => person.id === created.id).deactivationReason).toBe('Fin de la relación laboral');
-    });
-
-    it('inactivate() debe exigir un motivo', () => {
-        const created = service.add(makePersonInput({ documentNumber: 'V-99999007' }), 'Tester');
-        const result = service.inactivate(created.id, '  ', 'Tester');
-
-        expect(result.ok).toBeFalse();
-        expect(service.persons().find((person) => person.id === created.id)?.status).toBe('Activo');
-    });
-
-    it('inactivate() debe rechazar motivos de más de 500 caracteres', () => {
-        const created = service.add(makePersonInput({ documentNumber: 'V-99999010' }), 'Tester');
-        const result = service.inactivate(created.id, 'x'.repeat(501), 'Tester');
-
-        expect(result.ok).toBeFalse();
-        expect(service.persons().find((person) => person.id === created.id)?.status).toBe('Activo');
-    });
-
-    it('activate() debe volver a habilitar un trabajador inactivo', () => {
-        const created = service.add(makePersonInput({ documentNumber: 'V-99999008' }), 'Tester');
-        service.inactivate(created.id, 'Motivo de prueba', 'Tester');
-
-        const result = service.activate(created.id, 'Tester');
-
-        expect(result.ok).toBeTrue();
-        expect(service.persons().find((person) => person.id === created.id)?.status).toBe('Activo');
+    it('detecta a los trabajadores egresados cargados desde los datos de ejemplo', () => {
+        expect(service.persons().find((person) => person.id === 'PER-0008')?.status).toBe('Egresado');
+        expect(service.stats().egresados).toBe(1);
     });
 
     it('stats() debe reflejar la cantidad de personas activas', () => {

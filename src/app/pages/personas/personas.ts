@@ -22,36 +22,65 @@ import { strToU8, zipSync } from 'fflate';
 import { AuthService } from '@/app/services/auth.service';
 import {
     AdditionalData,
+    ADDRESS_BUILDING_TYPES,
+    ADDRESS_THOROUGHFARE_TYPES,
+    ADDRESS_UNIT_TYPES,
+    ADDRESS_ZONE_TYPES,
     BLOOD_TYPES,
     CITIES_BY_DEPARTMENT,
     ChildData,
     DEPARTMENTS,
     DISABILITY_GRADES,
     DISABILITY_TYPES,
-    DOCUMENT_TYPES,
+    DOCUMENT_PREFIX_OPTIONS,
     FamilyData,
+    FamilyMember,
+    FAMILY_RELATIONSHIPS,
     GENDERS,
     HousingData,
     HOUSING_CONDITIONS,
     HOUSING_TYPES,
     JACKET_SIZES,
+    LaborData,
     LATERALITY_OPTIONS,
     MARITAL_STATUSES,
     MedicalData,
     MILITARY_REGISTRATION_OPTIONS,
+    MUNICIPALITIES_BY_STATE,
     NewPersonInput,
+    OFFICE_PHONE_CODES,
     PANTS_SIZES,
+    PARISHES_BY_MUNICIPALITY,
     Person,
+    PERSONAL_PHONE_CODES,
     PERSON_STATUSES,
     PERSON_TYPES,
     SHIRT_SIZES,
     SHOE_SIZES,
     TagSeverity,
+    USER_DOCUMENT_PREFIX_OPTIONS,
     VACATION_STATUSES,
     VacationData
 } from '@/app/services/models';
 import { PersonService } from '@/app/services/person.service';
-import { validateAcademicCompletionYear, validateAcademicInstitution, validateBirthDate, validateCedula, validateChildBirthDate, validateDocument, validatePersonName, validatePhone } from '@/app/services/validators';
+import {
+    composeDocumentNumber,
+    composePhoneNumber,
+    documentTypeForPrefix,
+    extractDocumentPrefix,
+    prefixForDocumentType,
+    splitPhoneNumber,
+    stripDocumentPrefix,
+    validateAcademicCompletionYear,
+    validateAcademicInstitution,
+    validateBirthDate,
+    validateCedula,
+    validateChildBirthDate,
+    validateDocument,
+    validateEmail,
+    validatePersonName,
+    validatePhone
+} from '@/app/services/validators';
 
 @Component({
     selector: 'app-personas',
@@ -125,7 +154,9 @@ export class Personas {
             }
 
             // Búsqueda estricta por nombre y apellido: excluye teléfono y todos los demás campos
-            const personFullName = this.normalizeSearchWords(`${person.firstName ?? ''} ${person.lastName ?? ''}`);
+            const personFullName = this.normalizeSearchWords(
+                [person.firstName, person.secondName, person.lastName, person.secondLastName].filter(Boolean).join(' ')
+            );
             const searchWords = this.normalizeSearchWords(rawSearch).split(' ').filter(Boolean);
 
             const matchesName =
@@ -135,11 +166,21 @@ export class Personas {
         })
     );
 
+    private get actor(): string {
+        return this.auth.currentUser()?.fullName ?? 'Sistema';
+    }
+
     readonly typeOptions = PERSON_TYPES.map((value) => ({ label: value, value }));
 
     readonly statusOptions = PERSON_STATUSES.map((value) => ({ label: value, value }));
 
-    readonly documentTypeOptions = DOCUMENT_TYPES.map((value) => ({ label: value, value }));
+    readonly documentTypeSelectOptions = DOCUMENT_PREFIX_OPTIONS.map(({ value, title }) => ({ label: title, value }));
+    readonly workerDocumentTypeOptions = DOCUMENT_PREFIX_OPTIONS.map(({ value, documentType, title }) => ({
+        label: title.split(' — ')[1]?.split(' (')[0] ?? documentType,
+        value
+    }));
+
+    readonly cedulaPrefixOptions = USER_DOCUMENT_PREFIX_OPTIONS;
 
     readonly genderOptions = GENDERS.map((value) => ({ label: value, value }));
 
@@ -152,7 +193,21 @@ export class Personas {
         ];
     }
 
+    get housingMunicipalityOptions(): { label: string; value: string }[] {
+        const state = this.person.department;
+        return state ? (MUNICIPALITIES_BY_STATE[state] ?? []).map((value) => ({ label: value, value })) : [];
+    }
+
+    get housingParishOptions(): { label: string; value: string }[] {
+        const state = this.person.department;
+        const municipality = this.person.housingData?.municipality;
+        const key = state && municipality ? `${state}::${municipality}` : '';
+        return key ? (PARISHES_BY_MUNICIPALITY[key] ?? []).map((value) => ({ label: value, value })) : [];
+    }
+
     readonly maritalStatusOptions = MARITAL_STATUSES.map((value) => ({ label: value, value }));
+
+    readonly relationshipOptions = FAMILY_RELATIONSHIPS.map((value) => ({ label: value, value }));
 
     readonly vacationStatusOptions = VACATION_STATUSES.map((value) => ({ label: value, value }));
 
@@ -165,6 +220,8 @@ export class Personas {
     readonly disabilityGradeOptions = DISABILITY_GRADES.map((value) => ({ label: value, value }));
 
     readonly militaryRegistrationOptions = MILITARY_REGISTRATION_OPTIONS.map((value) => ({ label: value, value }));
+
+    readonly childrenCountOptions = Array.from({ length: 21 }, (_, index) => ({ label: String(index), value: index }));
 
     readonly shirtSizeOptions = SHIRT_SIZES.map((value) => ({ label: value, value }));
 
@@ -201,6 +258,18 @@ export class Personas {
 
     readonly housingConditionOptions = HOUSING_CONDITIONS.map((value) => ({ label: value, value }));
 
+    readonly thoroughfareTypeOptions = ADDRESS_THOROUGHFARE_TYPES;
+
+    readonly buildingTypeOptions = ADDRESS_BUILDING_TYPES;
+
+    readonly unitTypeOptions = ADDRESS_UNIT_TYPES;
+
+    readonly zoneTypeOptions = ADDRESS_ZONE_TYPES;
+
+    readonly officePhoneCodeOptions = OFFICE_PHONE_CODES.map((value) => ({ label: value, value }));
+
+    readonly personalPhoneCodeOptions = PERSONAL_PHONE_CODES.map((value) => ({ label: value, value }));
+
     activeEditTab = '0';
 
     personDialog = false;
@@ -209,13 +278,37 @@ export class Personas {
 
     person: Person = this.emptyPerson();
 
+    documentPrefix = '';
+
+    personalPhoneCode = '';
+
+    personalPhoneNumber = '';
+
+    homePhoneCode = '';
+
+    homePhoneNumber = '';
+
+    spouseDocumentPrefix = '';
+
+    childDocumentPrefixes: string[] = [];
+
     birthDatePicker: Date | null = null;
 
     childBirthDatePickers: (Date | null)[] = [];
 
+    familyMemberBirthDatePickers: (Date | null)[] = [];
+
+    selectedFamilyMemberIndex = -1;
+
+    familyMemberEditing = false;
+
     vacationStartPicker: Date | null = null;
 
     vacationEndPicker: Date | null = null;
+
+    mpppstEntryDatePicker: Date | null = null;
+
+    publicAdminEntryDatePicker: Date | null = null;
 
     readonly todayDate = this.startOfDay(new Date());
 
@@ -228,18 +321,6 @@ export class Personas {
     private readonly touchedFields = new Set<string>();
 
     private readonly notifiedValidationErrors = new Map<string, string>();
-
-    statusDialog = false;
-
-    pendingStatusPerson: Person | null = null;
-
-    inactivationReason = '';
-
-    inactivationReasonError = '';
-
-    private get actor(): string {
-        return this.auth.currentUser()?.fullName ?? 'Sistema';
-    }
 
     private normalizeSearchText(value: string): string {
         return value
@@ -273,10 +354,12 @@ export class Personas {
         this.person = {
             ...person,
             familyData: person.familyData ? { ...person.familyData, children: person.familyData.children ? [...person.familyData.children.map(c => ({ ...c }))] : [] } : this.emptyFamilyData(),
+            familyMembers: (person.familyMembers ?? []).map((member) => ({ ...member })),
             vacationData: person.vacationData ? { ...person.vacationData } : this.emptyVacationData(),
-            medicalData: person.medicalData ? { ...person.medicalData } : this.emptyMedicalData(),
+            medicalData: { ...this.emptyMedicalData(), ...person.medicalData },
             housingData: person.housingData ? { ...person.housingData } : this.emptyHousingData(),
-            additionalData: person.additionalData ? { ...person.additionalData } : this.emptyAdditionalData(),
+            additionalData: { ...this.emptyAdditionalData(), ...person.additionalData },
+            laborData: person.laborData ? { ...person.laborData } : this.emptyLaborData(),
             academicData: {
                 academicLevel: '',
                 specialty: '',
@@ -290,9 +373,30 @@ export class Personas {
             }
         };
         this.birthDatePicker = this.fromStoredDate(this.person.birthDate);
+        const personalPhone = splitPhoneNumber(this.person.phone);
+        this.personalPhoneCode = personalPhone.code;
+        this.personalPhoneNumber = personalPhone.number;
+        const homePhone = splitPhoneNumber(this.person.homePhone ?? '');
+        this.homePhoneCode = homePhone.code;
+        this.homePhoneNumber = homePhone.number;
         this.childBirthDatePickers = (this.person.familyData?.children ?? []).map((child) => this.fromStoredDate(child.birthDate));
+        this.familyMemberBirthDatePickers = (this.person.familyMembers ?? []).map((member) => this.fromStoredDate(member.birthDate));
+        this.selectedFamilyMemberIndex = -1;
+        this.familyMemberEditing = false;
+        this.documentPrefix = extractDocumentPrefix(this.person.documentNumber) || prefixForDocumentType(this.person.documentType);
+        this.person.documentNumber = stripDocumentPrefix(this.person.documentNumber);
+        this.spouseDocumentPrefix = extractDocumentPrefix(this.person.familyData?.spouseDocumentNumber ?? '');
+        if (this.person.familyData?.spouseDocumentNumber) {
+            this.person.familyData.spouseDocumentNumber = stripDocumentPrefix(this.person.familyData.spouseDocumentNumber);
+        }
+        this.childDocumentPrefixes = (this.person.familyData?.children ?? []).map((child) => extractDocumentPrefix(child.documentNumber ?? ''));
+        for (const child of this.person.familyData?.children ?? []) {
+            child.documentNumber = stripDocumentPrefix(child.documentNumber ?? '');
+        }
         this.vacationStartPicker = this.fromStoredDate(this.person.vacationData?.lastVacationStart);
         this.vacationEndPicker = this.fromStoredDate(this.person.vacationData?.lastVacationEnd);
+        this.mpppstEntryDatePicker = this.fromStoredDate(this.person.laborData?.mpppstEntryDate);
+        this.publicAdminEntryDatePicker = this.fromStoredDate(this.person.laborData?.publicAdministrationEntryDate);
         this.citySelection = (CITIES_BY_DEPARTMENT[this.person.department] ?? []).includes(this.person.city)
             ? this.person.city
             : this.person.city
@@ -314,6 +418,10 @@ export class Personas {
     onDepartmentChange(): void {
         this.person.city = '';
         this.citySelection = '';
+        if (this.person.housingData) {
+            this.person.housingData.municipality = '';
+            this.person.housingData.parish = '';
+        }
     }
 
     onCitySelectionChange(value: string): void {
@@ -321,50 +429,8 @@ export class Personas {
         this.person.city = value === 'Otro' ? '' : value;
     }
 
-    openStatusDialog(person: Person): void {
-        this.pendingStatusPerson = person;
-        this.inactivationReason = '';
-        this.inactivationReasonError = '';
-        this.statusDialog = true;
-    }
-
-    hideStatusDialog(): void {
-        this.statusDialog = false;
-        this.pendingStatusPerson = null;
-        this.inactivationReason = '';
-        this.inactivationReasonError = '';
-    }
-
-    saveStatusChange(): void {
-        const person = this.pendingStatusPerson;
-        if (!person) {
-            return;
-        }
-
-        if (person.status !== 'Inactivo' && !this.inactivationReason.trim()) {
-            this.inactivationReasonError = 'El motivo es obligatorio para inhabilitar al trabajador.';
-            return;
-        }
-
-        const result =
-            person.status === 'Inactivo'
-                ? this.personService.activate(person.id, this.actor)
-                : this.personService.inactivate(person.id, this.inactivationReason, this.actor);
-
-        this.messageService.add({
-            severity: result.ok ? 'success' : 'error',
-            summary: result.ok ? 'Estado actualizado' : 'No se pudo actualizar',
-            detail: result.message,
-            life: 3500
-        });
-
-        if (result.ok) {
-            this.hideStatusDialog();
-        }
-    }
-
     private emptyFamilyData(): FamilyData {
-        return { maritalStatus: MARITAL_STATUSES[0], numberOfChildren: 0, children: [] };
+        return { maritalStatus: '', numberOfChildren: 0, children: [] };
     }
 
     private emptyVacationData(): VacationData {
@@ -383,12 +449,16 @@ export class Personas {
         return { militaryRegistration: MILITARY_REGISTRATION_OPTIONS[1] };
     }
 
+    private emptyLaborData(): LaborData {
+        return {};
+    }
+
     private emptyPerson(): Person {
         return {
             id: '',
             firstName: '',
             lastName: '',
-            documentType: DOCUMENT_TYPES[0],
+            documentType: '',
             documentNumber: '',
             birthDate: '',
             gender: GENDERS[0],
@@ -403,10 +473,12 @@ export class Personas {
             updatedAt: '',
             createdBy: '',
             familyData: this.emptyFamilyData(),
+            familyMembers: [],
             vacationData: this.emptyVacationData(),
             medicalData: this.emptyMedicalData(),
             housingData: this.emptyHousingData(),
             additionalData: this.emptyAdditionalData(),
+            laborData: this.emptyLaborData(),
             academicData: {
                 academicLevel: '',
                 specialty: '',
@@ -429,6 +501,7 @@ export class Personas {
         }
         this.person.familyData.children.push({ name: '', birthDate: '', documentNumber: '' });
         this.childBirthDatePickers.push(null);
+        this.childDocumentPrefixes.push('');
         if (this.person.familyData.children.length > (this.person.familyData.numberOfChildren || 0)) {
             this.person.familyData.numberOfChildren = this.person.familyData.children.length;
         }
@@ -437,10 +510,103 @@ export class Personas {
     removeChild(index: number): void {
         this.person.familyData?.children?.splice(index, 1);
         this.childBirthDatePickers.splice(index, 1);
+        this.childDocumentPrefixes.splice(index, 1);
         this.clearChildValidationState();
         if (this.person.familyData && (this.person.familyData.children?.length ?? 0) < this.person.familyData.numberOfChildren) {
             this.person.familyData.numberOfChildren = this.person.familyData.children?.length ?? 0;
         }
+    }
+
+    addFamilyMember(): void {
+        if (!this.person.familyMembers) {
+            this.person.familyMembers = [];
+        }
+        this.person.familyMembers.push({ hasDocument: true, hasDisability: false, hasAllergies: false, adoptedOrFoster: false });
+        this.familyMemberBirthDatePickers.push(null);
+        this.selectedFamilyMemberIndex = this.person.familyMembers.length - 1;
+        this.familyMemberEditing = true;
+    }
+
+    removeFamilyMember(index: number): void {
+        this.person.familyMembers?.splice(index, 1);
+        this.familyMemberBirthDatePickers.splice(index, 1);
+        this.clearValidationState();
+        if (this.selectedFamilyMemberIndex === index) {
+            this.selectedFamilyMemberIndex = -1;
+            this.familyMemberEditing = false;
+        } else if (this.selectedFamilyMemberIndex > index) {
+            this.selectedFamilyMemberIndex--;
+        }
+    }
+
+    selectFamilyMember(index: number): void {
+        this.selectedFamilyMemberIndex = index;
+        this.familyMemberEditing = false;
+    }
+
+    startFamilyMemberEdit(): void {
+        if (this.selectedFamilyMember) {
+            this.familyMemberEditing = true;
+        }
+    }
+
+    finishFamilyMemberEdit(): void {
+        this.familyMemberEditing = false;
+    }
+
+    get selectedFamilyMember(): FamilyMember | null {
+        return this.person.familyMembers?.[this.selectedFamilyMemberIndex] ?? null;
+    }
+
+    familyMemberFullName(member: FamilyMember): string {
+        const name = [member.firstName, member.secondName, member.lastName, member.secondLastName].filter(Boolean).join(' ');
+        return name || 'Familiar sin registrar';
+    }
+
+    familyMemberInitials(member: FamilyMember): string {
+        return `${member.firstName?.charAt(0) ?? ''}${member.lastName?.charAt(0) ?? ''}`.toUpperCase();
+    }
+
+    familyMemberDocument(member: FamilyMember): string {
+        return member.hasDocument && member.documentType && member.documentNumber ? composeDocumentNumber(member.documentType, member.documentNumber) : 'Sin documento';
+    }
+
+    familyMemberDocumentType(member: FamilyMember): string {
+        if (!member.hasDocument) {
+            return 'Sin documento';
+        }
+        return DOCUMENT_PREFIX_OPTIONS.find((option) => option.value === member.documentType)?.documentType ?? 'No registrado';
+    }
+
+    familyMemberDocumentNumber(member: FamilyMember): string {
+        return member.hasDocument && member.documentNumber ? member.documentNumber : 'Sin documento';
+    }
+
+    onFamilyMemberDisabilityChange(index: number, value: boolean): void {
+        const member = this.person.familyMembers?.[index];
+        if (!member) {
+            return;
+        }
+        member.hasDisability = value;
+        if (!value) {
+            member.disabilityType = '';
+            member.disabilityGrade = '';
+            member.conapdisCode = '';
+        }
+    }
+
+    onFamilyMemberBirthDateChange(index: number, value: Date | null): void {
+        const member = this.person.familyMembers?.[index];
+        if (!member) {
+            return;
+        }
+        member.birthDate = this.toStoredDate(value);
+        this.touchedFields.add(`familyMemberBirthDate:${index}`);
+        this.notifyValidationError(
+            `familyMemberBirthDate:${index}`,
+            member.birthDate ? validateChildBirthDate(member.birthDate) : null,
+            'Fecha de nacimiento inválida'
+        );
     }
 
     trackByIndex(index: number): number {
@@ -463,18 +629,89 @@ export class Personas {
     }
 
     firstNameError(): string {
-        return this.submitted || this.touchedFields.has('firstName') ? (validatePersonName(this.person.firstName, 'nombres') ?? '') : '';
+        return this.submitted || this.touchedFields.has('firstName') ? (validatePersonName(this.person.firstName, 'primer nombre') ?? '') : '';
+    }
+
+    secondNameError(): string {
+        if ((!this.submitted && !this.touchedFields.has('secondName')) || !this.person.secondName?.trim()) {
+            return '';
+        }
+        return validatePersonName(this.person.secondName, 'segundo nombre') ?? '';
     }
 
     lastNameError(): string {
-        return this.submitted || this.touchedFields.has('lastName') ? (validatePersonName(this.person.lastName, 'apellidos') ?? '') : '';
+        return this.submitted || this.touchedFields.has('lastName') ? (validatePersonName(this.person.lastName, 'primer apellido') ?? '') : '';
+    }
+
+    secondLastNameError(): string {
+        if ((!this.submitted && !this.touchedFields.has('secondLastName')) || !this.person.secondLastName?.trim()) {
+            return '';
+        }
+        return validatePersonName(this.person.secondLastName, 'segundo apellido') ?? '';
+    }
+
+    maritalStatusError(): string {
+        if (!this.submitted && !this.touchedFields.has('maritalStatus')) {
+            return '';
+        }
+        return this.person.familyData?.maritalStatus ? '' : 'Selecciona el estado civil.';
+    }
+
+    emailError(): string {
+        if (!this.submitted && !this.touchedFields.has('email')) {
+            return '';
+        }
+        return validateEmail(this.person.email ?? '') ?? '';
+    }
+
+    rifError(): string {
+        if ((!this.submitted && !this.touchedFields.has('rif')) || !this.person.rif?.trim()) {
+            return '';
+        }
+        return validateDocument('RIF', this.person.rif) ?? '';
+    }
+
+    personalPhoneError(): string {
+        if (!this.submitted && !this.touchedFields.has('personalPhone')) {
+            return '';
+        }
+        if (!this.personalPhoneCode && !this.personalPhoneNumber.trim()) {
+            return 'El teléfono personal es obligatorio.';
+        }
+        if (!this.personalPhoneCode) {
+            return 'Selecciona el código del teléfono personal.';
+        }
+        if (!/^\d{7}$/.test(this.personalPhoneNumber.replace(/\D/g, ''))) {
+            return 'Escribe el número del teléfono personal de 7 dígitos.';
+        }
+        return '';
+    }
+
+    homePhoneError(): string {
+        if (!this.submitted && !this.touchedFields.has('homePhone')) {
+            return '';
+        }
+        const digits = this.homePhoneNumber.replace(/\D/g, '');
+        if (!this.homePhoneCode && !digits) {
+            return '';
+        }
+        if (!this.homePhoneCode) {
+            return 'Selecciona el código de área del teléfono de habitación.';
+        }
+        if (!/^\d{7}$/.test(digits)) {
+            return 'Escribe el número local de 7 dígitos (sin el código de área).';
+        }
+        return '';
     }
 
     documentError(): string {
         if (!this.submitted && !this.touchedFields.has('document')) {
             return '';
         }
-        return validateDocument(this.person.documentType, this.person.documentNumber) ?? '';
+        if (!this.documentPrefix) {
+            return 'Selecciona el tipo de documento de identidad (V, E, J, G, P o C).';
+        }
+        return validateDocument(this.person.documentType, composeDocumentNumber(this.documentPrefix, this.person.documentNumber)) ?? '';
     }
 
     birthDateError(): string {
@@ -508,18 +745,11 @@ export class Personas {
         return this.submitted || this.touchedFields.has('completionYear') ? (validateAcademicCompletionYear(this.person.academicData?.completionYear ?? '') ?? '') : '';
     }
 
-    phoneError(): string {
-        if ((!this.submitted && !this.touchedFields.has('phone')) || !this.person.phone) {
-            return '';
-        }
-        return validatePhone(this.person.phone) ?? '';
-    }
-
     optionalCedulaError(field: string, value: string | undefined): string {
         if ((!this.submitted && !this.touchedFields.has(field)) || !value?.trim()) {
             return '';
         }
-        return validateCedula(value) ?? '';
+        return this.validateOptionalCedula(field, value) ?? '';
     }
 
     optionalPhoneError(field: string, value: string | undefined): string {
@@ -530,14 +760,86 @@ export class Personas {
     }
 
     onFirstNameChange(): void {
-        this.validateNameOnChange('firstName', this.person.firstName, 'nombres');
+        this.validateNameOnChange('firstName', this.person.firstName, 'primer nombre');
+    }
+
+    onSecondNameChange(): void {
+        this.touchedFields.add('secondName');
+        this.notifyValidationError('secondName', this.person.secondName?.trim() ? validatePersonName(this.person.secondName, 'segundo nombre') : null, 'Segundo nombre inválido');
     }
 
     onLastNameChange(): void {
-        this.validateNameOnChange('lastName', this.person.lastName, 'apellidos');
+        this.validateNameOnChange('lastName', this.person.lastName, 'primer apellido');
     }
 
-    onDocumentTypeChange(): void {
+    onSecondLastNameChange(): void {
+        this.touchedFields.add('secondLastName');
+        this.notifyValidationError('secondLastName', this.person.secondLastName?.trim() ? validatePersonName(this.person.secondLastName, 'segundo apellido') : null, 'Segundo apellido inválido');
+    }
+
+    onEmailChange(): void {
+        this.touchedFields.add('email');
+        this.notifyValidationError('email', this.person.email ? validateEmail(this.person.email) : null, 'Correo electrónico inválido');
+    }
+
+    onRifChange(): void {
+        this.touchedFields.add('rif');
+        this.notifyValidationError('rif', this.person.rif?.trim() ? validateDocument('RIF', this.person.rif) : null, 'RIF inválido');
+    }
+
+    onMaritalStatusChange(): void {
+        this.touchedFields.add('maritalStatus');
+        this.notifyValidationError('maritalStatus', this.person.familyData?.maritalStatus ? null : 'Selecciona el estado civil.', 'Estado civil requerido');
+    }
+
+    onPersonalPhoneChange(): void {
+        this.touchedFields.add('personalPhone');
+    }
+
+    onHomePhoneChange(): void {
+        this.touchedFields.add('homePhone');
+        const digits = this.homePhoneNumber.replace(/\D/g, '');
+        this.notifyValidationError(
+            'homePhone',
+            !this.homePhoneCode && !digits ? null : this.homePhoneCode && /^\d{7}$/.test(digits) ? null : 'Escribe un teléfono de habitación válido.',
+            'Teléfono de habitación inválido'
+        );
+    }
+
+    onOccupationalDiseaseChange(value: boolean): void {
+        if (!this.person.medicalData) {
+            return;
+        }
+        this.person.medicalData.hasOccupationalDisease = value;
+        if (!value) {
+            this.person.medicalData.occupationalDiseaseDescription = '';
+        }
+    }
+
+    onDisabilityChange(value: boolean): void {
+        if (!this.person.medicalData) {
+            return;
+        }
+        this.person.medicalData.hasDisability = value;
+        if (!value) {
+            this.person.medicalData.disabilityType = '';
+            this.person.medicalData.disabilityGrade = '';
+            this.person.medicalData.conapdisCode = '';
+        }
+    }
+
+    onMilitaryRegistrationChange(value: string | undefined): void {
+        if (!this.person.additionalData) {
+            return;
+        }
+        this.person.additionalData.militaryRegistration = value;
+        if (value !== 'Inscrito') {
+            this.person.additionalData.militaryRegistrationNumber = '';
+        }
+    }
+
+    onDocumentPrefixChange(): void {
+        this.person.documentType = documentTypeForPrefix(this.documentPrefix);
         this.validateDocumentOnChange();
     }
 
@@ -545,14 +847,9 @@ export class Personas {
         this.validateDocumentOnChange();
     }
 
-    onPhoneChange(): void {
-        this.touchedFields.add('phone');
-        this.notifyValidationError('phone', this.person.phone ? validatePhone(this.person.phone) : null, 'Teléfono inválido');
-    }
-
     onOptionalCedulaChange(field: string, value: string | undefined): void {
         this.touchedFields.add(field);
-        this.notifyValidationError(field, value?.trim() ? validateCedula(value) : null, 'Cédula inválida');
+        this.notifyValidationError(field, this.validateOptionalCedula(field, value), 'Cédula inválida');
     }
 
     onOptionalPhoneChange(field: string, value: string | undefined): void {
@@ -602,20 +899,79 @@ export class Personas {
         }
     }
 
+    onMpppstEntryDateChange(value: Date | null): void {
+        if (this.person.laborData) {
+            this.person.laborData.mpppstEntryDate = this.toStoredDate(value);
+        }
+    }
+
+    onPublicAdminEntryDateChange(value: Date | null): void {
+        if (this.person.laborData) {
+            this.person.laborData.publicAdministrationEntryDate = this.toStoredDate(value);
+        }
+    }
+
+    onHousingMunicipalityChange(): void {
+        if (this.person.housingData) {
+            this.person.housingData.parish = '';
+        }
+    }
+
+    hasAddressType(): boolean {
+        const housing = this.person.housingData;
+        return !!(housing && (housing.thoroughfareType || housing.buildingType || housing.unitType || housing.zoneType));
+    }
+
+    officePhoneError(): string {
+        if (!this.submitted) {
+            return '';
+        }
+        const digits = (this.person.laborData?.officePhone ?? '').replace(/\D/g, '');
+        if (!this.person.laborData?.officePhoneCode) {
+            return 'Selecciona el código de área.';
+        }
+        if (!/^\d{7}$/.test(digits)) {
+            return 'Escribe el número local de 7 dígitos (sin el código de área).';
+        }
+        return '';
+    }
+
     onCompletionYearChange(): void {
         this.touchedFields.add('completionYear');
         this.notifyValidationError('completionYear', validateAcademicCompletionYear(this.person.academicData?.completionYear ?? ''), 'Año de culminación inválido');
     }
 
-    private validateNameOnChange(field: 'firstName' | 'lastName', value: string, label: string): void {
+    private validateNameOnChange(field: 'firstName' | 'secondName' | 'lastName' | 'secondLastName', value: string, label: string): void {
         this.touchedFields.add(field);
         const error = validatePersonName(value, label);
-        this.notifyValidationError(field, error, `${label.charAt(0).toUpperCase()}${label.slice(1)} inválidos`);
+        this.notifyValidationError(field, error, `${label.charAt(0).toUpperCase()}${label.slice(1)} inválido`);
     }
 
     private validateDocumentOnChange(): void {
         this.touchedFields.add('document');
-        this.notifyValidationError('document', validateDocument(this.person.documentType, this.person.documentNumber), 'Documento inválido');
+        const error = this.documentPrefix
+            ? validateDocument(this.person.documentType, composeDocumentNumber(this.documentPrefix, this.person.documentNumber))
+            : 'Selecciona el tipo de documento de identidad (V, E, J, G, P o C).';
+        this.notifyValidationError('document', error, 'Documento inválido');
+    }
+
+    private validateOptionalCedula(field: string, value: string | undefined): string | null {
+        if (!value?.trim()) {
+            return null;
+        }
+        const prefix = this.optionalCedulaPrefix(field);
+        if (!prefix) {
+            return 'Selecciona el tipo de documento (V o E).';
+        }
+        return validateCedula(composeDocumentNumber(prefix, value));
+    }
+
+    private optionalCedulaPrefix(field: string): string {
+        if (field === 'spouseDocument') {
+            return this.spouseDocumentPrefix;
+        }
+        const match = /^childDocument:(\d+)$/.exec(field);
+        return match ? (this.childDocumentPrefixes[Number(match[1])] ?? '') : '';
     }
 
     private notifyValidationError(field: string, error: string | null, summary: string): void {
@@ -678,10 +1034,114 @@ export class Personas {
         return `${year}-${month}-${day}`;
     }
 
+    private validateFamilyMembers(): string | null {
+        for (const [index, member] of (this.person.familyMembers ?? []).entries()) {
+            const position = `integrante ${index + 1} del grupo familiar`;
+
+            if (!member.firstName?.trim()) {
+                return `Escribe el primer nombre del ${position}.`;
+            }
+            const firstNameError = validatePersonName(member.firstName, 'primer nombre');
+            if (firstNameError) {
+                return `${firstNameError} (${position})`;
+            }
+            const secondNameError = member.secondName?.trim() ? validatePersonName(member.secondName, 'segundo nombre') : null;
+            if (secondNameError) {
+                return `${secondNameError} (${position})`;
+            }
+            if (!member.lastName?.trim()) {
+                return `Escribe el primer apellido del ${position}.`;
+            }
+            const lastNameError = validatePersonName(member.lastName, 'primer apellido');
+            if (lastNameError) {
+                return `${lastNameError} (${position})`;
+            }
+            const secondLastNameError = member.secondLastName?.trim() ? validatePersonName(member.secondLastName, 'segundo apellido') : null;
+            if (secondLastNameError) {
+                return `${secondLastNameError} (${position})`;
+            }
+            if (!member.gender) {
+                return `Selecciona el sexo del ${position}.`;
+            }
+            if (!member.birthDate) {
+                return `Selecciona la fecha de nacimiento del ${position}.`;
+            }
+            const birthDateError = validateChildBirthDate(member.birthDate);
+            if (birthDateError) {
+                return birthDateError;
+            }
+            if (!member.maritalStatus) {
+                return `Selecciona el estado civil del ${position}.`;
+            }
+            if (!member.relationship) {
+                return `Selecciona el parentesco del ${position}.`;
+            }
+
+            const personalPhone = (member.personalPhone ?? '').replace(/\D/g, '');
+            if (!member.personalPhoneCode || !/^\d{7}$/.test(personalPhone)) {
+                return `Completa el teléfono personal del ${position} (código y 7 dígitos).`;
+            }
+            const homePhone = (member.homePhone ?? '').replace(/\D/g, '');
+            if (member.homePhoneCode || homePhone) {
+                if (!member.homePhoneCode) {
+                    return `Selecciona el código de área del teléfono de habitación del ${position}.`;
+                }
+                if (!/^\d{7}$/.test(homePhone)) {
+                    return `Escribe el número local de 7 dígitos del teléfono de habitación del ${position}.`;
+                }
+            }
+
+            if (!member.email?.trim()) {
+                return `Escribe el correo electrónico personal del ${position}.`;
+            }
+            const emailError = validateEmail(member.email);
+            if (emailError) {
+                return emailError;
+            }
+            if (!member.laterality) {
+                return `Selecciona la lateralidad del ${position}.`;
+            }
+
+            if (member.hasDocument && member.documentNumber?.trim()) {
+                if (!member.documentType) {
+                    return `Selecciona el tipo de documento del ${position}.`;
+                }
+                const documentError = validateDocument(
+                    documentTypeForPrefix(member.documentType),
+                    composeDocumentNumber(member.documentType, member.documentNumber)
+                );
+                if (documentError) {
+                    return documentError;
+                }
+            }
+        }
+        return null;
+    }
+
     savePerson(): void {
         this.submitted = true;
 
-        if (!this.person.firstName?.trim() || !this.person.lastName?.trim() || !this.person.documentNumber?.trim() || !this.person.type?.trim()) {
+        if (!this.documentPrefix) {
+            this.messageService.add({
+                severity: 'error',
+                summary: 'Documento requerido',
+                detail: 'Selecciona el tipo de documento de identidad (V, E, J, G, P o C).',
+                life: 4000
+            });
+            return;
+        }
+
+        if (
+            !this.person.firstName?.trim() ||
+            !this.person.lastName?.trim() ||
+            !this.person.documentNumber?.trim() ||
+            !this.person.type?.trim() ||
+            !this.person.familyData?.maritalStatus ||
+            !this.person.email?.trim() ||
+            !this.personalPhoneCode ||
+            !this.personalPhoneNumber.trim()
+        ) {
+            this.activeEditTab = '0';
             this.messageService.add({
                 severity: 'error',
                 summary: 'Formulario incompleto',
@@ -691,29 +1151,84 @@ export class Personas {
             return;
         }
 
-        const nameErr = validatePersonName(this.person.firstName, 'nombres');
+        const nameErr = validatePersonName(this.person.firstName, 'primer nombre');
         if (nameErr) {
+            this.activeEditTab = '0';
             this.messageService.add({
                 severity: 'error',
-                summary: 'Nombres inválidos',
+                summary: 'Nombre inválido',
                 detail: nameErr,
                 life: 3500
             });
             return;
         }
 
-        const lastNameErr = validatePersonName(this.person.lastName, 'apellidos');
+        const lastNameErr = validatePersonName(this.person.lastName, 'primer apellido');
         if (lastNameErr) {
+            this.activeEditTab = '0';
             this.messageService.add({
                 severity: 'error',
-                summary: 'Apellidos inválidos',
+                summary: 'Apellido inválido',
                 detail: lastNameErr,
                 life: 3500
             });
             return;
         }
 
-        const docErr = validateDocument(this.person.documentType, this.person.documentNumber);
+        const secondNameErr = this.person.secondName?.trim() ? validatePersonName(this.person.secondName, 'segundo nombre') : null;
+        if (secondNameErr) {
+            this.activeEditTab = '0';
+            this.messageService.add({ severity: 'error', summary: 'Segundo nombre inválido', detail: secondNameErr, life: 3500 });
+            return;
+        }
+
+        const secondLastNameErr = this.person.secondLastName?.trim() ? validatePersonName(this.person.secondLastName, 'segundo apellido') : null;
+        if (secondLastNameErr) {
+            this.activeEditTab = '0';
+            this.messageService.add({ severity: 'error', summary: 'Segundo apellido inválido', detail: secondLastNameErr, life: 3500 });
+            return;
+        }
+
+        const emailErr = validateEmail(this.person.email ?? '');
+        if (emailErr) {
+            this.activeEditTab = '0';
+            this.messageService.add({ severity: 'error', summary: 'Correo electrónico inválido', detail: emailErr, life: 4000 });
+            return;
+        }
+
+        const rifErr = this.person.rif?.trim() ? validateDocument('RIF', this.person.rif) : null;
+        if (rifErr) {
+            this.activeEditTab = '0';
+            this.messageService.add({ severity: 'error', summary: 'RIF inválido', detail: rifErr, life: 4000 });
+            return;
+        }
+
+        const personalPhoneDigits = this.personalPhoneNumber.replace(/\D/g, '');
+        if (!/^\d{7}$/.test(personalPhoneDigits)) {
+            this.activeEditTab = '0';
+            this.messageService.add({ severity: 'error', summary: 'Teléfono personal inválido', detail: 'Escribe el número del teléfono personal de 7 dígitos.', life: 4000 });
+            return;
+        }
+
+        const homePhoneDigits = this.homePhoneNumber.replace(/\D/g, '');
+        if (this.homePhoneCode || homePhoneDigits) {
+            if (!this.homePhoneCode) {
+                this.activeEditTab = '0';
+                this.messageService.add({ severity: 'error', summary: 'Teléfono de habitación inválido', detail: 'Selecciona el código de área del teléfono de habitación.', life: 4000 });
+                return;
+            }
+            if (!/^\d{7}$/.test(homePhoneDigits)) {
+                this.activeEditTab = '0';
+                this.messageService.add({ severity: 'error', summary: 'Teléfono de habitación inválido', detail: 'Escribe el número local de 7 dígitos (sin el código de área).', life: 4000 });
+                return;
+            }
+        }
+
+        this.person.phone = composePhoneNumber(this.personalPhoneCode, personalPhoneDigits);
+        this.person.homePhone = this.homePhoneCode ? composePhoneNumber(this.homePhoneCode, homePhoneDigits) : '';
+
+        const documentNumber = composeDocumentNumber(this.documentPrefix, this.person.documentNumber);
+        const docErr = validateDocument(this.person.documentType, documentNumber);
         if (docErr) {
             this.messageService.add({
                 severity: 'error',
@@ -726,19 +1241,25 @@ export class Personas {
 
         const spouseCedula = this.person.familyData?.spouseDocumentNumber?.trim();
         if (spouseCedula) {
-            const spouseCedulaError = validateCedula(spouseCedula);
+            if (!this.spouseDocumentPrefix) {
+                this.activeEditTab = '8';
+                this.messageService.add({ severity: 'error', summary: 'Documento del cónyuge requerido', detail: 'Selecciona el tipo de documento (V o E) del cónyuge.', life: 4000 });
+                return;
+            }
+            const spouseCedulaError = validateCedula(composeDocumentNumber(this.spouseDocumentPrefix, spouseCedula));
             if (spouseCedulaError) {
-                this.activeEditTab = '1';
+                this.activeEditTab = '8';
                 this.messageService.add({ severity: 'error', summary: 'Cédula del cónyuge inválida', detail: spouseCedulaError, life: 4000 });
                 return;
             }
+            this.person.familyData!.spouseDocumentNumber = composeDocumentNumber(this.spouseDocumentPrefix, spouseCedula);
         }
 
         const spousePhone = this.person.familyData?.spousePhone?.trim();
         if (spousePhone) {
             const spousePhoneError = validatePhone(spousePhone);
             if (spousePhoneError) {
-                this.activeEditTab = '1';
+                this.activeEditTab = '8';
                 this.messageService.add({ severity: 'error', summary: 'Teléfono del cónyuge inválido', detail: spousePhoneError, life: 4000 });
                 return;
             }
@@ -757,10 +1278,10 @@ export class Personas {
             }
         }
 
-        for (const child of this.person.familyData?.children ?? []) {
+        for (const [index, child] of (this.person.familyData?.children ?? []).entries()) {
             const childNameErr = validatePersonName(child.name, 'nombre del hijo/a');
             if (childNameErr) {
-                this.activeEditTab = '1';
+                this.activeEditTab = '8';
                 this.messageService.add({
                     severity: 'error',
                     summary: 'Nombre del hijo/a inválido',
@@ -772,7 +1293,7 @@ export class Personas {
 
             const childBirthDateErr = validateChildBirthDate(child.birthDate);
             if (childBirthDateErr) {
-                this.activeEditTab = '1';
+                this.activeEditTab = '8';
                 this.messageService.add({
                     severity: 'error',
                     summary: 'Fecha de nacimiento del hijo/a inválida',
@@ -783,13 +1304,32 @@ export class Personas {
             }
 
             if (child.documentNumber?.trim()) {
+                const prefix = this.childDocumentPrefixes[index] ?? '';
+                if (!prefix) {
+                    this.activeEditTab = '8';
+                    this.messageService.add({ severity: 'error', summary: 'Documento del hijo/a requerido', detail: 'Selecciona el tipo de documento (V o E) del hijo/a.', life: 4000 });
+                    return;
+                }
+                child.documentNumber = composeDocumentNumber(prefix, child.documentNumber);
                 const childCedulaErr = validateCedula(child.documentNumber);
                 if (childCedulaErr) {
-                    this.activeEditTab = '1';
+                    this.activeEditTab = '8';
                     this.messageService.add({ severity: 'error', summary: 'Cédula del hijo/a inválida', detail: childCedulaErr, life: 4000 });
                     return;
                 }
             }
+        }
+
+        const familyGroupError = this.validateFamilyMembers();
+        if (familyGroupError) {
+            this.activeEditTab = '8';
+            this.messageService.add({
+                severity: 'error',
+                summary: 'Grupo familiar incompleto',
+                detail: familyGroupError,
+                life: 4000
+            });
+            return;
         }
 
         const universityErr = validateAcademicInstitution(this.person.academicData?.university ?? '');
@@ -816,19 +1356,6 @@ export class Personas {
             return;
         }
 
-        if (this.person.phone) {
-            const phoneErr = validatePhone(this.person.phone);
-            if (phoneErr) {
-                this.messageService.add({
-                    severity: 'error',
-                    summary: 'Teléfono inválido',
-                    detail: phoneErr,
-                    life: 4000
-                });
-                return;
-            }
-        }
-
         const emergencyPhone = this.person.medicalData?.emergencyContactPhone?.trim();
         if (emergencyPhone) {
             const emergencyPhoneError = validatePhone(emergencyPhone);
@@ -839,7 +1366,74 @@ export class Personas {
             }
         }
 
-        if (this.personService.documentExists(this.person.documentNumber, this.person.id)) {
+        const secondaryEmergencyPhone = this.person.medicalData?.secondaryEmergencyContactPhone?.trim();
+        if (secondaryEmergencyPhone) {
+            const secondaryEmergencyPhoneError = validatePhone(secondaryEmergencyPhone);
+            if (secondaryEmergencyPhoneError) {
+                this.activeEditTab = '3';
+                this.messageService.add({ severity: 'error', summary: 'Teléfono del segundo contacto inválido', detail: secondaryEmergencyPhoneError, life: 4000 });
+                return;
+            }
+        }
+
+        const labor = this.person.laborData;
+        if (!labor?.administrativeState) {
+            this.activeEditTab = '7';
+            this.messageService.add({ severity: 'error', summary: 'Estado de adscripción requerido', detail: 'Selecciona el estado de la ubicación administrativa de adscripción.', life: 4000 });
+            return;
+        }
+        if (!labor.physicalLocation?.trim()) {
+            this.activeEditTab = '7';
+            this.messageService.add({ severity: 'error', summary: 'Ubicación física requerida', detail: 'Escribe la ubicación física del trabajador.', life: 4000 });
+            return;
+        }
+        const officePhoneDigits = (labor.officePhone ?? '').replace(/\D/g, '');
+        if (!labor.officePhoneCode) {
+            this.activeEditTab = '7';
+            this.messageService.add({ severity: 'error', summary: 'Teléfono de oficina requerido', detail: 'Selecciona el código de área del teléfono de oficina.', life: 4000 });
+            return;
+        }
+        if (!/^\d{7}$/.test(officePhoneDigits)) {
+            this.activeEditTab = '7';
+            this.messageService.add({ severity: 'error', summary: 'Teléfono de oficina inválido', detail: 'Escribe el número local de 7 dígitos (sin el código de área).', life: 4000 });
+            return;
+        }
+        labor.physicalLocation = labor.physicalLocation.trim();
+        labor.officePhone = officePhoneDigits;
+
+        const housing = this.person.housingData;
+        if (!housing) {
+            return;
+        }
+        if (!this.person.department) {
+            this.activeEditTab = '4';
+            this.messageService.add({ severity: 'error', summary: 'Estado de habitación requerido', detail: 'Selecciona el estado de la dirección de habitación.', life: 4000 });
+            return;
+        }
+        if (!housing.municipality?.trim()) {
+            this.activeEditTab = '4';
+            this.messageService.add({ severity: 'error', summary: 'Municipio requerido', detail: 'Selecciona el municipio de la dirección de habitación.', life: 4000 });
+            return;
+        }
+        if (!housing.parish?.trim()) {
+            this.activeEditTab = '4';
+            this.messageService.add({ severity: 'error', summary: 'Parroquia requerida', detail: 'Selecciona o escribe la parroquia de la dirección de habitación.', life: 4000 });
+            return;
+        }
+        if (!this.hasAddressType()) {
+            this.activeEditTab = '4';
+            this.messageService.add({ severity: 'error', summary: 'Tipo de dirección requerido', detail: 'Selecciona al menos un tipo de dirección (vía, edificación, inmueble o zona).', life: 4000 });
+            return;
+        }
+        if (!housing.referencePoint?.trim()) {
+            this.activeEditTab = '4';
+            this.messageService.add({ severity: 'error', summary: 'Punto de referencia requerido', detail: 'Escribe un punto de referencia de la vivienda.', life: 4000 });
+            return;
+        }
+        housing.parish = housing.parish.trim();
+        housing.referencePoint = housing.referencePoint.trim();
+
+        if (this.personService.documentExists(documentNumber, this.person.id)) {
             this.messageService.add({
                 severity: 'error',
                 summary: 'Documento duplicado',
@@ -851,12 +1445,18 @@ export class Personas {
 
         const input: NewPersonInput = {
             firstName: this.person.firstName,
+            secondName: this.person.secondName,
             lastName: this.person.lastName,
+            secondLastName: this.person.secondLastName,
             documentType: this.person.documentType,
-            documentNumber: this.person.documentNumber,
+            documentNumber,
+            birthPlace: this.person.birthPlace,
             birthDate: this.person.birthDate,
             gender: this.person.gender,
             phone: this.person.phone,
+            homePhone: this.person.homePhone,
+            email: this.person.email,
+            rif: this.person.rif,
             address: this.person.address,
             city: this.person.city,
             department: this.person.department,
@@ -864,10 +1464,12 @@ export class Personas {
             status: this.person.status,
             notes: this.person.notes,
             familyData: this.person.familyData,
+            familyMembers: this.person.familyMembers,
             vacationData: this.person.vacationData,
             medicalData: this.person.medicalData,
             housingData: this.person.housingData,
             additionalData: this.person.additionalData,
+            laborData: this.person.laborData,
             academicData: this.person.academicData
         };
 
@@ -896,8 +1498,8 @@ export class Personas {
         const header = ['Código', 'Nombres', 'Apellidos', 'Tipo de documento', 'Documento', 'Teléfono', 'Ciudad', 'Estado', 'Cargo', 'Estado del trabajador', 'Última actualización'];
         const rows = this.filteredPersons().map((person) => [
             person.id,
-            person.firstName,
-            person.lastName,
+            [person.firstName, person.secondName].filter(Boolean).join(' '),
+            [person.lastName, person.secondLastName].filter(Boolean).join(' '),
             person.documentType,
             person.documentNumber,
             person.phone,
@@ -952,8 +1554,8 @@ export class Personas {
         ];
         const rows = this.filteredPersons().map((person) => [
             person.id,
-            person.firstName,
-            person.lastName,
+            [person.firstName, person.secondName].filter(Boolean).join(' '),
+            [person.lastName, person.secondLastName].filter(Boolean).join(' '),
             person.documentType,
             person.documentNumber,
             person.familyData?.numberOfChildren ?? person.familyData?.children?.length ?? 0,
@@ -1045,6 +1647,10 @@ export class Personas {
         return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
     }
 
+    displayName(person: Person): string {
+        return [person.firstName, person.secondName, person.lastName, person.secondLastName].filter(Boolean).join(' ');
+    }
+
     getTypeSeverity(type: string): TagSeverity {
         switch (type) {
             case 'Analista':
@@ -1072,7 +1678,7 @@ export class Personas {
                 return 'success';
             case 'Pendiente':
                 return 'warn';
-            case 'Inactivo':
+            case 'Egresado':
                 return 'danger';
             default:
                 return 'info';

@@ -1,4 +1,4 @@
-import { DOCUMENT_TYPES } from './models';
+import { DOCUMENT_PREFIX_OPTIONS, DOCUMENT_TYPES } from './models';
 
 const VENEZUELAN_MOBILE_CODES = ['412', '414', '416', '424', '426'];
 
@@ -8,7 +8,7 @@ const NAME_PATTERN = /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]+$/;
  * Valida nombres y apellidos: solo letras, espacios, tildes, diéresis, apóstrofes o guiones.
  * Longitud mínima de 2 y máxima de 60 caracteres.
  */
-export function validatePersonName(value: string, fieldName = 'nombre'): string | null {
+export function validatePersonName(value: string, fieldName = 'nombre', options: { allowMultipleWords?: boolean } = {}): string | null {
     const name = (value || '').trim();
     if (!name) {
         return `El ${fieldName} es obligatorio.`;
@@ -22,11 +22,30 @@ export function validatePersonName(value: string, fieldName = 'nombre'): string 
     if (!NAME_PATTERN.test(name)) {
         return `El ${fieldName} solo puede contener letras y espacios (sin números ni símbolos).`;
     }
+    if (!options.allowMultipleWords && /\s/.test(name)) {
+        const plural = fieldName.includes('apellido') ? 'apellidos' : 'nombres';
+        return `No puedes escribir dos ${plural} en el campo ${fieldName}. Registra cada uno en su propio campo (primer y segundo).`;
+    }
     return null;
 }
 
-export function validateAcademicInstitution(value: string): string | null {
-    const institution = (value || '').trim();
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+export function validateEmail(value: string): string | null {
+    const email = (value || '').trim();
+    if (!email) {
+        return 'El correo electrónico personal es obligatorio.';
+    }
+    if (email.length > 120) {
+        return 'El correo electrónico no puede exceder 120 caracteres.';
+    }
+    if (!EMAIL_PATTERN.test(email)) {
+        return 'Escribe un correo electrónico válido (ej. nombre@dominio.com).';
+    }
+    return null;
+}
+
+export function validateAcademicInstitution(value: string): string | null {    const institution = (value || '').trim();
     if (!institution) {
         return null;
     }
@@ -54,10 +73,6 @@ export function validateAcademicCompletionYear(value: string | number): string |
         return `El año debe estar entre 1950 y ${currentYear + 10}.`;
     }
     return null;
-}
-
-export function isValidPersonName(value: string): boolean {
-    return validatePersonName(value) === null;
 }
 
 export function isValidVenezuelanPhone(value: string): boolean {
@@ -205,16 +220,14 @@ export function validateDocument(documentType: string, documentNumber: string): 
     const clean = number.replace(/\s+/g, '').replace(/\./g, '');
 
     switch (type) {
-        case 'Cédula de identidad': {
-            if (!/^(?:[Vv]-?)?\d{5,9}$/.test(clean)) {
-                return 'La Cédula de identidad debe contener entre 5 y 9 dígitos numéricos (ej. V-18745632 o 18745632).';
-            }
-            return null;
-        }
-
+        case 'Cédula de identidad':
         case 'Cédula de extranjería': {
-            if (!/^(?:[Ee]-?)?\d{5,9}$/.test(clean)) {
-                return 'La Cédula de extranjería debe contener entre 5 y 9 dígitos numéricos (ej. E-84123456).';
+            if (number.includes('.')) {
+                return 'La cédula debe llevar el número sin puntos (ej. V-18745632).';
+            }
+            const expected = type === 'Cédula de identidad' ? 'V' : 'E';
+            if (!new RegExp(`^[${expected}${expected.toLowerCase()}]-\\d{5,9}$`).test(clean)) {
+                return `La cédula debe llevar el tipo de documento (${expected}) y entre 5 y 9 dígitos sin puntos (ej. ${expected}-18745632).`;
             }
             return null;
         }
@@ -227,7 +240,7 @@ export function validateDocument(documentType: string, documentNumber: string): 
         }
 
         case 'Pasaporte': {
-            if (!/^[A-Za-z0-9]{6,15}$/.test(clean)) {
+            if (!/^(?:[Pp]-?)?[A-Za-z0-9]{6,15}$/.test(clean)) {
                 return 'El pasaporte debe contener entre 6 y 15 caracteres alfanuméricos.';
             }
             return null;
@@ -238,18 +251,125 @@ export function validateDocument(documentType: string, documentNumber: string): 
     }
 }
 
-export function isValidDocument(documentType: string, documentNumber: string): boolean {
-    return validateDocument(documentType, documentNumber) === null;
+export function documentTypeForPrefix(prefix: string): string {
+    return DOCUMENT_PREFIX_OPTIONS.find((option) => option.value === prefix.toUpperCase())?.documentType ?? '';
 }
 
-export function normalizeCedula(value: string): string {
-    const clean = value.trim().replace(/[\s.]/g, '').toUpperCase();
-    const digits = clean.replace(/^V-?/, '');
-    return `V-${digits}`;
+export function prefixForDocumentType(documentType: string): string {
+    return DOCUMENT_PREFIX_OPTIONS.find((option) => option.documentType === documentType)?.value ?? '';
+}
+
+export function extractDocumentPrefix(value: string): string {
+    return /^[VEJGPC]/i.exec((value || '').trim().replace(/[\s.]/g, ''))?.[0].toUpperCase() ?? '';
+}
+
+export function stripDocumentPrefix(value: string): string {
+    return (value || '').trim().replace(/^[VEJGPC]-?/i, '');
+}
+
+export function composeDocumentNumber(prefix: string, number: string): string {
+    const clean = stripDocumentPrefix(number).replace(/\s+/g, '');
+    return prefix ? `${prefix.toUpperCase()}-${clean}` : clean;
+}
+
+export function splitPhoneNumber(value: string): { code: string; number: string } {
+    let digits = (value || '').replace(/\D/g, '');
+    if (!digits) {
+        return { code: '', number: '' };
+    }
+    if (digits.startsWith('58')) {
+        digits = digits.slice(2);
+    }
+    if (digits.startsWith('0')) {
+        digits = digits.slice(1);
+    }
+    if (digits.length < 10) {
+        return { code: '', number: digits };
+    }
+    return { code: `0${digits.slice(0, 3)}`, number: digits.slice(3) };
+}
+
+export function composePhoneNumber(code: string, number: string): string {
+    const clean = (number || '').replace(/\D/g, '');
+    return code ? `${code}-${clean}` : clean;
+}
+
+export function validateIdentityDocument(prefix: string, number: string): string | null {
+    const selected = (prefix || '').trim().toUpperCase();
+
+    if (!selected) {
+        return 'La cédula debe llevar el tipo de documento (V o E).';
+    }
+
+    if (selected !== 'V' && selected !== 'E') {
+        return 'El tipo de documento de identidad seleccionado no es válido.';
+    }
+
+    const clean = stripDocumentPrefix(number).replace(/[\s.]/g, '');
+
+    if (!clean) {
+        return 'El número de documento es obligatorio.';
+    }
+
+    if ((number || '').includes('.')) {
+        return 'La cédula debe llevar el número sin puntos (ej. V-18745632).';
+    }
+
+    if (!/^\d{5,9}$/.test(clean)) {
+        return 'La cédula debe llevar entre 5 y 9 dígitos sin puntos (ej. V-18745632).';
+    }
+
+    return null;
+}
+
+export function normalizeCedula(value: string, prefix?: string): string {
+    const clean = (value || '').trim().replace(/[\s.]/g, '').toUpperCase();
+    const detected = (prefix || extractDocumentPrefix(clean) || 'V').toUpperCase();
+    return `${detected}-${stripDocumentPrefix(clean)}`;
 }
 
 export function validateCedula(value: string): string | null {
-    return validateDocument('Cédula de identidad', value);
+    const raw = (value || '').trim();
+
+    if (!raw) {
+        return 'La cédula es obligatoria.';
+    }
+
+    if (raw.includes('.')) {
+        return 'La cédula debe llevar el número sin puntos (ej. V-18745632).';
+    }
+
+    if (!/^[VEve]-/.test(raw.replace(/\s+/g, ''))) {
+        return 'La cédula debe llevar el tipo de documento (V o E).';
+    }
+
+    const clean = raw.replace(/[\s.]/g, '');
+
+    if (!/^[VEve]-?\d{5,9}$/.test(clean)) {
+        return 'La cédula debe llevar entre 5 y 9 dígitos sin puntos (ej. V-18745632).';
+    }
+
+    return null;
+}
+
+export interface PasswordRequirement {
+    key: string;
+    label: string;
+    test: (password: string) => boolean;
+}
+
+export const PASSWORD_REQUIREMENTS: PasswordRequirement[] = [
+    { key: 'lower', label: 'Al menos una letra minúscula', test: (password) => /[a-z]/.test(password) },
+    { key: 'upper', label: 'Al menos una letra mayúscula', test: (password) => /[A-Z]/.test(password) },
+    { key: 'number', label: 'Al menos un número', test: (password) => /\d/.test(password) },
+    { key: 'length', label: 'Debe contener más de 8 caracteres', test: (password) => password.length > 8 },
+    { key: 'special', label: 'La contraseña debe tener un carácter especial Ej:(@, #, $, etc.)', test: (password) => /[^A-Za-z0-9\s]/.test(password) }
+];
+
+export const PASSWORD_CONFIRMATION_LABEL = 'La contraseña debe coincidir';
+
+export function missingPasswordRequirements(password: string): string[] {
+    return PASSWORD_REQUIREMENTS.filter((requirement) => !requirement.test(password)).map(({ label }) => label);
 }
 
 export function validatePassword(password: string): string | null {
@@ -257,24 +377,13 @@ export function validatePassword(password: string): string | null {
         return 'La contraseña es obligatoria.';
     }
 
-    if (password.length < 6) {
-        return 'La contraseña debe tener al menos 6 caracteres.';
-    }
-
     if (password.length > 64) {
         return 'La contraseña no puede superar los 64 caracteres.';
     }
 
-    if (/\s/.test(password)) {
-        return 'La contraseña no puede contener espacios en blanco.';
-    }
-
-    if (!/[A-Za-z]/.test(password)) {
-        return 'La contraseña debe incluir al menos una letra.';
-    }
-
-    if (!/\d/.test(password)) {
-        return 'La contraseña debe incluir al menos un número.';
+    const missing = missingPasswordRequirements(password);
+    if (missing.length) {
+        return `La contraseña debe cumplir: ${missing.join('; ')}.`;
     }
 
     return null;

@@ -12,7 +12,7 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <div class="mini-stat">
                 <span>Total de trabajadores</span>
                 <strong>{{ stats().total }}</strong>
@@ -24,6 +24,10 @@
             <div class="mini-stat">
                 <span>Pendientes</span>
                 <strong>{{ stats().pending }}</strong>
+            </div>
+            <div class="mini-stat">
+                <span>Egresados</span>
+                <strong>{{ stats().egresados }}</strong>
             </div>
         </div>
 
@@ -79,10 +83,10 @@
                 <ng-template #header>
                     <tr>
                         <th pSortableColumn="firstName" style="min-width: 16rem">
-                            Trabajador
+                            Nombre y apellido
                             <p-sortIcon field="firstName" />
                         </th>
-                        <th style="min-width: 12rem">Documento</th>
+                        <th style="min-width: 12rem">Documento de identidad</th>
                         <th style="min-width: 12rem">Contacto</th>
                         <th pSortableColumn="type" style="min-width: 11rem">
                             Cargo
@@ -106,7 +110,7 @@
                             <div class="person-cell" style="cursor: pointer" (click)="viewPerson(person)">
                                 <span class="person-avatar">{{ initials(person.firstName, person.lastName) }}</span>
                                 <div>
-                                    <strong>{{ person.firstName }} {{ person.lastName }}</strong>
+                                    <strong>{{ displayName(person) }}</strong>
                                 </div>
                             </div>
                         </td>
@@ -129,14 +133,6 @@
                             <div class="table-actions">
                                 <p-button icon="pi pi-eye" ariaLabel="Ver información del trabajador" [rounded]="true" [outlined]="true" severity="info" (click)="viewPerson(person)" />
                                 <p-button icon="pi pi-pencil" ariaLabel="Editar trabajador" [rounded]="true" [outlined]="true" (click)="editPerson(person)" />
-                                <p-button
-                                    [icon]="person.status === 'Inactivo' ? 'pi pi-check' : 'pi pi-ban'"
-                                    [ariaLabel]="person.status === 'Inactivo' ? 'Habilitar trabajador' : 'Inhabilitar trabajador'"
-                                    [severity]="person.status === 'Inactivo' ? 'success' : 'warn'"
-                                    [rounded]="true"
-                                    [outlined]="true"
-                                    (click)="openStatusDialog(person)"
-                                />
                             </div>
                         </td>
                     </tr>
@@ -162,8 +158,9 @@
             <fieldset [disabled]="viewMode" style="border: none; padding: 0; margin: 0">
             <p-tabs [(value)]="activeEditTab" [scrollable]="true">
                 <p-tablist>
-                    <p-tab value="0">Datos personales</p-tab>
-                    <p-tab value="1">Datos familiares</p-tab>
+                    <p-tab value="0">Datos Básicos</p-tab>
+                    <p-tab value="7">Datos laborales</p-tab>
+                    <p-tab value="8">Grupo Familiar</p-tab>
                     <p-tab value="2">Vacaciones</p-tab>
                     <p-tab value="3">Datos médicos</p-tab>
                     <p-tab value="4">Datos habitacionales</p-tab>
@@ -172,216 +169,573 @@
                 </p-tablist>
 
                 <p-tabpanels>
-                    <!-- ===================== TAB 0: DATOS PERSONALES ===================== -->
+                    <!-- ===================== TAB 0: DATOS BÁSICOS ===================== -->
                     <p-tabpanel value="0">
-                        <div class="form-grid" style="margin-top: 1rem">
-                            <div class="form-field">
-                                <label for="editFirstName">Nombres *</label>
-                                <input pInputText id="editFirstName" [(ngModel)]="person.firstName" (ngModelChange)="onFirstNameChange()" />
-                                @if (firstNameError()) {
-                                    <small class="field-error">{{ firstNameError() }}</small>
-                                }
-                            </div>
-                            <div class="form-field">
-                                <label for="editLastName">Apellidos *</label>
-                                <input pInputText id="editLastName" [(ngModel)]="person.lastName" (ngModelChange)="onLastNameChange()" />
-                                @if (lastNameError()) {
-                                    <small class="field-error">{{ lastNameError() }}</small>
-                                }
-                            </div>
-
-                            <div class="form-field">
-                                <label for="editDocumentType">Tipo de documento *</label>
-                                <p-select id="editDocumentType" [options]="documentTypeOptions" optionLabel="label" optionValue="value" [(ngModel)]="person.documentType" (ngModelChange)="onDocumentTypeChange()" appendTo="body" scrollHeight="350px" styleClass="w-full" />
-                            </div>
-                            <div class="form-field">
-                                <label for="editDocumentNumber">Número de documento *</label>
-                                <input pInputText id="editDocumentNumber" [(ngModel)]="person.documentNumber" (ngModelChange)="onDocumentNumberChange()" />
-                                @if (documentError()) {
-                                    <small class="field-error">{{ documentError() }}</small>
-                                }
-                            </div>
-
-                            <div class="form-field">
-                                <label for="editBirthDate">Fecha de nacimiento</label>
-                                <p-datepicker
-                                    inputId="editBirthDate"
-                                    [(ngModel)]="birthDatePicker"
-                                    (ngModelChange)="onBirthDatePickerChange($event)"
-                                    [minDate]="minBirthDate"
-                                    [maxDate]="todayDate"
-                                    dateFormat="dd/mm/yy"
-                                    [showIcon]="true"
-                                    [readonlyInput]="true"
-                                    styleClass="w-full"
-                                />
-                                @if (birthDateError()) {
-                                    <small class="field-error">{{ birthDateError() }}</small>
-                                }
-                            </div>
-                            <div class="form-field">
-                                <label for="editGender">Género</label>
-                                <p-select id="editGender" [options]="genderOptions" optionLabel="label" optionValue="value" [(ngModel)]="person.gender" appendTo="body" scrollHeight="350px" styleClass="w-full" />
-                            </div>
-
-                            <div class="form-field">
-                                <label for="editPhone">Teléfono</label>
-                                <input pInputText id="editPhone" type="tel" [(ngModel)]="person.phone" (ngModelChange)="onPhoneChange()" placeholder="+58 412 1234567" />
-                                @if (phoneError()) {
-                                    <small class="field-error">{{ phoneError() }}</small>
-                                }
-                            </div>
-
-                            <div class="form-field form-field-full">
-                                <label for="editAddress">Dirección</label>
-                                <input pInputText id="editAddress" [(ngModel)]="person.address" />
-                            </div>
-
-                            <div class="form-field">
-                                <label for="editDepartment">Estado</label>
-                                <p-select id="editDepartment" [options]="departmentOptions" optionLabel="label" optionValue="value" [(ngModel)]="person.department" (ngModelChange)="onDepartmentChange()" appendTo="body" scrollHeight="350px" styleClass="w-full" />
-                            </div>
-                            <div class="form-field">
-                                <label for="editCity">Ciudad</label>
-                                <p-select
-                                    id="editCity"
-                                    [options]="cityOptions"
-                                    optionLabel="label"
-                                    optionValue="value"
-                                    placeholder="Seleccione primero el estado"
-                                    [disabled]="!person.department"
-                                    [(ngModel)]="citySelection"
-                                    (ngModelChange)="onCitySelectionChange($event)"
-                                    appendTo="body"
-                                    scrollHeight="350px"
-                                    styleClass="w-full"
-                                />
-                                <small>Si no encuentra la ciudad, seleccione «Otro» para escribirla.</small>
-                            </div>
-                            @if (citySelection === 'Otro') {
-                                <div class="form-field">
-                                    <label for="editOtherCity">Escriba la ciudad</label>
-                                    <input pInputText id="editOtherCity" [(ngModel)]="person.city" placeholder="Ingrese el nombre de la ciudad" />
-                                </div>
-                            }
-
-                            <div class="form-field">
-                                <label for="editType">Cargo o puesto de trabajo *</label>
-                                <p-select
-                                    id="editType"
-                                    [options]="typeOptions"
-                                    optionLabel="label"
-                                    optionValue="value"
-                                    placeholder="Seleccione el cargo o puesto de trabajo"
-                                    [(ngModel)]="person.type"
-                                    appendTo="body"
-                                    scrollHeight="350px"
-                                    styleClass="w-full"
-                                />
-                                @if (submitted && !person.type.trim()) {
-                                    <small class="field-error">Selecciona el cargo o puesto de trabajo.</small>
-                                }
-                            </div>
-                            <div class="form-field form-field-full">
-                                <label for="editNotes">Observaciones</label>
-                                <textarea pTextarea id="editNotes" rows="3" [(ngModel)]="person.notes" style="width: 100%"></textarea>
-                            </div>
-                        </div>
-                    </p-tabpanel>
-
-                    <!-- ===================== TAB 1: DATOS FAMILIARES ===================== -->
-                    <p-tabpanel value="1">
                         @if (person.familyData) {
                             <div class="form-grid" style="margin-top: 1rem">
                                 <div class="form-field">
-                                    <label for="maritalStatus">Estado civil</label>
-                                    <p-select id="maritalStatus" [options]="maritalStatusOptions" optionLabel="label" optionValue="value" [(ngModel)]="person.familyData.maritalStatus" appendTo="body" scrollHeight="380px" styleClass="w-full" />
+                                    <label for="editDocumentType">Tipo de documento *</label>
+                                    <p-select
+                                        id="editDocumentType"
+                                        [options]="workerDocumentTypeOptions"
+                                        optionLabel="label"
+                                        optionValue="value"
+                                        placeholder="Seleccione..."
+                                        [(ngModel)]="documentPrefix"
+                                        (ngModelChange)="onDocumentPrefixChange()"
+                                        appendTo="body"
+                                        scrollHeight="300px"
+                                        styleClass="w-full"
+                                        [disabled]="true"
+                                    />
+                                    @if (submitted && !documentPrefix) {
+                                        <small class="field-error">Selecciona el tipo de documento.</small>
+                                    }
                                 </div>
                                 <div class="form-field">
-                                    <label for="numberOfChildren">Número de hijos</label>
-                                    <p-inputnumber id="numberOfChildren" [(ngModel)]="person.familyData.numberOfChildren" [min]="0" [max]="20" [showButtons]="true" styleClass="w-full" />
+                                    <label for="editDocumentNumber">Nro. de documento *</label>
+                                    <input pInputText id="editDocumentNumber" [(ngModel)]="person.documentNumber" (ngModelChange)="onDocumentNumberChange()" placeholder="Ingrese..." [disabled]="true" />
+                                    @if (documentError()) {
+                                        <small class="field-error">{{ documentError() }}</small>
+                                    }
                                 </div>
 
-                                @if (hasSpouseFields()) {
-                                    <div class="form-field form-field-full">
-                                        <label>Datos del cónyuge / pareja</label>
-                                    </div>
-                                    <div class="form-field">
-                                        <label for="spouseName">Nombre completo</label>
-                                        <input pInputText id="spouseName" [(ngModel)]="person.familyData.spouseName" placeholder="Nombre del cónyuge o pareja" />
-                                    </div>
-                                    <div class="form-field">
-                                        <label for="spouseDoc">Cédula de identidad</label>
-                                        <input pInputText id="spouseDoc" [(ngModel)]="person.familyData.spouseDocumentNumber" (ngModelChange)="onOptionalCedulaChange('spouseDocument', $event)" placeholder="V-12345678" />
-                                        @if (optionalCedulaError('spouseDocument', person.familyData.spouseDocumentNumber)) {
-                                            <small class="field-error">{{ optionalCedulaError('spouseDocument', person.familyData.spouseDocumentNumber) }}</small>
-                                        }
-                                    </div>
-                                    <div class="form-field">
-                                        <label for="spousePhone">Teléfono</label>
-                                        <input pInputText id="spousePhone" type="tel" [(ngModel)]="person.familyData.spousePhone" (ngModelChange)="onOptionalPhoneChange('spousePhone', $event)" placeholder="+58 412 1234567" />
-                                        @if (optionalPhoneError('spousePhone', person.familyData.spousePhone)) {
-                                            <small class="field-error">{{ optionalPhoneError('spousePhone', person.familyData.spousePhone) }}</small>
-                                        }
-                                    </div>
-                                    <div class="form-field form-field-full">
-                                        <label for="spouseMpppst">Si su cónyuge trabaja en el MPPPST, especifique en qué dependencia labora</label>
-                                        <input pInputText id="spouseMpppst" [(ngModel)]="person.familyData.spouseMpppstDepartment" placeholder="Ingrese dependencia o dirección en la que labora..." />
-                                    </div>
-                                }
+                                <div class="form-field">
+                                    <label for="editFirstName">Primer nombre *</label>
+                                    <input pInputText id="editFirstName" [(ngModel)]="person.firstName" (ngModelChange)="onFirstNameChange()" placeholder="Ingrese..." [disabled]="true" />
+                                    @if (firstNameError()) {
+                                        <small class="field-error">{{ firstNameError() }}</small>
+                                    }
+                                </div>
+                                <div class="form-field">
+                                    <label for="editSecondName">Segundo nombre</label>
+                                    <input pInputText id="editSecondName" [(ngModel)]="person.secondName" (ngModelChange)="onSecondNameChange()" placeholder="Ingrese..." [disabled]="true" />
+                                    @if (secondNameError()) {
+                                        <small class="field-error">{{ secondNameError() }}</small>
+                                    }
+                                </div>
+                                <div class="form-field">
+                                    <label for="editLastName">Primer apellido *</label>
+                                    <input pInputText id="editLastName" [(ngModel)]="person.lastName" (ngModelChange)="onLastNameChange()" placeholder="Ingrese..." [disabled]="true" />
+                                    @if (lastNameError()) {
+                                        <small class="field-error">{{ lastNameError() }}</small>
+                                    }
+                                </div>
+                                <div class="form-field">
+                                    <label for="editSecondLastName">Segundo apellido</label>
+                                    <input pInputText id="editSecondLastName" [(ngModel)]="person.secondLastName" (ngModelChange)="onSecondLastNameChange()" placeholder="Ingrese..." [disabled]="true" />
+                                    @if (secondLastNameError()) {
+                                        <small class="field-error">{{ secondLastNameError() }}</small>
+                                    }
+                                </div>
 
-                                @if (person.familyData.numberOfChildren > 0) {
-                                    <div class="form-field form-field-full">
-                                        <label>Hijos registrados</label>
+                                <div class="form-field">
+                                    <label for="editBirthPlace">Lugar de nacimiento</label>
+                                    <input pInputText id="editBirthPlace" [(ngModel)]="person.birthPlace" placeholder="Ingrese..." [disabled]="true" />
+                                </div>
+                                <div class="form-field">
+                                    <label for="editBirthDate">Fecha de nacimiento</label>
+                                    <p-datepicker
+                                        inputId="editBirthDate"
+                                        [(ngModel)]="birthDatePicker"
+                                        (ngModelChange)="onBirthDatePickerChange($event)"
+                                        [minDate]="minBirthDate"
+                                        [maxDate]="todayDate"
+                                        dateFormat="dd-mm-yy"
+                                        placeholder="dd-mm-aaaa"
+                                        [showIcon]="true"
+                                        [readonlyInput]="true"
+                                        styleClass="w-full"
+                                        [disabled]="true"
+                                    />
+                                    @if (birthDateError()) {
+                                        <small class="field-error">{{ birthDateError() }}</small>
+                                    }
+                                </div>
+
+                                <div class="form-field">
+                                    <label for="editGender">Sexo</label>
+                                    <p-select id="editGender" [options]="genderOptions" optionLabel="label" optionValue="value" [(ngModel)]="person.gender" appendTo="body" scrollHeight="350px" styleClass="w-full" [disabled]="true" />
+                                </div>
+                                <div class="form-field">
+                                    <label for="editMaritalStatus">Estado civil *</label>
+                                    <p-select
+                                        id="editMaritalStatus"
+                                        [options]="maritalStatusOptions"
+                                        optionLabel="label"
+                                        optionValue="value"
+                                        placeholder="Seleccione..."
+                                        [(ngModel)]="person.familyData.maritalStatus"
+                                        (ngModelChange)="onMaritalStatusChange()"
+                                        appendTo="body"
+                                        scrollHeight="380px"
+                                        styleClass="w-full"
+                                    />
+                                    @if (maritalStatusError()) {
+                                        <small class="field-error">{{ maritalStatusError() }}</small>
+                                    }
+                                </div>
+
+                                <div class="form-field form-field-full">
+                                    <label for="editPersonalPhone">Teléfono personal *</label>
+                                    <div class="phone-input-row">
+                                        <p-select
+                                            inputId="editPersonalPhoneCode"
+                                            [options]="personalPhoneCodeOptions"
+                                            optionLabel="label"
+                                            optionValue="value"
+                                            placeholder="Seleccione..."
+                                            [(ngModel)]="personalPhoneCode"
+                                            (ngModelChange)="onPersonalPhoneChange()"
+                                            appendTo="body"
+                                            scrollHeight="300px"
+                                            styleClass="w-full phone-code-select"
+                                        />
+                                        <input pInputText id="editPersonalPhone" inputmode="numeric" [(ngModel)]="personalPhoneNumber" (ngModelChange)="onPersonalPhoneChange()" placeholder="Ingrese..." />
                                     </div>
-                                    @for (child of person.familyData.children; track $index) {
-                                        <div class="form-field form-field-full" style="background: var(--surface-50, #f9fafb); border-radius: 6px; padding: 0.75rem 1rem; border: 1px solid var(--surface-200, #e5e7eb); margin-bottom: 0.25rem">
-                                            <div class="form-grid" style="margin: 0">
-                                                <div class="form-field">
-                                                    <label>Nombre completo</label>
-                                                    <input pInputText [(ngModel)]="child.name" placeholder="Nombre del hijo/a" (ngModelChange)="onChildNameChange($index)" />
-                                                    @if (childNameError($index)) {
-                                                        <small class="field-error">{{ childNameError($index) }}</small>
-                                                    }
-                                                </div>
-                                                <div class="form-field">
-                                                    <label>Fecha de nacimiento</label>
-                                                    <p-datepicker
-                                                        inputId="childBirthDate-{{$index}}"
-                                                        [(ngModel)]="childBirthDatePickers[$index]"
-                                                        (ngModelChange)="onChildBirthDatePickerChange($index, $event)"
-                                                        [minDate]="minBirthDate"
-                                                        [maxDate]="todayDate"
-                                                        dateFormat="dd/mm/yy"
-                                                        [showIcon]="true"
-                                                        [readonlyInput]="true"
-                                                        styleClass="w-full"
-                                                    />
-                                                    @if (childBirthDateError($index)) {
-                                                        <small class="field-error">{{ childBirthDateError($index) }}</small>
-                                                    }
-                                                </div>
-                                                <div class="form-field">
-                                                    <label>Cédula (opcional)</label>
-                                                    <input pInputText [(ngModel)]="child.documentNumber" (ngModelChange)="onOptionalCedulaChange('childDocument:' + $index, $event)" placeholder="V-12345678" />
-                                                    @if (optionalCedulaError('childDocument:' + $index, child.documentNumber)) {
-                                                        <small class="field-error">{{ optionalCedulaError('childDocument:' + $index, child.documentNumber) }}</small>
-                                                    }
-                                                </div>
-                                                <div class="form-field" style="display: flex; align-items: flex-end">
-                                                    <p-button icon="pi pi-trash" severity="danger" [outlined]="true" size="small" (onClick)="removeChild($index)" ariaLabel="Eliminar hijo" />
-                                                </div>
-                                            </div>
-                                        </div>
+                                    @if (personalPhoneError()) {
+                                        <small class="field-error">{{ personalPhoneError() }}</small>
                                     }
-                                    @if (!person.familyData.children || person.familyData.children.length < person.familyData.numberOfChildren) {
-                                        <div class="form-field form-field-full">
-                                            <p-button label="Agregar hijo" icon="pi pi-plus" severity="secondary" [outlined]="true" size="small" (onClick)="addChild()" />
-                                        </div>
+                                </div>
+                                <div class="form-field form-field-full">
+                                    <label for="editHomePhone">Teléfono de habitación</label>
+                                    <div class="phone-input-row">
+                                        <p-select
+                                            inputId="editHomePhoneCode"
+                                            [options]="officePhoneCodeOptions"
+                                            optionLabel="label"
+                                            optionValue="value"
+                                            placeholder="Seleccione..."
+                                            [(ngModel)]="homePhoneCode"
+                                            (ngModelChange)="onHomePhoneChange()"
+                                            appendTo="body"
+                                            scrollHeight="300px"
+                                            styleClass="w-full phone-code-select"
+                                        />
+                                        <input pInputText id="editHomePhone" inputmode="numeric" [(ngModel)]="homePhoneNumber" (ngModelChange)="onHomePhoneChange()" placeholder="Ingrese..." />
+                                    </div>
+                                    @if (homePhoneError()) {
+                                        <small class="field-error">{{ homePhoneError() }}</small>
                                     }
-                                }
+                                </div>
+
+                                <div class="form-field">
+                                    <label for="editEmail">Correo electrónico personal *</label>
+                                    <input pInputText id="editEmail" type="email" [(ngModel)]="person.email" (ngModelChange)="onEmailChange()" placeholder="Ingrese..." />
+                                    @if (emailError()) {
+                                        <small class="field-error">{{ emailError() }}</small>
+                                    }
+                                </div>
+                                <div class="form-field">
+                                    <label for="editRif">N° de rif</label>
+                                    <input pInputText id="editRif" [(ngModel)]="person.rif" (ngModelChange)="onRifChange()" placeholder="Ingrese..." />
+                                    @if (rifError()) {
+                                        <small class="field-error">{{ rifError() }}</small>
+                                    }
+                                </div>
                             </div>
                         }
+                    </p-tabpanel>
+
+                    <!-- ===================== TAB 7: DATOS LABORALES ===================== -->
+                    <p-tabpanel value="7">
+                        @if (person.laborData) {
+                            <div class="form-grid" style="margin-top: 1rem">
+                                <div class="form-field">
+                                    <label for="laborAdminLocation">Ubicación administrativa de adscripción</label>
+                                    <input
+                                        pInputText
+                                        id="laborAdminLocation"
+                                        [ngModel]="person.laborData.administrativeLocation"
+                                        disabled
+                                        placeholder="Registrado en el sistema"
+                                    />
+                                </div>
+                                <div class="form-field">
+                                    <label for="laborState">Estado *</label>
+                                    <p-select
+                                        id="laborState"
+                                        [options]="departmentOptions"
+                                        optionLabel="label"
+                                        optionValue="value"
+                                        placeholder="Seleccione..."
+                                        [(ngModel)]="person.laborData.administrativeState"
+                                        appendTo="body"
+                                        scrollHeight="350px"
+                                        styleClass="w-full"
+                                    />
+                                    @if (submitted && !person.laborData.administrativeState) {
+                                        <small class="field-error">Selecciona el estado de adscripción.</small>
+                                    }
+                                </div>
+                                <div class="form-field">
+                                    <label for="laborLocation">Ubicación física *</label>
+                                    <input pInputText id="laborLocation" [(ngModel)]="person.laborData.physicalLocation" placeholder="Ingrese..." />
+                                    @if (submitted && !person.laborData.physicalLocation?.trim()) {
+                                        <small class="field-error">Escribe la ubicación física.</small>
+                                    }
+                                </div>
+
+                                <div class="form-field form-field-full">
+                                    <label for="laborPhone">Teléfono de oficina *</label>
+                                    <div class="phone-input-row">
+                                        <p-select
+                                            inputId="laborPhoneCode"
+                                            [options]="officePhoneCodeOptions"
+                                            optionLabel="label"
+                                            optionValue="value"
+                                            placeholder="Seleccione..."
+                                            [(ngModel)]="person.laborData.officePhoneCode"
+                                            appendTo="body"
+                                            scrollHeight="300px"
+                                            styleClass="w-full phone-code-select"
+                                        />
+                                        <input pInputText id="laborPhone" inputmode="numeric" [(ngModel)]="person.laborData.officePhone" placeholder="Ingrese..." />
+                                    </div>
+                                    @if (officePhoneError()) {
+                                        <small class="field-error">{{ officePhoneError() }}</small>
+                                    }
+                                </div>
+
+                                <div class="form-field">
+                                    <label for="laborTitular">Cargo o puesto de trabajo titular</label>
+                                    <input pInputText id="laborTitular" [(ngModel)]="person.laborData.titularPosition" [disabled]="true" placeholder="Ingrese..." />
+                                </div>
+                                <div class="form-field">
+                                    <label for="laborPosition">Cargo o puesto de trabajo que ejerce *</label>
+                                    <input pInputText id="laborPosition" [(ngModel)]="person.type" placeholder="Ingrese..." />
+                                    @if (submitted && !person.type.trim()) {
+                                        <small class="field-error">Ingresa el cargo o puesto de trabajo que ejerce.</small>
+                                    }
+                                </div>
+
+                                <div class="form-field">
+                                    <label for="laborWorkerType">Tipo de trabajador</label>
+                                    <input pInputText id="laborWorkerType" [(ngModel)]="person.laborData.workerType" [disabled]="true" placeholder="Ingrese..." />
+                                </div>
+                                <div class="form-field">
+                                    <label for="laborPayroll">Código de nómina</label>
+                                    <input pInputText id="laborPayroll" [(ngModel)]="person.laborData.payrollCode" [disabled]="true" placeholder="Ingrese..." />
+                                </div>
+
+                                <div class="form-field">
+                                    <label for="laborMpppstDate">Fecha de ingreso al MPPPST</label>
+                                    <p-datepicker
+                                        inputId="laborMpppstDate"
+                                        [(ngModel)]="mpppstEntryDatePicker"
+                                        (ngModelChange)="onMpppstEntryDateChange($event)"
+                                        [maxDate]="todayDate"
+                                        [disabled]="true"
+                                        dateFormat="dd/mm/yy"
+                                        [showIcon]="true"
+                                        [readonlyInput]="true"
+                                        styleClass="w-full"
+                                    />
+                                </div>
+                                <div class="form-field">
+                                    <label for="laborPublicDate">Fecha de ingreso a la adm. pública</label>
+                                    <p-datepicker
+                                        inputId="laborPublicDate"
+                                        [(ngModel)]="publicAdminEntryDatePicker"
+                                        (ngModelChange)="onPublicAdminEntryDateChange($event)"
+                                        [maxDate]="todayDate"
+                                        [disabled]="true"
+                                        dateFormat="dd/mm/yy"
+                                        [showIcon]="true"
+                                        [readonlyInput]="true"
+                                        styleClass="w-full"
+                                    />
+                                </div>
+
+                                <div class="form-field form-field-full">
+                                    <label for="laborObs">Observación(es)</label>
+                                    <textarea pTextarea id="laborObs" rows="3" [(ngModel)]="person.laborData.observations" placeholder="Ingrese..." style="width: 100%"></textarea>
+                                </div>
+                            </div>
+                        }
+                    </p-tabpanel>
+
+                    <!-- ===================== TAB 8: GRUPO FAMILIAR ===================== -->
+                    <p-tabpanel value="8">
+                        <div class="form-grid" style="margin-top: 1rem">
+                            <div class="form-field form-field-full" style="display: flex; align-items: center; justify-content: space-between; gap: 1rem">
+                                <div>
+                                    <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--primary-700, #1d4ed8)">Grupo Familiar</h3>
+                                    <small style="color: var(--text-color-secondary, #64748b)">Selecciona un familiar de la lista para ver sus datos; abajo puedes editarlo si es necesario.</small>
+                                </div>
+                                <p-button label="Agregar familiar" icon="pi pi-plus" severity="secondary" [outlined]="true" size="small" (onClick)="addFamilyMember()" />
+                            </div>
+
+                            @if (!person.familyMembers?.length) {
+                                <div class="form-field form-field-full">
+                                    <small style="color: var(--text-color-secondary, #64748b)">No hay familiares registrados.</small>
+                                </div>
+                            } @else {
+                                <div class="form-field form-field-full" style="display: flex; flex-direction: column; gap: 0.5rem">
+                                    @for (member of person.familyMembers; track $index) {
+                                        <button
+                                            type="button"
+                                            (click)="selectFamilyMember($index)"
+                                            style="display: flex; align-items: center; gap: 0.75rem; width: 100%; text-align: left; padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--surface-200, #e5e7eb); background: var(--surface-0, #fff); cursor: pointer"
+                                        >
+                                            <span style="display: inline-flex; align-items: center; justify-content: center; width: 2.25rem; height: 2.25rem; border-radius: 999px; background: var(--primary-100, #dbeafe); color: var(--primary-700, #1d4ed8); font-weight: 700">{{ familyMemberInitials(member) }}</span>
+                                            <span style="display: flex; flex-direction: column; flex: 1">
+                                                <strong>{{ familyMemberFullName(member) }}</strong>
+                                                <small style="color: var(--text-color-secondary, #64748b)">{{ member.relationship || 'Familiar' }} · {{ familyMemberDocument(member) }}</small>
+                                            </span>
+                                            <i class="pi pi-chevron-right" style="color: var(--text-color-secondary, #64748b)"></i>
+                                        </button>
+                                    }
+                                </div>
+                            }
+
+                            @for (member of person.familyMembers ?? []; track $index) {
+                                @if (selectedFamilyMemberIndex === $index) {
+                                <div class="form-field form-field-full" style="background: var(--surface-50, #f9fafb); border-radius: 6px; padding: 1rem; border: 1px solid var(--surface-200, #e5e7eb)">
+                                    <div class="form-grid" style="margin: 0">
+                                        <div class="form-field form-field-full" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.25rem">
+                                            <label style="font-weight: 700; color: var(--primary-700, #1d4ed8)">Familiar {{ $index + 1 }}</label>
+                                            <p-button icon="pi pi-trash" severity="danger" [outlined]="true" size="small" (onClick)="removeFamilyMember($index)" ariaLabel="Eliminar familiar" />
+                                        </div>
+
+                                        @if (!familyMemberEditing) {
+                                            <div class="form-field">
+                                                <label>Nombre completo</label>
+                                                <strong>{{ familyMemberFullName(member) }}</strong>
+                                            </div>
+                                            <div class="form-field">
+                                                <label>Tipo de documento</label>
+                                                <strong>{{ familyMemberDocumentType(member) }}</strong>
+                                            </div>
+                                            <div class="form-field">
+                                                <label>Nro. de documento</label>
+                                                <strong>{{ familyMemberDocumentNumber(member) }}</strong>
+                                            </div>
+                                            <div class="form-field">
+                                                <label>Sexo</label>
+                                                <strong>{{ member.gender || 'No registrado' }}</strong>
+                                            </div>
+                                            <div class="form-field">
+                                                <label>Fecha de nacimiento</label>
+                                                <strong>{{ member.birthDate ? (member.birthDate | date: 'dd/MM/yyyy') : 'No registrada' }}</strong>
+                                            </div>
+                                            <div class="form-field">
+                                                <label>Estado civil</label>
+                                                <strong>{{ member.maritalStatus || 'No registrado' }}</strong>
+                                            </div>
+                                            <div class="form-field">
+                                                <label>Parentesco</label>
+                                                <strong>{{ member.relationship || 'No registrado' }}</strong>
+                                            </div>
+                                            <div class="form-field">
+                                                <label>Teléfono personal</label>
+                                                <strong>{{ member.personalPhoneCode && member.personalPhone ? member.personalPhoneCode + '-' + member.personalPhone : 'No registrado' }}</strong>
+                                            </div>
+                                            <div class="form-field">
+                                                <label>Teléfono de habitación</label>
+                                                <strong>{{ member.homePhoneCode && member.homePhone ? member.homePhoneCode + '-' + member.homePhone : 'No registrado' }}</strong>
+                                            </div>
+                                            <div class="form-field">
+                                                <label>Correo electrónico personal</label>
+                                                <strong>{{ member.email || 'No registrado' }}</strong>
+                                            </div>
+                                            <div class="form-field">
+                                                <label>Lateralidad</label>
+                                                <strong>{{ member.laterality || 'No registrada' }}</strong>
+                                            </div>
+                                            <div class="form-field">
+                                                <label>Discapacidad</label>
+                                                <strong>{{ member.hasDisability ? (member.disabilityType || 'Sí') : 'No' }}</strong>
+                                            </div>
+                                            <div class="form-field">
+                                                <label>Grado de discapacidad</label>
+                                                <strong>{{ member.hasDisability ? (member.disabilityGrade || 'No registrado') : 'No aplica' }}</strong>
+                                            </div>
+                                            <div class="form-field">
+                                                <label>Código CONAPDIS</label>
+                                                <strong>{{ member.hasDisability ? (member.conapdisCode || 'No registrado') : 'No aplica' }}</strong>
+                                            </div>
+                                            <div class="form-field">
+                                                <label>Alergias</label>
+                                                <strong>{{ member.hasAllergies ? (member.allergyTypes || 'Sí') : 'No' }}</strong>
+                                            </div>
+                                            <div class="form-field">
+                                                <label>Adopción o colocación familiar</label>
+                                                <strong>{{ member.adoptedOrFoster ? 'Sí' : 'No' }}</strong>
+                                            </div>
+                                            <div class="form-field">
+                                                <label>N° Registro tribunal</label>
+                                                <strong>{{ member.adoptedOrFoster ? (member.courtRegistryNumber || 'No registrado') : 'No aplica' }}</strong>
+                                            </div>
+                                            <div class="form-field form-field-full">
+                                                <label>Observacion(es)</label>
+                                                <p style="margin: 0">{{ member.observations || 'Sin observaciones' }}</p>
+                                            </div>
+
+                                            <div class="form-field form-field-full" style="display: flex; justify-content: flex-end">
+                                                <p-button label="Editar familiar" icon="pi pi-pencil" (onClick)="startFamilyMemberEdit()" />
+                                            </div>
+                                        } @else {
+                                            <div class="form-field form-field-full">
+                                                <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--primary-700, #1d4ed8)">Datos Básicos</h4>
+                                                <small style="color: var(--text-color-secondary, #64748b)">Campos obligatorios (*)</small>
+                                            </div>
+
+                                        <div class="form-field">
+                                            <label for="memberHasDocument-{{$index}}">¿Tiene documento de identidad?</label>
+                                            <p-select inputId="memberHasDocument-{{$index}}" [options]="yesNoOptions" optionLabel="label" optionValue="value" [(ngModel)]="member.hasDocument" appendTo="body" scrollHeight="300px" styleClass="w-full" />
+                                        </div>
+                                        @if (member.hasDocument) {
+                                            <div class="form-field">
+                                                <label for="memberDocType-{{$index}}">Tipo de Documento</label>
+                                                <p-select inputId="memberDocType-{{$index}}" [options]="documentTypeSelectOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="member.documentType" appendTo="body" scrollHeight="300px" styleClass="w-full" [showClear]="true" />
+                                            </div>
+                                            <div class="form-field">
+                                                <label for="memberDocNumber-{{$index}}">Nro. de Documento</label>
+                                                <input pInputText id="memberDocNumber-{{$index}}" [(ngModel)]="member.documentNumber" placeholder="Ingrese..." />
+                                            </div>
+                                        }
+
+                                        <div class="form-field">
+                                            <label for="memberFirstName-{{$index}}">Primer nombre *</label>
+                                            <input pInputText id="memberFirstName-{{$index}}" [(ngModel)]="member.firstName" placeholder="Ingrese..." />
+                                        </div>
+                                        <div class="form-field">
+                                            <label for="memberSecondName-{{$index}}">Segundo nombre</label>
+                                            <input pInputText id="memberSecondName-{{$index}}" [(ngModel)]="member.secondName" placeholder="Ingrese..." />
+                                        </div>
+                                        <div class="form-field">
+                                            <label for="memberLastName-{{$index}}">Primer apellido *</label>
+                                            <input pInputText id="memberLastName-{{$index}}" [(ngModel)]="member.lastName" placeholder="Ingrese..." />
+                                        </div>
+                                        <div class="form-field">
+                                            <label for="memberSecondLastName-{{$index}}">Segundo apellido</label>
+                                            <input pInputText id="memberSecondLastName-{{$index}}" [(ngModel)]="member.secondLastName" placeholder="Ingrese..." />
+                                        </div>
+
+                                        <div class="form-field">
+                                            <label for="memberGender-{{$index}}">Sexo *</label>
+                                            <p-select inputId="memberGender-{{$index}}" [options]="genderOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="member.gender" appendTo="body" scrollHeight="300px" styleClass="w-full" />
+                                        </div>
+                                        <div class="form-field">
+                                            <label for="memberBirthDate-{{$index}}">Fecha de nacimiento *</label>
+                                            <p-datepicker
+                                                inputId="memberBirthDate-{{$index}}"
+                                                [(ngModel)]="familyMemberBirthDatePickers[$index]"
+                                                (ngModelChange)="onFamilyMemberBirthDateChange($index, $event)"
+                                                [minDate]="minBirthDate"
+                                                [maxDate]="todayDate"
+                                                dateFormat="dd/mm/yy"
+                                                placeholder="dd/mm/aaaa"
+                                                [showIcon]="true"
+                                                [readonlyInput]="true"
+                                                styleClass="w-full"
+                                            />
+                                        </div>
+                                        <div class="form-field">
+                                            <label for="memberMaritalStatus-{{$index}}">Estado civil *</label>
+                                            <p-select inputId="memberMaritalStatus-{{$index}}" [options]="maritalStatusOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="member.maritalStatus" appendTo="body" scrollHeight="380px" styleClass="w-full" />
+                                        </div>
+                                        <div class="form-field">
+                                            <label for="memberRelationship-{{$index}}">Parentesco *</label>
+                                            <p-select inputId="memberRelationship-{{$index}}" [options]="relationshipOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="member.relationship" appendTo="body" scrollHeight="300px" styleClass="w-full" />
+                                        </div>
+
+                                        <div class="form-field form-field-full">
+                                            <label for="memberPersonalPhone-{{$index}}">Teléfono personal *</label>
+                                            <div class="phone-input-row">
+                                                <p-select
+                                                    inputId="memberPersonalPhoneCode-{{$index}}"
+                                                    [options]="personalPhoneCodeOptions"
+                                                    optionLabel="label"
+                                                    optionValue="value"
+                                                    placeholder="Seleccione..."
+                                                    [(ngModel)]="member.personalPhoneCode"
+                                                    appendTo="body"
+                                                    scrollHeight="300px"
+                                                    styleClass="w-full phone-code-select"
+                                                />
+                                                <input pInputText id="memberPersonalPhone-{{$index}}" inputmode="numeric" [(ngModel)]="member.personalPhone" placeholder="Ingrese..." />
+                                            </div>
+                                        </div>
+                                        <div class="form-field form-field-full">
+                                            <label for="memberHomePhone-{{$index}}">Teléfono de habitación</label>
+                                            <div class="phone-input-row">
+                                                <p-select
+                                                    inputId="memberHomePhoneCode-{{$index}}"
+                                                    [options]="officePhoneCodeOptions"
+                                                    optionLabel="label"
+                                                    optionValue="value"
+                                                    placeholder="Seleccione..."
+                                                    [(ngModel)]="member.homePhoneCode"
+                                                    appendTo="body"
+                                                    scrollHeight="300px"
+                                                    styleClass="w-full phone-code-select"
+                                                />
+                                                <input pInputText id="memberHomePhone-{{$index}}" inputmode="numeric" [(ngModel)]="member.homePhone" placeholder="Ingrese..." />
+                                            </div>
+                                        </div>
+                                        <div class="form-field">
+                                            <label for="memberEmail-{{$index}}">Correo electrónico personal *</label>
+                                            <input pInputText id="memberEmail-{{$index}}" type="email" [(ngModel)]="member.email" placeholder="Ingrese..." />
+                                        </div>
+
+                                        <div class="form-field form-field-full" style="margin-top: 1rem; border-top: 1px solid var(--surface-200, #e2e8f0); padding-top: 1rem">
+                                            <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--primary-700, #1d4ed8)">Datos Adicionales</h4>
+                                        </div>
+
+                                        <div class="form-field">
+                                            <label for="memberHasDisability-{{$index}}">¿Tiene alguna discapacidad? *</label>
+                                            <p-select inputId="memberHasDisability-{{$index}}" [options]="yesNoOptions" optionLabel="label" optionValue="value" [(ngModel)]="member.hasDisability" (ngModelChange)="onFamilyMemberDisabilityChange($index, $event)" appendTo="body" scrollHeight="300px" styleClass="w-full" />
+                                        </div>
+                                        <div class="form-field">
+                                            <label for="memberDisabilityType-{{$index}}">Tipo de discapacidad</label>
+                                            <p-select inputId="memberDisabilityType-{{$index}}" [options]="disabilityTypeOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="member.disabilityType" [disabled]="!member.hasDisability" appendTo="body" scrollHeight="300px" styleClass="w-full" [showClear]="true" />
+                                        </div>
+                                        <div class="form-field">
+                                            <label for="memberDisabilityGrade-{{$index}}">Grado de discapacidad</label>
+                                            <p-select inputId="memberDisabilityGrade-{{$index}}" [options]="disabilityGradeOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="member.disabilityGrade" [disabled]="!member.hasDisability" appendTo="body" scrollHeight="300px" styleClass="w-full" [showClear]="true" />
+                                        </div>
+                                        <div class="form-field">
+                                            <label for="memberConapdis-{{$index}}">Código CONAPDIS</label>
+                                            <input pInputText id="memberConapdis-{{$index}}" [(ngModel)]="member.conapdisCode" [disabled]="!member.hasDisability" placeholder="Ingrese..." />
+                                        </div>
+                                        <div class="form-field">
+                                            <label for="memberLaterality-{{$index}}">Lateralidad *</label>
+                                            <p-select inputId="memberLaterality-{{$index}}" [options]="lateralityOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="member.laterality" appendTo="body" scrollHeight="300px" styleClass="w-full" [showClear]="true" />
+                                        </div>
+
+                                        <div class="form-field">
+                                            <label for="memberHasAllergies-{{$index}}">Alergias *</label>
+                                            <p-select inputId="memberHasAllergies-{{$index}}" [options]="yesNoOptions" optionLabel="label" optionValue="value" [(ngModel)]="member.hasAllergies" appendTo="body" scrollHeight="300px" styleClass="w-full" />
+                                        </div>
+                                        <div class="form-field">
+                                            <label for="memberAllergyTypes-{{$index}}">Tipo de alergias</label>
+                                            <input pInputText id="memberAllergyTypes-{{$index}}" [(ngModel)]="member.allergyTypes" placeholder="Ingrese..." />
+                                        </div>
+                                        <div class="form-field form-field-full">
+                                            <label for="memberObservations-{{$index}}">Observacion(es)</label>
+                                            <textarea pTextarea id="memberObservations-{{$index}}" rows="2" [(ngModel)]="member.observations" placeholder="Ingrese..." style="width: 100%"></textarea>
+                                        </div>
+
+                                        <div class="form-field">
+                                            <label for="memberAdopted-{{$index}}">¿Posee parentesco por adopción o colocación familiar?</label>
+                                            <p-select inputId="memberAdopted-{{$index}}" [options]="yesNoOptions" optionLabel="label" optionValue="value" [(ngModel)]="member.adoptedOrFoster" appendTo="body" scrollHeight="300px" styleClass="w-full" />
+                                        </div>
+                                        <div class="form-field">
+                                            <label for="memberCourtRegistry-{{$index}}">N° Registro tribunal</label>
+                                            <input pInputText id="memberCourtRegistry-{{$index}}" [(ngModel)]="member.courtRegistryNumber" placeholder="Ingrese..." />
+                                        </div>
+
+                                            <div class="form-field form-field-full" style="display: flex; justify-content: flex-end">
+                                                <p-button label="Listo" icon="pi pi-check" (onClick)="finishFamilyMemberEdit()" />
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                                }
+                            }
+                        </div>
                     </p-tabpanel>
 
                     <!-- ===================== TAB 2: VACACIONES ===================== -->
@@ -423,53 +777,6 @@
                     <p-tabpanel value="3">
                         @if (person.medicalData) {
                             <div class="form-grid" style="margin-top: 1rem">
-                                <div class="form-field">
-                                    <label for="laterality">Lateralidad *</label>
-                                    <p-select id="laterality" [options]="lateralityOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="person.medicalData.laterality" appendTo="body" scrollHeight="300px" styleClass="w-full" [showClear]="true" />
-                                </div>
-                                <div class="form-field">
-                                    <label for="bloodType">Tipo de sangre</label>
-                                    <p-select id="bloodType" [options]="bloodTypeOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="person.medicalData.bloodType" appendTo="body" scrollHeight="350px" styleClass="w-full" [showClear]="true" />
-                                </div>
-
-                                <div class="form-field form-field-full">
-                                    <div style="display: flex; align-items: center; gap: 0.5rem">
-                                        <p-checkbox [(ngModel)]="person.medicalData.hasOccupationalDisease" [binary]="true" inputId="hasOccupationalDisease" />
-                                        <label for="hasOccupationalDisease" style="margin: 0; cursor: pointer">¿Tiene alguna enfermedad ocupacional? *</label>
-                                    </div>
-                                </div>
-                                @if (person.medicalData.hasOccupationalDisease) {
-                                    <div class="form-field form-field-full">
-                                        <label for="occDiseaseDesc">Especifique el tipo de enfermedad ocupacional</label>
-                                        <textarea pTextarea id="occDiseaseDesc" rows="2" [(ngModel)]="person.medicalData.occupationalDiseaseDescription" placeholder="Ingrese el tipo de enfermedad ocupacional..." style="width: 100%"></textarea>
-                                    </div>
-                                }
-
-                                <div class="form-field form-field-full">
-                                    <div style="display: flex; align-items: center; gap: 0.5rem">
-                                        <p-checkbox [(ngModel)]="person.medicalData.hasDisability" [binary]="true" inputId="hasDisability" />
-                                        <label for="hasDisability" style="margin: 0; cursor: pointer">¿Tiene alguna discapacidad? *</label>
-                                    </div>
-                                </div>
-                                @if (person.medicalData.hasDisability) {
-                                    <div class="form-field">
-                                        <label for="disabilityType">Tipo de discapacidad</label>
-                                        <p-select id="disabilityType" [options]="disabilityTypeOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="person.medicalData.disabilityType" appendTo="body" scrollHeight="300px" styleClass="w-full" [showClear]="true" />
-                                    </div>
-                                    <div class="form-field">
-                                        <label for="disabilityGrade">Grado de discapacidad</label>
-                                        <p-select id="disabilityGrade" [options]="disabilityGradeOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="person.medicalData.disabilityGrade" appendTo="body" scrollHeight="300px" styleClass="w-full" [showClear]="true" />
-                                    </div>
-                                    <div class="form-field form-field-full">
-                                        <label for="conapdisCode">Código CONAPDIS</label>
-                                        <input pInputText id="conapdisCode" [(ngModel)]="person.medicalData.conapdisCode" placeholder="Ingrese número o código CONAPDIS..." />
-                                    </div>
-                                    <div class="form-field form-field-full">
-                                        <label for="disabilityDesc">Descripción detallada de la discapacidad</label>
-                                        <textarea pTextarea id="disabilityDesc" rows="2" [(ngModel)]="person.medicalData.disabilityDescription" placeholder="Describa la discapacidad..." style="width: 100%"></textarea>
-                                    </div>
-                                }
-
                                 <div class="form-field form-field-full">
                                     <div style="display: flex; align-items: center; gap: 0.5rem">
                                         <p-checkbox [(ngModel)]="person.medicalData.hasPathology" [binary]="true" inputId="hasPathology" />
@@ -512,6 +819,21 @@
                                 </div>
 
                                 <div class="form-field form-field-full">
+                                    <label style="font-weight: 700; color: var(--primary-700, #1d4ed8)">Segundo contacto de emergencia</label>
+                                </div>
+                                <div class="form-field">
+                                    <label for="emgName2">Nombre completo</label>
+                                    <input pInputText id="emgName2" [(ngModel)]="person.medicalData.secondaryEmergencyContactName" placeholder="Nombre del segundo contacto" />
+                                </div>
+                                <div class="form-field">
+                                    <label for="emgPhone2">Teléfono</label>
+                                    <input pInputText id="emgPhone2" type="tel" [(ngModel)]="person.medicalData.secondaryEmergencyContactPhone" (ngModelChange)="onOptionalPhoneChange('secondaryEmergencyPhone', $event)" placeholder="+58 412 1234567" />
+                                    @if (optionalPhoneError('secondaryEmergencyPhone', person.medicalData.secondaryEmergencyContactPhone)) {
+                                        <small class="field-error">{{ optionalPhoneError('secondaryEmergencyPhone', person.medicalData.secondaryEmergencyContactPhone) }}</small>
+                                    }
+                                </div>
+
+                                <div class="form-field form-field-full">
                                     <label for="medObs">Observaciones médicas</label>
                                     <textarea pTextarea id="medObs" rows="3" [(ngModel)]="person.medicalData.observations" placeholder="Cualquier otra información médica relevante" style="width: 100%"></textarea>
                                 </div>
@@ -523,6 +845,133 @@
                     <p-tabpanel value="4">
                         @if (person.housingData) {
                             <div class="form-grid" style="margin-top: 1rem">
+                                <div class="form-field form-field-full">
+                                    <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--primary-700, #1d4ed8)">Dirección de habitación</h3>
+                                </div>
+
+                                <div class="form-field form-field-full">
+                                    <div class="housing-location-grid">
+                                        <div class="form-field">
+                                            <label for="housingState">Estado *</label>
+                                            <p-select id="housingState" [options]="departmentOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="person.department" (ngModelChange)="onDepartmentChange()" appendTo="body" scrollHeight="350px" styleClass="w-full" />
+                                            @if (submitted && !person.department) {
+                                                <small class="field-error">Selecciona el estado.</small>
+                                            }
+                                        </div>
+                                        <div class="form-field">
+                                            <label for="housingMunicipality">Municipio *</label>
+                                            <p-select id="housingMunicipality" [options]="housingMunicipalityOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="person.housingData.municipality" (ngModelChange)="onHousingMunicipalityChange()" appendTo="body" scrollHeight="350px" styleClass="w-full" />
+                                            @if (submitted && !person.housingData.municipality) {
+                                                <small class="field-error">Selecciona el municipio.</small>
+                                            }
+                                        </div>
+                                        <div class="form-field">
+                                            <label for="housingParish">Parroquia *</label>
+                                            <p-select id="housingParish" [options]="housingParishOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [editable]="true" [(ngModel)]="person.housingData.parish" appendTo="body" scrollHeight="350px" styleClass="w-full" />
+                                            @if (submitted && !person.housingData.parish) {
+                                                <small class="field-error">Selecciona o escribe la parroquia.</small>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="form-field">
+                                    <label for="housingCity">Ciudad</label>
+                                    <p-select
+                                        id="housingCity"
+                                        [options]="cityOptions"
+                                        optionLabel="label"
+                                        optionValue="value"
+                                        placeholder="Seleccione primero el estado"
+                                        [disabled]="!person.department"
+                                        [(ngModel)]="citySelection"
+                                        (ngModelChange)="onCitySelectionChange($event)"
+                                        appendTo="body"
+                                        scrollHeight="350px"
+                                        styleClass="w-full"
+                                    />
+                                    <small>Si no encuentra la ciudad, seleccione «Otro» para escribirla.</small>
+                                </div>
+                                @if (citySelection === 'Otro') {
+                                    <div class="form-field">
+                                        <label for="housingOtherCity">Escriba la ciudad</label>
+                                        <input pInputText id="housingOtherCity" [(ngModel)]="person.city" placeholder="Ingrese el nombre de la ciudad" />
+                                    </div>
+                                }
+
+                                <div class="form-field form-field-full">
+                                    <label for="housingAddress">Dirección</label>
+                                    <input pInputText id="housingAddress" [(ngModel)]="person.address" placeholder="Ingrese la dirección de habitación" />
+                                </div>
+
+                                <div class="form-field form-field-full">
+                                    <label>Tipo de dirección *</label>
+                                    <div class="address-type-grid">
+                                        <div class="address-type-group">
+                                            <div class="address-type-options">
+                                                @for (option of thoroughfareTypeOptions; track option) {
+                                                    <label class="address-type-option">
+                                                        <input type="radio" name="housingThoroughfare" [value]="option" [(ngModel)]="person.housingData.thoroughfareType" />
+                                                        <span>{{ option }}</span>
+                                                    </label>
+                                                }
+                                            </div>
+                                            <input pInputText id="housingThoroughfareDetails" [(ngModel)]="person.housingData.thoroughfareDetails" placeholder="Detalles de la dirección" aria-label="Detalles de la dirección" />
+                                        </div>
+
+                                        <div class="address-type-group">
+                                            <div class="address-type-options">
+                                                @for (option of buildingTypeOptions; track option) {
+                                                    <label class="address-type-option">
+                                                        <input type="radio" name="housingBuilding" [value]="option" [(ngModel)]="person.housingData.buildingType" />
+                                                        <span>{{ option }}</span>
+                                                    </label>
+                                                }
+                                            </div>
+                                            <input pInputText id="housingBuildingDetails" [(ngModel)]="person.housingData.buildingDetails" placeholder="Detalles de la vivienda" aria-label="Detalles de la vivienda" />
+                                        </div>
+
+                                        <div class="address-type-group">
+                                            <div class="address-type-options">
+                                                @for (option of unitTypeOptions; track option) {
+                                                    <label class="address-type-option">
+                                                        <input type="radio" name="housingUnit" [value]="option" [(ngModel)]="person.housingData.unitType" />
+                                                        <span>{{ option }}</span>
+                                                    </label>
+                                                }
+                                            </div>
+                                            <input pInputText id="housingUnitDetails" [(ngModel)]="person.housingData.unitDetails" placeholder="Detalles de la vivienda" aria-label="Detalles de la vivienda" />
+                                        </div>
+
+                                        <div class="address-type-group">
+                                            <div class="address-type-options">
+                                                @for (option of zoneTypeOptions; track option) {
+                                                    <label class="address-type-option">
+                                                        <input type="radio" name="housingZone" [value]="option" [(ngModel)]="person.housingData.zoneType" />
+                                                        <span>{{ option }}</span>
+                                                    </label>
+                                                }
+                                            </div>
+                                            <input pInputText id="housingZoneDetails" [(ngModel)]="person.housingData.zoneDetails" placeholder="Detalles de la vivienda" aria-label="Detalles de la vivienda" />
+                                        </div>
+                                    </div>
+                                    @if (submitted && !hasAddressType()) {
+                                        <small class="field-error">Selecciona al menos un tipo de dirección.</small>
+                                    }
+                                </div>
+
+                                <div class="form-field form-field-full">
+                                    <label for="housingReference">Punto de referencias *</label>
+                                    <input pInputText id="housingReference" [(ngModel)]="person.housingData.referencePoint" placeholder="Ingrese..." />
+                                    @if (submitted && !person.housingData.referencePoint?.trim()) {
+                                        <small class="field-error">Escribe un punto de referencia.</small>
+                                    }
+                                </div>
+
+                                <div class="form-field form-field-full">
+                                    <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--primary-700, #1d4ed8)">Características de la vivienda</h3>
+                                </div>
+
                                 <div class="form-field">
                                     <label for="housingType">Tipo de vivienda</label>
                                     <p-select id="housingType" [options]="housingTypeOptions" optionLabel="label" optionValue="value" placeholder="Seleccionar" [(ngModel)]="person.housingData.housingType" appendTo="body" scrollHeight="350px" styleClass="w-full" [showClear]="true" />
@@ -530,19 +979,6 @@
                                 <div class="form-field">
                                     <label for="housingCond">Condición de la vivienda</label>
                                     <p-select id="housingCond" [options]="housingConditionOptions" optionLabel="label" optionValue="value" placeholder="Seleccionar" [(ngModel)]="person.housingData.housingCondition" appendTo="body" scrollHeight="350px" styleClass="w-full" [showClear]="true" />
-                                </div>
-
-                                <div class="form-field">
-                                    <label for="hSector">Sector / Urbanización</label>
-                                    <input pInputText id="hSector" [(ngModel)]="person.housingData.sector" placeholder="Ej: La California Norte" />
-                                </div>
-                                <div class="form-field">
-                                    <label for="hMunicipality">Municipio</label>
-                                    <input pInputText id="hMunicipality" [(ngModel)]="person.housingData.municipality" placeholder="Municipio de residencia" />
-                                </div>
-                                <div class="form-field">
-                                    <label for="hZip">Código postal</label>
-                                    <input pInputText id="hZip" [(ngModel)]="person.housingData.zipCode" placeholder="Ej: 1060" />
                                 </div>
 
                                 <div class="form-field">
@@ -575,20 +1011,59 @@
 
                     <!-- ===================== TAB 5: DATOS ADICIONALES ===================== -->
                     <p-tabpanel value="5">
-                        @if (person.additionalData) {
+                        @if (person.additionalData && person.medicalData && person.familyData) {
                             <div class="form-grid" style="margin-top: 1rem">
-                                <div class="form-field form-field-full">
-                                    <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--primary-700, #1d4ed8)">Inscripción militar</h3>
-                                    <small style="color: var(--text-color-secondary, #64748b)">Registro ante la autoridad de conscripción y alistamiento militar.</small>
+                                <div class="form-field">
+                                    <label for="hasOccupationalDisease">¿Tiene alguna enfermedad ocupacional? *</label>
+                                    <p-select id="hasOccupationalDisease" [options]="yesNoOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="person.medicalData.hasOccupationalDisease" (ngModelChange)="onOccupationalDiseaseChange($event)" appendTo="body" scrollHeight="300px" styleClass="w-full" />
+                                </div>
+                                <div class="form-field">
+                                    <label for="occDiseaseDesc">Especifique el tipo de enfermedad ocupacional</label>
+                                    <input pInputText id="occDiseaseDesc" [(ngModel)]="person.medicalData.occupationalDiseaseDescription" [disabled]="!person.medicalData.hasOccupationalDisease" placeholder="Ingrese..." />
+                                </div>
+
+                                <div class="form-field">
+                                    <label for="hasDisability">¿Tiene alguna discapacidad? *</label>
+                                    <p-select id="hasDisability" [options]="yesNoOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="person.medicalData.hasDisability" (ngModelChange)="onDisabilityChange($event)" appendTo="body" scrollHeight="300px" styleClass="w-full" />
+                                </div>
+                                <div class="form-field">
+                                    <label for="disabilityType">Tipo de discapacidad</label>
+                                    <p-select id="disabilityType" [options]="disabilityTypeOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="person.medicalData.disabilityType" [disabled]="!person.medicalData.hasDisability" appendTo="body" scrollHeight="300px" styleClass="w-full" [showClear]="true" />
+                                </div>
+                                <div class="form-field">
+                                    <label for="disabilityGrade">Grado de discapacidad</label>
+                                    <p-select id="disabilityGrade" [options]="disabilityGradeOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="person.medicalData.disabilityGrade" [disabled]="!person.medicalData.hasDisability" appendTo="body" scrollHeight="300px" styleClass="w-full" [showClear]="true" />
+                                </div>
+                                <div class="form-field">
+                                    <label for="conapdisCode">Código CONAPDIS</label>
+                                    <input pInputText id="conapdisCode" [(ngModel)]="person.medicalData.conapdisCode" [disabled]="!person.medicalData.hasDisability" placeholder="Ingrese..." />
+                                </div>
+
+                                <div class="form-field">
+                                    <label for="laterality">Lateralidad *</label>
+                                    <p-select id="laterality" [options]="lateralityOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="person.medicalData.laterality" appendTo="body" scrollHeight="300px" styleClass="w-full" [showClear]="true" />
+                                </div>
+                                <div class="form-field">
+                                    <label for="bloodType">Tipo de sangre</label>
+                                    <p-select id="bloodType" [options]="bloodTypeOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="person.medicalData.bloodType" appendTo="body" scrollHeight="350px" styleClass="w-full" [showClear]="true" />
                                 </div>
 
                                 <div class="form-field">
                                     <label for="militaryReg">Inscripción militar *</label>
-                                    <p-select id="militaryReg" [options]="militaryRegistrationOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="person.additionalData.militaryRegistration" appendTo="body" scrollHeight="300px" styleClass="w-full" />
+                                    <p-select id="militaryReg" [options]="militaryRegistrationOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="person.additionalData.militaryRegistration" (ngModelChange)="onMilitaryRegistrationChange($event)" appendTo="body" scrollHeight="300px" styleClass="w-full" />
                                 </div>
                                 <div class="form-field">
                                     <label for="militaryRegNum">N°. de inscripción militar</label>
-                                    <input pInputText id="militaryRegNum" [(ngModel)]="person.additionalData.militaryRegistrationNumber" placeholder="Ingrese número de inscripción militar..." />
+                                    <input pInputText id="militaryRegNum" [(ngModel)]="person.additionalData.militaryRegistrationNumber" [disabled]="person.additionalData.militaryRegistration !== 'Inscrito'" placeholder="Ingrese..." />
+                                </div>
+
+                                <div class="form-field">
+                                    <label for="childrenCount">Cantidad de hijos *</label>
+                                    <p-select id="childrenCount" [options]="childrenCountOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="person.familyData.numberOfChildren" appendTo="body" scrollHeight="300px" styleClass="w-full" />
+                                </div>
+                                <div class="form-field">
+                                    <label for="spouseMpppst">Si su cónyuge trabaja en el MPPPST, especifique en qué dependencia labora</label>
+                                    <input pInputText id="spouseMpppst" [(ngModel)]="person.familyData.spouseMpppstDepartment" placeholder="Ingrese..." />
                                 </div>
 
                                 <div class="form-field form-field-full" style="margin-top: 1rem; border-top: 1px solid var(--surface-200, #e2e8f0); padding-top: 1rem">
@@ -611,11 +1086,6 @@
                                 <div class="form-field">
                                     <label for="jacketSize">Chaqueta</label>
                                     <p-select id="jacketSize" [options]="jacketSizeOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="person.additionalData.jacketSize" appendTo="body" scrollHeight="300px" styleClass="w-full" [showClear]="true" />
-                                </div>
-
-                                <div class="form-field form-field-full">
-                                    <label for="addObs">Observaciones adicionales</label>
-                                    <textarea pTextarea id="addObs" rows="3" [(ngModel)]="person.additionalData.observations" placeholder="Cualquier información adicional..." style="width: 100%"></textarea>
                                 </div>
                             </div>
                         }
@@ -674,51 +1144,5 @@
                     <p-button label="Cancelar" icon="pi pi-times" severity="secondary" [outlined]="true" styleClass="btn-cancelar" (click)="hideDialog()" />
                     <p-button label="Guardar cambios" icon="pi pi-check" (onClick)="savePerson()" />
                 }
-            </ng-template>
-        </p-dialog>
-
-        <p-dialog
-            [(visible)]="statusDialog"
-            [style]="{ width: '520px', maxWidth: '95vw' }"
-            [header]="pendingStatusPerson?.status === 'Inactivo' ? 'Habilitar trabajador' : 'Inhabilitar trabajador'"
-            [modal]="true"
-            (onHide)="hideStatusDialog()"
-        >
-            @if (pendingStatusPerson; as targetPerson) {
-                <div class="form-grid">
-                    <p class="form-field-full">
-                        {{ targetPerson.firstName }} {{ targetPerson.lastName }}
-                        <span class="text-color-secondary">({{ targetPerson.documentNumber }})</span>
-                    </p>
-                    @if (targetPerson.status !== 'Inactivo') {
-                        <div class="form-field form-field-full">
-                            <label for="inactivationReason">Motivo de la inhabilitación *</label>
-                            <textarea
-                                pTextarea
-                                id="inactivationReason"
-                                [(ngModel)]="inactivationReason"
-                                rows="4"
-                                maxlength="500"
-                                placeholder="Explica por qué se inhabilita este trabajador"
-                                style="width: 100%"
-                            ></textarea>
-                            @if (inactivationReasonError) {
-                                <small class="field-error">{{ inactivationReasonError }}</small>
-                            }
-                        </div>
-                    } @else {
-                        <p class="form-field-full">El trabajador volverá a quedar Activo. El motivo anterior permanecerá en la bitácora.</p>
-                    }
-                </div>
-            }
-
-            <ng-template #footer>
-                <p-button label="Cancelar" icon="pi pi-times" severity="secondary" [outlined]="true" styleClass="btn-cancelar" (click)="hideStatusDialog()" />
-                <p-button
-                    [label]="pendingStatusPerson?.status === 'Inactivo' ? 'Habilitar' : 'Inhabilitar'"
-                    [icon]="pendingStatusPerson?.status === 'Inactivo' ? 'pi pi-check' : 'pi pi-ban'"
-                    [severity]="pendingStatusPerson?.status === 'Inactivo' ? 'success' : 'warn'"
-                    (click)="saveStatusChange()"
-                />
             </ng-template>
         </p-dialog>

@@ -15,7 +15,8 @@ import { TagModule } from 'primeng/tag';
 import { ToastModule } from 'primeng/toast';
 import { AuthService } from '@/app/services/auth.service';
 import { AppUser, NewUserInput, SECURITY_QUESTIONS, SecurityQuestion, TagSeverity, UpdateUserInput } from '@/app/services/models';
-import { validateCedula, validatePassword, validatePersonName } from '@/app/services/validators';
+import { composeDocumentNumber, extractDocumentPrefix, stripDocumentPrefix, validateIdentityDocument, validatePassword, validatePersonName } from '@/app/services/validators';
+import { DocumentPrefixSelect } from '@/app/components/document-prefix-select/document-prefix-select';
 
 @Component({
     selector: 'app-usuarios',
@@ -28,6 +29,7 @@ import { validateCedula, validatePassword, validatePersonName } from '@/app/serv
         CheckboxModule,
         ConfirmDialogModule,
         DialogModule,
+        DocumentPrefixSelect,
         InputTextModule,
         PasswordModule,
         SelectModule,
@@ -57,9 +59,13 @@ export class Usuarios {
 
     editing = false;
 
+    editingSelf = false;
+
     submitted = false;
 
     cedulaTouched = false;
+
+    cedulaPrefix = '';
 
     editingId: string | null = null;
 
@@ -71,37 +77,45 @@ export class Usuarios {
         { question: '', answer: '' }
     ];
 
+    securityAnswerVisible: boolean[] = [false, false, false];
+
     openNew(): void {
         this.editing = false;
+        this.editingSelf = false;
         this.editingId = null;
         this.submitted = false;
         this.cedulaTouched = false;
+        this.cedulaPrefix = '';
         this.userForm = this.emptyUser();
         this.securityQuestionsForm = [
             { question: '', answer: '' },
             { question: '', answer: '' },
             { question: '', answer: '' }
         ];
+        this.securityAnswerVisible = [false, false, false];
         this.userDialog = true;
     }
 
     editUser(user: AppUser): void {
         this.editing = true;
+        this.editingSelf = this.isCurrentUser(user);
         this.editingId = user.id;
         this.submitted = false;
         this.cedulaTouched = false;
+        this.cedulaPrefix = extractDocumentPrefix(user.cedula);
         this.userForm = {
             fullName: user.fullName,
-            cedula: user.cedula,
+            cedula: stripDocumentPrefix(user.cedula),
             password: '',
             role: 'Administrador',
             active: user.active
         };
-        const existing = user.securityQuestions ?? [];
+        const existing = this.editingSelf ? (user.securityQuestions ?? []) : [];
         this.securityQuestionsForm = [0, 1, 2].map((i) => ({
             question: existing[i]?.question ?? '',
-            answer: existing[i]?.answer ?? ''
+            answer: (existing[i]?.answer ?? '').toUpperCase()
         }));
+        this.securityAnswerVisible = [false, false, false];
         this.userDialog = true;
     }
 
@@ -112,11 +126,19 @@ export class Usuarios {
     }
 
     fullNameError(): string {
-        return this.submitted ? (validatePersonName(this.userForm.fullName, 'nombre completo') ?? '') : '';
+        return this.submitted ? (validatePersonName(this.userForm.fullName, 'nombre completo', { allowMultipleWords: true }) ?? '') : '';
     }
 
     cedulaError(): string {
-        return this.submitted || this.cedulaTouched ? (validateCedula(this.userForm.cedula) ?? '') : '';
+        return this.submitted || this.cedulaTouched ? (validateIdentityDocument(this.cedulaPrefix, this.userForm.cedula) ?? '') : '';
+    }
+
+    get displayCedula(): string {
+        return composeDocumentNumber(this.cedulaPrefix, this.userForm.cedula);
+    }
+
+    get manageCredentials(): boolean {
+        return !this.editing || this.editingSelf;
     }
 
     passwordError(): string {
@@ -133,6 +155,14 @@ export class Usuarios {
         return '';
     }
 
+    toggleSecurityAnswerVisibility(index: number): void {
+        this.securityAnswerVisible[index] = !this.securityAnswerVisible[index];
+    }
+
+    onSecurityAnswerChange(index: number, value: string): void {
+        this.securityQuestionsForm[index].answer = (value ?? '').toUpperCase();
+    }
+
     availableQuestionsFor(index: number): { label: string; value: string }[] {
         const usedQuestions = this.securityQuestionsForm
             .filter((_, i) => i !== index)
@@ -144,11 +174,11 @@ export class Usuarios {
     saveUser(): void {
         this.submitted = true;
 
-        const nameErr = validatePersonName(this.userForm.fullName, 'nombre completo');
-        const cedulaErr = validateCedula(this.userForm.cedula);
-        const passErr = (!this.editing || this.userForm.password) ? validatePassword(this.userForm.password) : null;
+        const nameErr = validatePersonName(this.userForm.fullName, 'nombre completo', { allowMultipleWords: true });
+        const cedulaErr = validateIdentityDocument(this.cedulaPrefix, this.userForm.cedula);
+        const passErr = this.manageCredentials && (!this.editing || this.userForm.password) ? validatePassword(this.userForm.password) : null;
 
-        const sqErr = this.securityQuestionsForm.some((q) =>
+        const sqErr = this.manageCredentials && this.securityQuestionsForm.some((q) =>
             (q.question && !q.answer.trim()) || (!q.question && q.answer.trim())
         );
 
@@ -172,16 +202,15 @@ export class Usuarios {
         if (this.editing && this.editingId) {
             const input: UpdateUserInput = {
                 fullName: this.userForm.fullName,
-                cedula: this.userForm.cedula,
+                cedula: composeDocumentNumber(this.cedulaPrefix, this.userForm.cedula),
                 role: 'Administrador',
                 active: this.userForm.active,
-                password: this.userForm.password,
-                securityQuestions
+                ...(this.editingSelf ? { password: this.userForm.password, securityQuestions } : {})
             };
             result = this.auth.updateUser(this.editingId, input);
         } else {
             this.userForm.role = 'Administrador';
-            this.userForm.securityQuestions = securityQuestions;
+            this.userForm.cedula = composeDocumentNumber(this.cedulaPrefix, this.userForm.cedula);
             result = this.auth.createUser(this.userForm);
         }
 

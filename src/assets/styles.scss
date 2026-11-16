@@ -677,10 +677,165 @@ select {
     min-height: 2.75rem;
 }
 
+.housing-location-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem 1.25rem;
+}
+
+.address-type-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.85rem 1.25rem;
+}
+
+.address-type-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    min-width: 0;
+}
+
+.address-type-options {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 1.1rem;
+}
+
+.address-type-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.8rem;
+    color: #475569;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.address-type-option input[type='radio'] {
+    width: 0.95rem;
+    height: 0.95rem;
+    margin: 0;
+    accent-color: var(--primary-color, #2563eb);
+    cursor: pointer;
+}
+
+@media (max-width: 900px) {
+    .housing-location-grid,
+    .address-type-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 .field-error {
     color: #dc2626;
     font-size: 0.7rem;
     font-weight: 600;
+}
+
+.doc-input-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.doc-input-row > input {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.auth-form .doc-input-row input {
+    width: 100%;
+}
+
+.phone-input-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.phone-input-row > input {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.phone-input-row .phone-code-select {
+    flex: 0 0 8.5rem;
+    width: 8.5rem;
+}
+
+.secret-input {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.secret-input input {
+    width: 100%;
+    padding-right: 2.5rem;
+}
+
+.secret-input-toggle {
+    position: absolute;
+    right: 0.3rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border: 0;
+    border-radius: 0.4rem;
+    background: transparent;
+    color: #64748b;
+    cursor: pointer;
+    transition:
+        background 0.15s ease,
+        color 0.15s ease;
+}
+
+.secret-input-toggle:hover:not(:disabled) {
+    background: #eef2f7;
+    color: #1d4ed8;
+}
+
+.secret-input-toggle:focus-visible {
+    outline: 2px solid #93c5fd;
+    outline-offset: 1px;
+}
+
+.secret-input-toggle:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.security-question-field {
+    margin-bottom: 0.75rem;
+    padding: 0.7rem 0.75rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.65rem;
+    background: #f8fafc;
+    transition:
+        border-color 0.15s ease,
+        box-shadow 0.15s ease,
+        background 0.15s ease;
+}
+
+.security-question-field label {
+    display: block;
+    margin-bottom: 0.35rem;
+    color: #334155;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.security-question-field.is-incorrect {
+    border-color: #dc2626;
+    background: #fef2f2;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
 }
 
 .field-hint {
@@ -693,6 +848,61 @@ select {
     color: var(--registro-muted);
     font-size: 0.72rem;
     margin-top: 0.25rem;
+}
+
+.password-field {
+    border-left: 3px solid transparent;
+    padding-left: 0.6rem;
+    transition: border-color 0.2s ease;
+}
+
+.password-field.is-invalid {
+    border-left-color: #dc2626;
+}
+
+.password-rules {
+    list-style: none;
+    margin: 0.35rem 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    font-size: 0.7rem;
+    color: var(--registro-muted);
+}
+
+.password-rules li::before {
+    display: inline-block;
+    width: 1rem;
+    font-weight: 700;
+    content: '•';
+    color: #94a3b8;
+}
+
+.password-rules li.is-met {
+    color: #15803d;
+}
+
+.password-rules li.is-met::before {
+    content: '✓';
+    color: #16a34a;
+}
+
+.password-rules li.is-missing {
+    color: #b91c1c;
+    font-weight: 600;
+}
+
+.password-rules li.is-missing::before {
+    content: '✕';
+    color: #dc2626;
+}
+
+.password-missing-summary {
+    margin: 0.5rem 0 0;
+    color: #b91c1c;
+    font-size: 0.75rem;
+    font-weight: 600;
 }
 
 .checkbox-field {
@@ -1546,6 +1756,11 @@ select {
 .person-dialog {
     max-width: 95vw !important;
 
+    fieldset {
+        min-width: 0;
+        min-inline-size: 0;
+    }
+
     .p-dialog-content {
         max-height: 75vh;
         overflow-y: auto;
@@ -1553,14 +1768,31 @@ select {
         padding: 1rem 1.25rem 1.5rem;
     }
 
-    .p-tabs {
+    .p-tabs,
+    .p-tablist,
+    .p-tabpanels,
+    .p-tabpanel {
         width: 100%;
         max-width: 100%;
+        min-width: 0;
     }
 
-    .p-tablist {
-        max-width: 100%;
-        overflow-x: auto;
+    .p-tablist-content {
+        scrollbar-width: thin;
+        scrollbar-color: #94a3b8 transparent;
+
+        &::-webkit-scrollbar {
+            height: 5px;
+        }
+
+        &::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 999px;
+        }
+
+        &::-webkit-scrollbar-track {
+            background: transparent;
+        }
     }
 
     .p-tabpanel {
@@ -1675,6 +1907,12 @@ select {
             background: #eef2f7;
             color: #64748b;
         }
+    }
+
+    .security-question-card.is-invalid {
+        border-color: #dc2626;
+        background: #fef2f2;
+        box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
     }
 
     .security-question-label {

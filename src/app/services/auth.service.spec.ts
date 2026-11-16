@@ -40,20 +40,26 @@ describe('AuthService', () => {
     });
 
     it('register() debe crear un nuevo usuario y dejarlo con sesión iniciada', () => {
-        const result = service.register('Pedro López', '18745678', 'clave123');
+        const result = service.register('Pedro López', 'V-18745678', 'clave123');
         expect(result.ok).toBeTrue();
         expect(service.currentUser()?.cedula).toBe('V-18745678');
         expect(service.currentUser()?.role).toBe('Administrador');
     });
 
     it('register() debe fallar si la cédula ya está registrada', () => {
-        service.register('Alicia Ruiz', '18745678', 'clave123');
+        service.register('Alicia Ruiz', 'V-18745678', 'clave123');
         const result = service.register('Alicia Copia', 'V-18745678', 'clave456');
         expect(result.ok).toBeFalse();
     });
 
+    it('register() debe fallar si la cédula no lleva el tipo de documento', () => {
+        const result = service.register('Bruno Díaz', '18745678', 'clave123');
+        expect(result.ok).toBeFalse();
+        expect(result.message).toContain('tipo de documento');
+    });
+
     it('register() debe fallar si la contraseña tiene menos de 6 caracteres', () => {
-        const result = service.register('Carlos M.', '18745678', '123');
+        const result = service.register('Carlos M.', 'V-18745678', '123');
         expect(result.ok).toBeFalse();
     });
 
@@ -139,5 +145,73 @@ describe('AuthService', () => {
         expect(service.getSecurityQuestions('V-12345678').message).toBe(expectedMessage);
         expect(service.verifySecurityQuestions('V-12345678', [{ question: '¿En qué ciudad naciste?', answer: 'Caracas' }]).message).toBe(expectedMessage);
         expect(service.resetPassword('V-12345678', 'nuevaClave123').message).toBe(expectedMessage);
+    });
+
+    describe('restricciones de gestión de cuentas', () => {
+        const baseInput = (cedula: string) => ({
+            fullName: 'Usuario Prueba',
+            cedula,
+            password: 'clave123',
+            role: 'Administrador' as const,
+            active: true
+        });
+
+        const createOther = (): string => {
+            const created = service.createUser(baseInput('V-12345678'));
+            expect(created.ok).toBeTrue();
+            return service.users().find((user) => user.cedula === 'V-12345678')!.id;
+        };
+
+        it('updateUser() debe rechazar modificar la cédula de un usuario', () => {
+            service.login('V-00000000', 'admin123');
+            const otherId = createOther();
+
+            const result = service.updateUser(otherId, { ...baseInput('V-87654321'), password: undefined });
+
+            expect(result.ok).toBeFalse();
+            expect(result.message).toContain('cédula');
+            expect(service.users().find((user) => user.id === otherId)?.cedula).toBe('V-12345678');
+        });
+
+        it('updateUser() debe rechazar cambiar la contraseña de otro usuario', () => {
+            service.login('V-00000000', 'admin123');
+            const otherId = createOther();
+
+            const result = service.updateUser(otherId, { ...baseInput('V-12345678'), password: 'otraClave9' });
+
+            expect(result.ok).toBeFalse();
+            expect(result.message).toContain('propio');
+        });
+
+        it('updateUser() debe rechazar cambiar las preguntas de seguridad de otro usuario', () => {
+            service.login('V-00000000', 'admin123');
+            const otherId = createOther();
+
+            const result = service.updateUser(otherId, {
+                ...baseInput('V-12345678'),
+                password: undefined,
+                securityQuestions: [{ question: '¿En qué ciudad naciste?', answer: 'Caracas' }]
+            });
+
+            expect(result.ok).toBeFalse();
+            expect(result.message).toContain('preguntas de seguridad');
+        });
+
+        it('updateUser() debe permitir cambiar la propia contraseña y preguntas de seguridad', () => {
+            service.login('V-00000000', 'admin123');
+            const selfId = service.currentUser()!.id;
+
+            const result = service.updateUser(selfId, {
+                fullName: 'Administrador del Sistema',
+                cedula: 'V-00000000',
+                role: 'Administrador',
+                active: true,
+                password: 'nuevaClave9',
+                securityQuestions: [{ question: '¿En qué ciudad naciste?', answer: 'Caracas' }]
+            });
+
+            expect(result.ok).toBeTrue();
+            expect(service.login('V-00000000', 'nuevaclave9').ok).toBeTrue();
+        });
     });
 });

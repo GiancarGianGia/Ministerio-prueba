@@ -24,9 +24,14 @@ describe('validación de teléfonos y cédulas venezolanas', () => {
         expect(validatePhone('58 0412 1234567')).not.toBeNull();
     });
 
-    it('acepta cédulas venezolanas con prefijo V opcional', () => {
+    it('acepta cédulas venezolanas con el tipo de documento (V o E)', () => {
         expect(validateCedula('V-18745632')).toBeNull();
-        expect(validateCedula('18745632')).toBeNull();
+        expect(validateCedula('E-84123456')).toBeNull();
+    });
+
+    it('exige el tipo de documento y el número sin puntos', () => {
+        expect(validateCedula('18745632')).toContain('tipo de documento');
+        expect(validateCedula('V-18.745.632')).toContain('sin puntos');
     });
 
     it('rechaza cédulas con prefijo extranjero o longitud inválida', () => {

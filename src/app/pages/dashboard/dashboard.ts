@@ -6,7 +6,7 @@ import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { AuthService } from '@/app/services/auth.service';
 import { LogService } from '@/app/services/log.service';
-import { TagSeverity } from '@/app/services/models';
+import { Person, TagSeverity } from '@/app/services/models';
 import { PersonService } from '@/app/services/person.service';
 
 @Component({
@@ -36,6 +36,10 @@ export class Dashboard {
 
     initials(firstName: string, lastName: string): string {
         return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+    }
+
+    displayName(person: Person): string {
+        return [person.firstName, person.secondName, person.lastName, person.secondLastName].filter(Boolean).join(' ');
     }
 
     typePercent(count: number): number {
@@ -70,7 +74,7 @@ export class Dashboard {
                 return 'success';
             case 'Pendiente':
                 return 'warn';
-            case 'Inactivo':
+            case 'Egresado':
                 return 'danger';
             default:
                 return 'info';

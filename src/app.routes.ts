@@ -4,7 +4,6 @@ import { Actividad } from './app/pages/actividad/actividad';
 import { Dashboard } from './app/pages/dashboard/dashboard';
 import { Notfound } from './app/pages/notfound/notfound';
 import { Personas } from './app/pages/personas/personas';
-import { RegistroPersona } from './app/pages/registro-persona/registro-persona';
 import { Usuarios } from './app/pages/usuarios/usuarios';
 import { adminGuard, authGuard } from './app/services/auth.guard';
 
