@@ -101,9 +101,9 @@ import { DocumentPrefixSelect } from '@/app/components/document-prefix-select/do
                                         />
                                         <ul class="password-rules">
                                             @for (rule of passwordRequirements; track rule.key) {
-                                                <li [class.is-met]="rule.test(password)" [class.is-missing]="!rule.test(password)">{{ rule.label }}</li>
+                                                <li [class.is-met]="rule.test(password)" [class.is-missing]="passwordHasIssues() && !rule.test(password)">{{ rule.label }}</li>
                                             }
-                                            <li [class.is-met]="passwordsMatch()" [class.is-missing]="!passwordsMatch()">{{ passwordConfirmationLabel }}</li>
+                                            <li [class.is-met]="passwordsMatch()" [class.is-missing]="passwordHasIssues() && !passwordsMatch()">{{ passwordConfirmationLabel }}</li>
                                         </ul>
                                     </div>
                                     @if (submitted && passwordError()) {

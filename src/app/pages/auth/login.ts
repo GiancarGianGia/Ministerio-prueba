@@ -183,28 +183,39 @@ import { DocumentPrefixSelect } from '@/app/components/document-prefix-select/do
                     </p>
                     <div>
                         <label for="forgotNewPassword">Nueva contraseña *</label>
-                        <p-password
-                            inputId="forgotNewPassword"
-                            [ngModel]="forgotNewPassword"
-                            (ngModelChange)="forgotNewPassword = $event.toUpperCase()"
-                            [toggleMask]="true"
-                            [feedback]="false"
-                            [fluid]="true"
-                            placeholder="Mínimo 6 caracteres"
-                        />
+                        <div class="password-field" [class.is-invalid]="forgotPasswordHasIssues()">
+                            <p-password
+                                inputId="forgotNewPassword"
+                                [ngModel]="forgotNewPassword"
+                                (ngModelChange)="forgotNewPassword = $event"
+                                [toggleMask]="true"
+                                [feedback]="false"
+                                [fluid]="true"
+                                placeholder="Más de 8 caracteres"
+                            />
+                            <ul class="password-rules">
+                                @for (rule of passwordRequirements; track rule.key) {
+                                    <li [class.is-met]="rule.test(forgotNewPassword)" [class.is-missing]="forgotPasswordHasIssues() && !rule.test(forgotNewPassword)">{{ rule.label }}</li>
+                                }
+                                <li [class.is-met]="forgotPasswordsMatch()" [class.is-missing]="forgotPasswordHasIssues() && !forgotPasswordsMatch()">{{ passwordConfirmationLabel }}</li>
+                            </ul>
+                        </div>
                     </div>
                     <div>
                         <label for="forgotConfirmPassword">Confirmar contraseña *</label>
                         <p-password
                             inputId="forgotConfirmPassword"
                             [ngModel]="forgotConfirmPassword"
-                            (ngModelChange)="forgotConfirmPassword = $event.toUpperCase()"
+                            (ngModelChange)="forgotConfirmPassword = $event"
                             [toggleMask]="true"
                             [feedback]="false"
                             [fluid]="true"
                             placeholder="Repite la nueva contraseña"
                         />
                     </div>
+                    @if (forgotPasswordHasIssues()) {
+                        <p class="password-missing-summary">Te falta cumplir: {{ missingForgotPasswordRules().join('; ') }}.</p>
+                    }
                 }
 
                 @if (forgotError) {
@@ -257,6 +268,10 @@ export class Login {
     forgotConfirmPassword = '';
     forgotError = '';
     forgotLoading = false;
+
+    readonly passwordRequirements = PASSWORD_REQUIREMENTS;
+
+    readonly passwordConfirmationLabel = PASSWORD_CONFIRMATION_LABEL;
 
     get forgotDialogHeader(): string {
         switch (this.forgotStep) {
@@ -401,6 +416,22 @@ export class Login {
     onForgotAnswerChange(index: number, value: string): void {
         this.forgotAnswers[index] = (value ?? '').toUpperCase();
         this.forgotIncorrectQuestions.delete(this.forgotQuestions[index]);
+    }
+
+    forgotPasswordsMatch(): boolean {
+        return !!this.forgotNewPassword && this.forgotNewPassword === this.forgotConfirmPassword;
+    }
+
+    missingForgotPasswordRules(): string[] {
+        const missing = missingPasswordRequirements(this.forgotNewPassword);
+        if (!this.forgotPasswordsMatch()) {
+            missing.push(this.passwordConfirmationLabel);
+        }
+        return missing;
+    }
+
+    forgotPasswordHasIssues(): boolean {
+        return (this.forgotNewPassword.length > 0 || this.forgotConfirmPassword.length > 0) && this.missingForgotPasswordRules().length > 0;
     }
 
     forgotStep3(): void {

@@ -142,12 +142,41 @@
                 @if (manageCredentials) {
                     <div class="form-field form-field-full">
                         <label for="userPassword">{{ editing ? 'Nueva contraseña' : 'Contraseña *' }}</label>
-                        <p-password id="userPassword" [ngModel]="userForm.password" (ngModelChange)="userForm.password = $event.toUpperCase()" [toggleMask]="true" [feedback]="false" [fluid]="true" [placeholder]="editing ? 'Déjala vacía para conservar la actual' : 'Mínimo 6 caracteres (letras y números)'" />
+                        <div class="password-field" [class.is-invalid]="passwordHasIssues()">
+                            <p-password
+                                inputId="userPassword"
+                                [ngModel]="userForm.password"
+                                (ngModelChange)="userForm.password = $event"
+                                [toggleMask]="true"
+                                [feedback]="false"
+                                [fluid]="true"
+                                [placeholder]="editing ? 'Déjala vacía para conservar la actual' : 'Más de 8 caracteres'"
+                            />
+                            <ul class="password-rules">
+                                @for (rule of passwordRequirements; track rule.key) {
+                                    <li [class.is-met]="rule.test(userForm.password)" [class.is-missing]="passwordHasIssues() && !rule.test(userForm.password)">{{ rule.label }}</li>
+                                }
+                                <li [class.is-met]="passwordsMatch()" [class.is-missing]="passwordHasIssues() && !passwordsMatch()">{{ passwordConfirmationLabel }}</li>
+                            </ul>
+                            <label for="userPasswordConfirm">Confirmar contraseña</label>
+                            <p-password
+                                inputId="userPasswordConfirm"
+                                [ngModel]="confirmPassword"
+                                (ngModelChange)="confirmPassword = $event"
+                                [toggleMask]="true"
+                                [feedback]="false"
+                                [fluid]="true"
+                                [placeholder]="editing ? 'Repite la nueva contraseña' : 'Repite la contraseña'"
+                            />
+                        </div>
                         @if (editing) {
                             <small class="field-hint">Si no escribes una contraseña, se conserva la actual.</small>
                         }
                         @if (passwordError()) {
                             <small class="field-error">{{ passwordError() }}</small>
+                        }
+                        @if (confirmPasswordError()) {
+                            <small class="field-error">{{ confirmPasswordError() }}</small>
                         }
                     </div>
                 }
@@ -219,6 +248,10 @@
                     <div class="form-field form-field-full">
                         <small class="field-hint">Las preguntas de seguridad son personales: cada usuario solo puede verlas y editarlas desde su propia cuenta, al igual que su contraseña.</small>
                     </div>
+                }
+
+                @if (manageCredentials && passwordHasIssues()) {
+                    <p class="password-missing-summary">Te falta cumplir: {{ missingPasswordRules().join('; ') }}.</p>
                 }
             </div>
 

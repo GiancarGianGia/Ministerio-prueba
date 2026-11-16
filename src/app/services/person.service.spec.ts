@@ -51,7 +51,7 @@ describe('PersonService', () => {
 
     it('migrates stored records and removes unsupported fields', () => {
         localStorage.setItem(
-            'registro.personas.v3',
+            'registro.personas.v4',
             JSON.stringify([
                 {
                     ...makePersonInput(),
@@ -76,7 +76,7 @@ describe('PersonService', () => {
         TestBed.configureTestingModule({});
 
         const migratedService = TestBed.inject(PersonService);
-        const savedPersons = JSON.parse(localStorage.getItem('registro.personas.v3') ?? '[]');
+        const savedPersons = JSON.parse(localStorage.getItem('registro.personas.v4') ?? '[]');
 
         expect(migratedService.persons().length).toBe(2);
         expect(migratedService.persons()[0].status).toBe('Egresado');
@@ -88,7 +88,7 @@ describe('PersonService', () => {
 
     it('migra las cédulas almacenadas con puntos a formato sin puntos', () => {
         localStorage.setItem(
-            'registro.personas.v3',
+            'registro.personas.v4',
             JSON.stringify([
                 {
                     ...makePersonInput({ documentNumber: 'V-18.745.632' }),

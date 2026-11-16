@@ -15,7 +15,7 @@ import { TagModule } from 'primeng/tag';
 import { ToastModule } from 'primeng/toast';
 import { AuthService } from '@/app/services/auth.service';
 import { AppUser, NewUserInput, SECURITY_QUESTIONS, SecurityQuestion, TagSeverity, UpdateUserInput } from '@/app/services/models';
-import { composeDocumentNumber, extractDocumentPrefix, stripDocumentPrefix, validateIdentityDocument, validatePassword, validatePersonName } from '@/app/services/validators';
+import { PASSWORD_CONFIRMATION_LABEL, PASSWORD_REQUIREMENTS, composeDocumentNumber, extractDocumentPrefix, missingPasswordRequirements, stripDocumentPrefix, validateIdentityDocument, validatePassword, validatePasswordConfirmation, validatePersonName } from '@/app/services/validators';
 import { DocumentPrefixSelect } from '@/app/components/document-prefix-select/document-prefix-select';
 
 @Component({
@@ -71,6 +71,12 @@ export class Usuarios {
 
     userForm: NewUserInput = this.emptyUser();
 
+    confirmPassword = '';
+
+    readonly passwordRequirements = PASSWORD_REQUIREMENTS;
+
+    readonly passwordConfirmationLabel = PASSWORD_CONFIRMATION_LABEL;
+
     securityQuestionsForm: { question: string; answer: string }[] = [
         { question: '', answer: '' },
         { question: '', answer: '' },
@@ -87,6 +93,7 @@ export class Usuarios {
         this.cedulaTouched = false;
         this.cedulaPrefix = '';
         this.userForm = this.emptyUser();
+        this.confirmPassword = '';
         this.securityQuestionsForm = [
             { question: '', answer: '' },
             { question: '', answer: '' },
@@ -110,6 +117,7 @@ export class Usuarios {
             role: 'Administrador',
             active: user.active
         };
+        this.confirmPassword = '';
         const existing = this.editingSelf ? (user.securityQuestions ?? []) : [];
         this.securityQuestionsForm = [0, 1, 2].map((i) => ({
             question: existing[i]?.question ?? '',
@@ -123,6 +131,7 @@ export class Usuarios {
         this.userDialog = false;
         this.submitted = false;
         this.cedulaTouched = false;
+        this.confirmPassword = '';
     }
 
     fullNameError(): string {
@@ -145,6 +154,28 @@ export class Usuarios {
         if (!this.submitted) return '';
         if (this.editing && !this.userForm.password) return '';
         return validatePassword(this.userForm.password) ?? '';
+    }
+
+    confirmPasswordError(): string {
+        if (!this.submitted) return '';
+        if (this.editing && !this.userForm.password && !this.confirmPassword) return '';
+        return validatePasswordConfirmation(this.userForm.password, this.confirmPassword) ?? '';
+    }
+
+    passwordsMatch(): boolean {
+        return !!this.userForm.password && this.userForm.password === this.confirmPassword;
+    }
+
+    missingPasswordRules(): string[] {
+        const missing = missingPasswordRequirements(this.userForm.password);
+        if (!this.passwordsMatch()) {
+            missing.push(this.passwordConfirmationLabel);
+        }
+        return missing;
+    }
+
+    passwordHasIssues(): boolean {
+        return (this.userForm.password.length > 0 || this.confirmPassword.length > 0) && this.missingPasswordRules().length > 0;
     }
 
     securityQuestionError(index: number): string {
@@ -177,13 +208,16 @@ export class Usuarios {
         const nameErr = validatePersonName(this.userForm.fullName, 'nombre completo', { allowMultipleWords: true });
         const cedulaErr = validateIdentityDocument(this.cedulaPrefix, this.userForm.cedula);
         const passErr = this.manageCredentials && (!this.editing || this.userForm.password) ? validatePassword(this.userForm.password) : null;
+        const confirmPassErr = this.manageCredentials && (!this.editing || this.userForm.password || this.confirmPassword)
+            ? validatePasswordConfirmation(this.userForm.password, this.confirmPassword)
+            : null;
 
         const sqErr = this.manageCredentials && this.securityQuestionsForm.some((q) =>
             (q.question && !q.answer.trim()) || (!q.question && q.answer.trim())
         );
 
-        if (nameErr || cedulaErr || passErr || sqErr) {
-            const firstError = nameErr || cedulaErr || passErr || (sqErr ? 'Completa o limpia las preguntas de seguridad incompletas.' : null);
+        if (nameErr || cedulaErr || passErr || confirmPassErr || sqErr) {
+            const firstError = nameErr || cedulaErr || passErr || confirmPassErr || (sqErr ? 'Completa o limpia las preguntas de seguridad incompletas.' : null);
             this.messageService.add({
                 severity: 'error',
                 summary: 'Formulario con errores',

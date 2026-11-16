@@ -40,27 +40,33 @@ describe('AuthService', () => {
     });
 
     it('register() debe crear un nuevo usuario y dejarlo con sesión iniciada', () => {
-        const result = service.register('Pedro López', 'V-18745678', 'clave123');
+        const result = service.register('Pedro López', 'V-18745678', 'Clave123@');
         expect(result.ok).toBeTrue();
         expect(service.currentUser()?.cedula).toBe('V-18745678');
         expect(service.currentUser()?.role).toBe('Administrador');
     });
 
     it('register() debe fallar si la cédula ya está registrada', () => {
-        service.register('Alicia Ruiz', 'V-18745678', 'clave123');
-        const result = service.register('Alicia Copia', 'V-18745678', 'clave456');
+        service.register('Alicia Ruiz', 'V-18745678', 'Clave123@');
+        const result = service.register('Alicia Copia', 'V-18745678', 'Clave456@');
         expect(result.ok).toBeFalse();
     });
 
     it('register() debe fallar si la cédula no lleva el tipo de documento', () => {
-        const result = service.register('Bruno Díaz', '18745678', 'clave123');
+        const result = service.register('Bruno Díaz', '18745678', 'Clave123@');
         expect(result.ok).toBeFalse();
         expect(result.message).toContain('tipo de documento');
     });
 
-    it('register() debe fallar si la contraseña tiene menos de 6 caracteres', () => {
+    it('register() debe fallar si la contraseña no cumple las reglas', () => {
         const result = service.register('Carlos M.', 'V-18745678', '123');
         expect(result.ok).toBeFalse();
+    });
+
+    it('register() debe exigir minúscula, mayúscula, número, más de 8 caracteres y carácter especial', () => {
+        expect(service.register('Diana R.', 'V-18745679', 'CLAVE123@').ok).toBeFalse();
+        expect(service.register('Diana R.', 'V-18745679', 'Clave123').ok).toBeFalse();
+        expect(service.register('Diana R.', 'V-18745679', 'Clave123@').ok).toBeTrue();
     });
 
     it('migrates stored accounts while keeping only supported account fields', () => {
@@ -81,7 +87,7 @@ describe('AuthService', () => {
                     id: 'USR-0002',
                     fullName: 'Usuario anterior',
                     legacyField: 'another old value',
-                    password: 'clave123',
+                    password: 'Clave123@',
                     role: 'Registrador',
                     active: true,
                     createdAt: '2026-01-01T00:00:00.000Z',
@@ -107,14 +113,14 @@ describe('AuthService', () => {
     });
 
     it('resetPassword() debe actualizar la contraseña de un usuario existente', () => {
-        const res = service.resetPassword('V-00000000', 'nuevaClave123');
+        const res = service.resetPassword('V-00000000', 'NuevaClave1@');
         expect(res.ok).toBeTrue();
-        const loginRes = service.login('V-00000000', 'nuevaClave123');
+        const loginRes = service.login('V-00000000', 'NuevaClave1@');
         expect(loginRes.ok).toBeTrue();
     });
 
     it('resetPassword() debe fallar si la cédula no existe', () => {
-        const res = service.resetPassword('V-99999999', 'nuevaClave123');
+        const res = service.resetPassword('V-99999999', 'NuevaClave1@');
         expect(res.ok).toBeFalse();
     });
 
@@ -128,7 +134,7 @@ describe('AuthService', () => {
         const created = service.createUser({
             fullName: 'Gian Pérez',
             cedula: 'V-12345678',
-            password: 'clave123',
+            password: 'Clave123@',
             role: 'Administrador',
             active: true,
             securityQuestions: [{ question: '¿En qué ciudad naciste?', answer: 'Caracas' }]
@@ -141,17 +147,17 @@ describe('AuthService', () => {
         expect(deactivated.ok).toBeTrue();
 
         const expectedMessage = 'Esta cuenta fue desactivada por Administrador del Sistema. Contacta a un administrador.';
-        expect(service.login('V-12345678', 'clave123').message).toBe(expectedMessage);
+        expect(service.login('V-12345678', 'Clave123@').message).toBe(expectedMessage);
         expect(service.getSecurityQuestions('V-12345678').message).toBe(expectedMessage);
         expect(service.verifySecurityQuestions('V-12345678', [{ question: '¿En qué ciudad naciste?', answer: 'Caracas' }]).message).toBe(expectedMessage);
-        expect(service.resetPassword('V-12345678', 'nuevaClave123').message).toBe(expectedMessage);
+        expect(service.resetPassword('V-12345678', 'NuevaClave1@').message).toBe(expectedMessage);
     });
 
     describe('restricciones de gestión de cuentas', () => {
         const baseInput = (cedula: string) => ({
             fullName: 'Usuario Prueba',
             cedula,
-            password: 'clave123',
+            password: 'Clave123@',
             role: 'Administrador' as const,
             active: true
         });
@@ -177,7 +183,7 @@ describe('AuthService', () => {
             service.login('V-00000000', 'admin123');
             const otherId = createOther();
 
-            const result = service.updateUser(otherId, { ...baseInput('V-12345678'), password: 'otraClave9' });
+            const result = service.updateUser(otherId, { ...baseInput('V-12345678'), password: 'OtraClave9@' });
 
             expect(result.ok).toBeFalse();
             expect(result.message).toContain('propio');
@@ -206,12 +212,12 @@ describe('AuthService', () => {
                 cedula: 'V-00000000',
                 role: 'Administrador',
                 active: true,
-                password: 'nuevaClave9',
+                password: 'NuevaClave9@',
                 securityQuestions: [{ question: '¿En qué ciudad naciste?', answer: 'Caracas' }]
             });
 
             expect(result.ok).toBeTrue();
-            expect(service.login('V-00000000', 'nuevaclave9').ok).toBeTrue();
+            expect(service.login('V-00000000', 'nuevaclave9@').ok).toBeTrue();
         });
     });
 });

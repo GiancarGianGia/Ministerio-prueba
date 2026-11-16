@@ -236,7 +236,7 @@ export interface AuthResult {
 export const STORAGE_KEYS = {
     users: 'registro.usuarios.v1',
     session: 'registro.sesion.v1',
-    persons: 'registro.personas.v3',
+    persons: 'registro.personas.v4',
     logs: 'registro.actividad.v2'
 } as const;
 
