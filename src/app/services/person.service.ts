@@ -125,7 +125,7 @@ export class PersonService {
                 city: person.city ?? '',
                 department: person.department ?? '',
                 type: person.type ?? '',
-                status: person.status === 'Egresado' || person.status === 'Inactivo' ? 'Egresado' : 'Activo',
+                status: person.status === 'Egresado' || (person.status as string) === 'Inactivo' ? 'Egresado' : 'Activo',
                 notes: legacyCargo ? legacyCargo[2].trim() : notes,
                 createdAt: person.createdAt ?? '',
                 updatedAt: person.updatedAt ?? '',

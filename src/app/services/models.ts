@@ -1,4 +1,5 @@
-export type UserRole = 'Administrador' | 'Registrador' | 'Consulta';
+export const USER_ROLES = ['Administrador', 'Registrador', 'Consulta'] as const;
+export type UserRole = (typeof USER_ROLES)[number];
 
 export type TagSeverity = 'success' | 'secondary' | 'info' | 'warn' | 'danger' | 'contrast';
 
@@ -204,7 +205,7 @@ export interface Person {
     city: string;
     department: string;
     type: string;
-    status: string;
+    status: PersonStatus;
     notes: string;
     createdAt: string;
     updatedAt: string;
@@ -242,9 +243,8 @@ export const STORAGE_KEYS = {
     logs: 'registro.actividad.v2'
 } as const;
 
-export const USER_ROLES: UserRole[] = ['Administrador'];
-
-export const DOCUMENT_TYPES = ['Cédula de identidad', 'Pasaporte', 'Cédula de extranjería', 'RIF'];
+export const DOCUMENT_TYPES = ['Cédula de identidad', 'Pasaporte', 'Cédula de extranjería', 'RIF'] as const;
+export type DocumentType = (typeof DOCUMENT_TYPES)[number];
 
 export interface DocumentPrefixOption {
     value: string;
@@ -266,7 +266,8 @@ export const USER_DOCUMENT_PREFIX_OPTIONS: DocumentPrefixOption[] = DOCUMENT_PRE
     (option) => option.value === 'V' || option.value === 'E'
 );
 
-export const GENDERS = ['Femenino', 'Masculino'];
+export const GENDERS = ['Femenino', 'Masculino'] as const;
+export type Gender = (typeof GENDERS)[number];
 
 export const PERSON_TYPES = [
     'Analista',
@@ -313,7 +314,8 @@ export const PERSON_TYPES = [
     'Pasante en Programación',
 ];
 
-export const PERSON_STATUSES = ['Activo', 'Egresado'];
+export const PERSON_STATUSES = ['Activo', 'Egresado'] as const;
+export type PersonStatus = (typeof PERSON_STATUSES)[number];
 
 export const DEPARTMENTS = [
     'Amazonas',

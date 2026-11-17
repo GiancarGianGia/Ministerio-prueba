@@ -209,7 +209,7 @@ export function validateDocument(documentType: string, documentNumber: string): 
         return 'Selecciona el tipo de documento.';
     }
 
-    if (!DOCUMENT_TYPES.includes(type)) {
+    if (!(DOCUMENT_TYPES as readonly string[]).includes(type)) {
         return 'El tipo de documento seleccionado no es válido.';
     }
 
@@ -387,10 +387,6 @@ export function validatePassword(password: string): string | null {
     }
 
     return null;
-}
-
-export function isValidPassword(password: string): boolean {
-    return validatePassword(password) === null;
 }
 
 export function validatePasswordConfirmation(password: string, confirmPassword: string): string | null {

@@ -275,11 +275,18 @@ describe('Personas Component - Búsqueda de trabajadores', () => {
         const worksheet = strFromU8(workbook['xl/worksheets/sheet1.xml']);
 
         expect(worksheet).toContain('Cantidad de hijos');
+        const rowsXml = worksheet.match(/<row r="\d+"[\s\S]*?<\/row>/g) ?? [];
+        const targetRow = rowsXml.find((row) => row.includes('V-88888888'));
+        if (!targetRow) {
+            throw new Error('No se encontró el trabajador en la exportación.');
+        }
+        const rowNumber = /r="(\d+)"/.exec(targetRow)![1];
         const headerRow = /<row r="1">([\s\S]*?)<\/row>/.exec(worksheet)?.[1] ?? '';
         const column = /<c r="([A-Z]+)1" t="inlineStr"><is><t xml:space="preserve">Cantidad de hijos<\/t><\/is><\/c>/.exec(headerRow)?.[1];
         expect(column).toBeDefined();
-        expect(worksheet).toContain(`<c r="${column}2" t="inlineStr"><is><t xml:space="preserve">2</t></is></c>`);
-        expect(worksheet).toContain('Dato de hijo exportado');
+        expect(targetRow).toContain(`<c r="${column}${rowNumber}" t="inlineStr"><is><t xml:space="preserve">2</t></is></c>`);
+        expect(targetRow).toContain('Dato de hijo exportado');
+        expect(worksheet).toContain('Esperanza');
     });
 
     it('debe exportar todos los campos del trabajador en CSV', async () => {
@@ -325,5 +332,6 @@ describe('Personas Component - Búsqueda de trabajadores', () => {
         expect(content).toContain('"Familiares registrados"');
         expect(content).toContain('"Observaciones laborales"');
         expect(content).toContain('Hija en CSV');
+        expect(content).toContain('Esperanza');
     });
 });

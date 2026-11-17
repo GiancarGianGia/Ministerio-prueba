@@ -191,9 +191,12 @@
                 <div class="form-field form-field-full">
                     <label>Estado de la cuenta</label>
                     <div class="checkbox-field">
-                        <p-checkbox [(ngModel)]="userForm.active" [binary]="true" inputId="userActive" />
+                        <p-checkbox [(ngModel)]="userForm.active" [binary]="true" inputId="userActive" [disabled]="editingSelf" />
                         <label for="userActive">{{ userForm.active ? 'Activo (puede iniciar sesión)' : 'Inactivo (sin acceso)' }}</label>
                     </div>
+                    @if (editingSelf) {
+                        <small class="field-hint">No puedes desactivar tu propia cuenta.</small>
+                    }
                 </div>
 
                 @if (editDeactivationRequired) {

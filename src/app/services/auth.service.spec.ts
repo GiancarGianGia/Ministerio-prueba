@@ -107,11 +107,6 @@ describe('AuthService', () => {
         expect(savedUsers[1].legacyField).toBeUndefined();
     });
 
-    it('roleOptions debe incluir el rol Administrador', () => {
-        expect(service.roleOptions.length).toBe(1);
-        expect(service.roleOptions.map(r => r.value)).toContain('Administrador');
-    });
-
     it('resetPassword() debe actualizar la contraseña de un usuario existente', () => {
         const res = service.resetPassword('V-00000000', 'NuevaClave1@');
         expect(res.ok).toBeTrue();
@@ -212,6 +207,24 @@ describe('AuthService', () => {
 
             expect(result.ok).toBeFalse();
             expect(result.message).toContain('preguntas de seguridad');
+        });
+
+        it('updateUser() debe rechazar que un administrador se desactive a sí mismo', () => {
+            service.login('V-00000000', 'admin123');
+            createOther();
+            const selfId = service.currentUser()!.id;
+
+            const result = service.updateUser(selfId, {
+                fullName: 'Administrador del Sistema',
+                cedula: 'V-00000000',
+                role: 'Administrador',
+                active: false,
+                deactivationReason: 'Prueba'
+            });
+
+            expect(result.ok).toBeFalse();
+            expect(result.message).toBe('No puedes desactivar tu propia cuenta.');
+            expect(service.currentUser()?.active).toBeTrue();
         });
 
         it('updateUser() debe permitir cambiar la propia contraseña y preguntas de seguridad', () => {

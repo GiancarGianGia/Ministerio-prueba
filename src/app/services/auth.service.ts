@@ -1,5 +1,5 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { AppUser, AuthResult, NewUserInput, nextSequentialId, STORAGE_KEYS, UpdateUserInput, USER_ROLES, UserRole } from './models';
+import { AppUser, AuthResult, NewUserInput, nextSequentialId, STORAGE_KEYS, UpdateUserInput, UserRole } from './models';
 import { LogService } from './log.service';
 import { StorageService } from './storage.service';
 import { normalizeCedula, validateCedula, validatePassword } from './validators';
@@ -276,6 +276,10 @@ export class AuthService {
 
         const isSelf = this._currentUser()?.id === id;
 
+        if (isSelf && !input.active) {
+            return { ok: false, message: 'No puedes desactivar tu propia cuenta.' };
+        }
+
         if (input.password?.trim() && !isSelf) {
             return { ok: false, message: 'Solo el propio usuario puede cambiar su contraseña.' };
         }
@@ -417,8 +421,6 @@ export class AuthService {
         this._currentUser.set(null);
         this.storage.remove(STORAGE_KEYS.session);
     }
-
-    readonly roleOptions: { label: string; value: UserRole }[] = USER_ROLES.map((role) => ({ label: role, value: role }));
 
     private bootstrap(): void {
         const users = this.storage.read<Partial<AppUser>[]>(STORAGE_KEYS.users, []);
