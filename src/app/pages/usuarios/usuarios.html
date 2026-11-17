@@ -77,7 +77,7 @@
                             <p-tag [value]="user.active ? 'Activo' : 'Inactivo'" [severity]="user.active ? 'success' : 'danger'" />
                             @if (!user.active && user.deactivatedBy) {
                                 <small class="deactivation-detail" [title]="user.deactivationReason || ''">
-                                    Desactivado por {{ user.deactivatedBy }}{{ user.deactivationReason ? ': ' + user.deactivationReason : '' }}
+                                    Deshabilitado por {{ user.deactivatedBy }}{{ user.deactivationReason ? ': ' + user.deactivationReason : '' }}
                                 </small>
                             }
                         </td>
@@ -88,7 +88,7 @@
                                 <p-button icon="pi pi-pencil" ariaLabel="Editar usuario" [rounded]="true" [outlined]="true" (click)="editUser(user)" />
                                 <p-button
                                     [icon]="user.active ? 'pi pi-power-off' : 'pi pi-check'"
-                                    [ariaLabel]="user.active ? 'Desactivar usuario' : 'Activar usuario'"
+                                    [ariaLabel]="user.active ? 'Deshabilitar usuario' : 'Habilitar usuario'"
                                     [severity]="user.active ? 'warn' : 'success'"
                                     [rounded]="true"
                                     [outlined]="true"
@@ -195,14 +195,14 @@
                         <label for="userActive">{{ userForm.active ? 'Activo (puede iniciar sesión)' : 'Inactivo (sin acceso)' }}</label>
                     </div>
                     @if (editingSelf) {
-                        <small class="field-hint">No puedes desactivar tu propia cuenta.</small>
+                        <small class="field-hint">No puedes deshabilitar tu propia cuenta.</small>
                     }
                 </div>
 
                 @if (editDeactivationRequired) {
                     <div class="form-field form-field-full">
-                        <label for="userDeactivationReason">Motivo de la desactivación *</label>
-                        <textarea pTextarea id="userDeactivationReason" rows="3" [(ngModel)]="editDeactivationReason" placeholder="Ingrese el motivo por el cual se desactiva la cuenta..."></textarea>
+                        <label for="userDeactivationReason">Motivo de la deshabilitación *</label>
+                        <textarea pTextarea id="userDeactivationReason" rows="3" [(ngModel)]="editDeactivationReason" placeholder="Ingrese el motivo por el cual se deshabilita la cuenta..."></textarea>
                         @if (editDeactivationReasonError()) {
                             <small class="field-error">{{ editDeactivationReasonError() }}</small>
                         }
@@ -281,13 +281,13 @@
             </ng-template>
         </p-dialog>
 
-        <p-dialog [(visible)]="deactivateDialog" [style]="{ width: '480px', maxWidth: '95vw' }" header="Desactivar usuario" [modal]="true">
+        <p-dialog [(visible)]="deactivateDialog" [style]="{ width: '480px', maxWidth: '95vw' }" header="Deshabilitar usuario" [modal]="true">
             <p class="deactivate-description">
-                <strong>{{ deactivateTarget?.fullName }}</strong> dejará de poder iniciar sesión hasta que un administrador reactive la cuenta.
+                <strong>{{ deactivateTarget?.fullName }}</strong> dejará de poder iniciar sesión hasta que un administrador vuelva a habilitar la cuenta.
             </p>
             <div class="form-field form-field-full mt-3">
-                <label for="deactivateReason">Motivo de la desactivación *</label>
-                <textarea pTextarea id="deactivateReason" rows="3" [(ngModel)]="deactivateReason" placeholder="Ingrese el motivo por el cual se desactiva la cuenta..."></textarea>
+                <label for="deactivateReason">Motivo de la deshabilitación *</label>
+                <textarea pTextarea id="deactivateReason" rows="3" [(ngModel)]="deactivateReason" placeholder="Ingrese el motivo por el cual se deshabilita la cuenta..."></textarea>
                 @if (deactivateReasonError()) {
                     <small class="field-error">{{ deactivateReasonError() }}</small>
                 }
@@ -295,6 +295,24 @@
 
             <ng-template #footer>
                 <p-button label="Cancelar" icon="pi pi-times" severity="secondary" [outlined]="true" styleClass="btn-cancelar" (click)="deactivateDialog = false" />
-                <p-button label="Desactivar" icon="pi pi-power-off" severity="warn" (click)="confirmDeactivate()" />
+                <p-button label="Deshabilitar" icon="pi pi-power-off" severity="warn" (click)="confirmDeactivate()" />
+            </ng-template>
+        </p-dialog>
+
+        <p-dialog [(visible)]="deleteDialog" [style]="{ width: '480px', maxWidth: '95vw' }" header="Eliminar usuario" [modal]="true">
+            <p class="deactivate-description">
+                <strong>{{ deleteTarget?.fullName }}</strong> será eliminado permanentemente del sistema. Para volver a ingresar, un administrador deberá crearle la cuenta nuevamente.
+            </p>
+            <div class="form-field form-field-full mt-3">
+                <label for="deleteReason">Motivo de la eliminación *</label>
+                <textarea pTextarea id="deleteReason" rows="3" [(ngModel)]="deleteReason" placeholder="Ingrese el motivo por el cual se elimina la cuenta..."></textarea>
+                @if (deleteReasonError()) {
+                    <small class="field-error">{{ deleteReasonError() }}</small>
+                }
+            </div>
+
+            <ng-template #footer>
+                <p-button label="Cancelar" icon="pi pi-times" severity="secondary" [outlined]="true" styleClass="btn-cancelar" (click)="deleteDialog = false" />
+                <p-button label="Eliminar" icon="pi pi-trash" severity="danger" (click)="confirmDelete()" />
             </ng-template>
         </p-dialog>

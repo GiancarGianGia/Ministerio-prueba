@@ -53,6 +53,16 @@ export interface UpdateUserInput {
     deactivationReason?: string;
 }
 
+export interface DeletedUserRecord {
+    id: string;
+    fullName: string;
+    cedula: string;
+    role: UserRole;
+    deletedBy: string;
+    deletionReason: string;
+    deletedAt: string;
+}
+
 export interface ChildData {
     name: string;
     birthDate: string;
@@ -239,6 +249,7 @@ export interface AuthResult {
 export const STORAGE_KEYS = {
     users: 'registro.usuarios.v1',
     session: 'registro.sesion.v1',
+    deletedUsers: 'registro.usuarios.eliminados.v1',
     persons: 'registro.personas.v4',
     logs: 'registro.actividad.v2'
 } as const;

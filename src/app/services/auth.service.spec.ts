@@ -124,7 +124,7 @@ describe('AuthService', () => {
         expect(res.ok).toBeFalse();
     });
 
-    it('exige un motivo para desactivar y muestra quién y por qué al iniciar sesión', () => {
+    it('exige un motivo para deshabilitar y muestra quién y por qué al iniciar sesión', () => {
         service.login('V-00000000', 'admin123');
         const created = service.createUser({
             fullName: 'Gian Pérez',
@@ -141,13 +141,13 @@ describe('AuthService', () => {
 
         const withoutReason = service.toggleUser(gian!.id);
         expect(withoutReason.ok).toBeFalse();
-        expect(withoutReason.message).toBe('Escribe el motivo de la desactivación.');
+        expect(withoutReason.message).toBe('Escribe el motivo de la deshabilitación.');
 
         const deactivated = service.toggleUser(gian!.id, 'Incumplimiento de las normas internas.');
         expect(deactivated.ok).toBeTrue();
         expect(service.users().find((user) => user.id === gian!.id)?.deactivationReason).toBe('Incumplimiento de las normas internas.');
 
-        const expectedMessage = 'Esta cuenta fue desactivada por Administrador del Sistema. Motivo: Incumplimiento de las normas internas. Contacta a un administrador.';
+        const expectedMessage = 'Esta cuenta fue deshabilitada por Administrador del Sistema. Motivo: Incumplimiento de las normas internas. Contacta a un administrador.';
         expect(service.login('V-12345678', 'Clave123@').message).toBe(expectedMessage);
         expect(service.getSecurityQuestions('V-12345678').message).toBe(expectedMessage);
         expect(service.verifySecurityQuestions('V-12345678', [{ question: '¿En qué ciudad naciste?', answer: 'Caracas' }]).message).toBe(expectedMessage);
@@ -157,6 +157,43 @@ describe('AuthService', () => {
         const reactivated = service.users().find((user) => user.id === gian!.id);
         expect(reactivated?.deactivationReason).toBeUndefined();
         expect(reactivated?.deactivatedBy).toBeUndefined();
+    });
+
+    it('exige un motivo para eliminar y avisa quién y por qué al intentar iniciar sesión', () => {
+        service.login('V-00000000', 'admin123');
+        const created = service.createUser({
+            fullName: 'Gian Pérez',
+            cedula: 'V-12345678',
+            password: 'Clave123@',
+            role: 'Administrador',
+            active: true
+        });
+        expect(created.ok).toBeTrue();
+
+        const gian = service.users().find((user) => user.cedula === 'V-12345678');
+        expect(gian).toBeDefined();
+
+        const withoutReason = service.deleteUser(gian!.id);
+        expect(withoutReason.ok).toBeFalse();
+        expect(withoutReason.message).toBe('Escribe el motivo de la eliminación.');
+
+        const deleted = service.deleteUser(gian!.id, 'Fraude comprobado.');
+        expect(deleted.ok).toBeTrue();
+        expect(service.users().some((user) => user.id === gian!.id)).toBeFalse();
+
+        const expectedMessage = 'Esta cuenta fue eliminada por Administrador del Sistema. Motivo: Fraude comprobado. Si deseas volver a ingresar, un administrador debe crear tu cuenta nuevamente.';
+        expect(service.login('V-12345678', 'Clave123@').message).toBe(expectedMessage);
+        expect(service.getSecurityQuestions('V-12345678').message).toBe(expectedMessage);
+
+        const recreated = service.createUser({
+            fullName: 'Gian Pérez',
+            cedula: 'V-12345678',
+            password: 'Clave123@',
+            role: 'Administrador',
+            active: true
+        });
+        expect(recreated.ok).toBeTrue();
+        expect(service.login('V-12345678', 'Clave123@').ok).toBeTrue();
     });
 
     describe('restricciones de gestión de cuentas', () => {
@@ -209,7 +246,7 @@ describe('AuthService', () => {
             expect(result.message).toContain('preguntas de seguridad');
         });
 
-        it('updateUser() debe rechazar que un administrador se desactive a sí mismo', () => {
+        it('updateUser() debe rechazar que un administrador se deshabilite a sí mismo', () => {
             service.login('V-00000000', 'admin123');
             createOther();
             const selfId = service.currentUser()!.id;
@@ -223,7 +260,7 @@ describe('AuthService', () => {
             });
 
             expect(result.ok).toBeFalse();
-            expect(result.message).toBe('No puedes desactivar tu propia cuenta.');
+            expect(result.message).toBe('No puedes deshabilitar tu propia cuenta.');
             expect(service.currentUser()?.active).toBeTrue();
         });
 

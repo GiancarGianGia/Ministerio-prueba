@@ -75,6 +75,14 @@ export class Usuarios {
 
     deactivateSubmitted = false;
 
+    deleteDialog = false;
+
+    deleteTarget: AppUser | null = null;
+
+    deleteReason = '';
+
+    deleteSubmitted = false;
+
     submitted = false;
 
     cedulaTouched = false;
@@ -159,7 +167,7 @@ export class Usuarios {
     }
 
     editDeactivationReasonError(): string {
-        return this.submitted && this.editDeactivationRequired && !this.editDeactivationReason.trim() ? 'Escribe el motivo de la desactivación.' : '';
+        return this.submitted && this.editDeactivationRequired && !this.editDeactivationReason.trim() ? 'Escribe el motivo de la deshabilitación.' : '';
     }
 
     fullNameError(): string {
@@ -245,7 +253,7 @@ export class Usuarios {
         );
 
         const deactivationErr = this.editDeactivationRequired && !this.editDeactivationReason.trim()
-            ? 'Escribe el motivo de la desactivación.'
+            ? 'Escribe el motivo de la deshabilitación.'
             : null;
 
         if (nameErr || cedulaErr || passErr || confirmPassErr || sqErr || deactivationErr) {
@@ -313,7 +321,7 @@ export class Usuarios {
     }
 
     deactivateReasonError(): string {
-        return this.deactivateSubmitted && !this.deactivateReason.trim() ? 'Escribe el motivo de la desactivación.' : '';
+        return this.deactivateSubmitted && !this.deactivateReason.trim() ? 'Escribe el motivo de la deshabilitación.' : '';
     }
 
     confirmDeactivate(): void {
@@ -329,7 +337,7 @@ export class Usuarios {
         if (!result.ok) {
             this.messageService.add({
                 severity: 'error',
-                summary: 'No se pudo desactivar',
+                summary: 'No se pudo deshabilitar',
                 detail: result.message,
                 life: 4000
             });
@@ -340,18 +348,18 @@ export class Usuarios {
         this.deactivateTarget = null;
         this.messageService.add({
             severity: 'success',
-            summary: 'Usuario desactivado',
-            detail: `${target.fullName} fue desactivado. El motivo quedó registrado.`,
+            summary: 'Usuario deshabilitado',
+            detail: `${target.fullName} fue deshabilitado. El motivo quedó registrado.`,
             life: 4000
         });
     }
 
     private activateUser(user: AppUser): void {
         this.confirmationService.confirm({
-            message: `¿Deseas activar a ${user.fullName}?`,
-            header: 'Activar usuario',
+            message: `¿Deseas habilitar a ${user.fullName}?`,
+            header: 'Habilitar usuario',
             icon: 'pi pi-exclamation-triangle',
-            acceptLabel: 'Activar',
+            acceptLabel: 'Habilitar',
             rejectLabel: 'Cancelar',
             accept: () => {
                 const result = this.auth.toggleUser(user.id);
@@ -366,22 +374,43 @@ export class Usuarios {
     }
 
     deleteUser(user: AppUser): void {
-        this.confirmationService.confirm({
-            message: `¿Deseas eliminar permanentemente la cuenta de ${user.fullName}?`,
-            header: 'Eliminar usuario',
-            icon: 'pi pi-exclamation-triangle',
-            acceptLabel: 'Eliminar',
-            rejectLabel: 'Cancelar',
-            acceptButtonStyleClass: 'p-button-danger',
-            accept: () => {
-                const result = this.auth.deleteUser(user.id);
-                this.messageService.add({
-                    severity: result.ok ? 'success' : 'error',
-                    summary: result.ok ? 'Usuario eliminado' : 'No se pudo eliminar',
-                    detail: result.message,
-                    life: 3500
-                });
-            }
+        this.deleteTarget = user;
+        this.deleteReason = '';
+        this.deleteSubmitted = false;
+        this.deleteDialog = true;
+    }
+
+    deleteReasonError(): string {
+        return this.deleteSubmitted && !this.deleteReason.trim() ? 'Escribe el motivo de la eliminación.' : '';
+    }
+
+    confirmDelete(): void {
+        this.deleteSubmitted = true;
+
+        const target = this.deleteTarget;
+        if (!target || !this.deleteReason.trim()) {
+            return;
+        }
+
+        const result = this.auth.deleteUser(target.id, this.deleteReason);
+
+        if (!result.ok) {
+            this.messageService.add({
+                severity: 'error',
+                summary: 'No se pudo eliminar',
+                detail: result.message,
+                life: 4000
+            });
+            return;
+        }
+
+        this.deleteDialog = false;
+        this.deleteTarget = null;
+        this.messageService.add({
+            severity: 'success',
+            summary: 'Usuario eliminado',
+            detail: `${target.fullName} fue eliminado. El motivo quedó registrado.`,
+            life: 4000
         });
     }
 

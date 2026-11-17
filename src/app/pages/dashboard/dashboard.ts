@@ -99,7 +99,7 @@ export class Dashboard {
         if (action.includes('elimin')) {
             return 'tone-red';
         }
-        if (action.includes('desactiv') || action.includes('egresad')) {
+        if (action.includes('desactiv') || action.includes('deshabilit') || action.includes('egresad')) {
             return 'tone-orange';
         }
         if (action.includes('Trabajador') || action.includes('Persona') || action.includes('activ')) {

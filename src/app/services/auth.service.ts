@@ -1,5 +1,5 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { AppUser, AuthResult, NewUserInput, nextSequentialId, STORAGE_KEYS, UpdateUserInput, UserRole } from './models';
+import { AppUser, AuthResult, DeletedUserRecord, NewUserInput, nextSequentialId, STORAGE_KEYS, UpdateUserInput, UserRole } from './models';
 import { LogService } from './log.service';
 import { StorageService } from './storage.service';
 import { normalizeCedula, validateCedula, validatePassword } from './validators';
@@ -25,6 +25,8 @@ export class AuthService {
 
     private readonly _currentUser = signal<AppUser | null>(null);
 
+    private readonly _deletedUsers = signal<DeletedUserRecord[]>([]);
+
     readonly users = this._users.asReadonly();
 
     readonly currentUser = this._currentUser.asReadonly();
@@ -43,7 +45,15 @@ export class AuthService {
         const normalizedCedula = normalizeCedula(cedula);
         const user = this._users().find((item) => item.cedula === normalizedCedula);
 
-        if (!user || user.password.toUpperCase() !== password.toUpperCase()) {
+        if (!user) {
+            const deleted = this.deletedUserRecord(normalizedCedula);
+            return {
+                ok: false,
+                message: deleted ? this.deletedUserMessage(deleted) : 'La cédula o la contraseña no son correctas.'
+            };
+        }
+
+        if (user.password.toUpperCase() !== password.toUpperCase()) {
             return { ok: false, message: 'La cédula o la contraseña no son correctas.' };
         }
 
@@ -114,7 +124,8 @@ export class AuthService {
         const user = this._users().find((item) => item.cedula === normalizedCedula);
 
         if (!user) {
-            return { ok: false, message: 'No se encontró ningún usuario con esa cédula.' };
+            const deleted = this.deletedUserRecord(normalizedCedula);
+            return { ok: false, message: deleted ? this.deletedUserMessage(deleted) : 'No se encontró ningún usuario con esa cédula.' };
         }
 
         if (!user.active) {
@@ -160,7 +171,8 @@ export class AuthService {
         const user = this._users().find((item) => item.cedula === normalizedCedula);
 
         if (!user) {
-            return { ok: false, message: 'No se encontró ningún usuario con esa cédula.' };
+            const deleted = this.deletedUserRecord(normalizedCedula);
+            return { ok: false, message: deleted ? this.deletedUserMessage(deleted) : 'No se encontró ningún usuario con esa cédula.' };
         }
         if (!user.active) {
             return { ok: false, message: this.deactivatedUserMessage(user) };
@@ -188,7 +200,8 @@ export class AuthService {
         const normalizedCedula = normalizeCedula(cedula);
         const user = this._users().find((item) => item.cedula === normalizedCedula);
         if (!user) {
-            return { ok: false, questions: [], message: 'No se encontró ningún usuario con esa cédula.' };
+            const deleted = this.deletedUserRecord(normalizedCedula);
+            return { ok: false, questions: [], message: deleted ? this.deletedUserMessage(deleted) : 'No se encontró ningún usuario con esa cédula.' };
         }
         if (!user.active) {
             return { ok: false, questions: [], message: this.deactivatedUserMessage(user) };
@@ -277,7 +290,7 @@ export class AuthService {
         const isSelf = this._currentUser()?.id === id;
 
         if (isSelf && !input.active) {
-            return { ok: false, message: 'No puedes desactivar tu propia cuenta.' };
+            return { ok: false, message: 'No puedes deshabilitar tu propia cuenta.' };
         }
 
         if (input.password?.trim() && !isSelf) {
@@ -307,7 +320,7 @@ export class AuthService {
         const deactivationReason = (input.deactivationReason ?? '').trim();
 
         if (isDeactivating && !deactivationReason) {
-            return { ok: false, message: 'Escribe el motivo de la desactivación.' };
+            return { ok: false, message: 'Escribe el motivo de la deshabilitación.' };
         }
 
         const actor = this.currentUser()?.fullName ?? 'Sistema';
@@ -348,7 +361,7 @@ export class AuthService {
         }
 
         if (this._currentUser()?.id === id) {
-            return { ok: false, message: 'No puedes desactivar tu propia cuenta.' };
+            return { ok: false, message: 'No puedes deshabilitar tu propia cuenta.' };
         }
 
         const user = this._users().find((item) => item.id === id);
@@ -357,13 +370,13 @@ export class AuthService {
         }
 
         if (user.active && user.role === 'Administrador' && this.isLastActiveAdmin(user.id)) {
-            return { ok: false, message: 'No puedes desactivar al último administrador activo.' };
+            return { ok: false, message: 'No puedes deshabilitar al último administrador activo.' };
         }
 
         const reason = (deactivationReason ?? '').trim();
 
         if (user.active && !reason) {
-            return { ok: false, message: 'Escribe el motivo de la desactivación.' };
+            return { ok: false, message: 'Escribe el motivo de la deshabilitación.' };
         }
 
         const actor = this.currentUser()?.fullName ?? 'Sistema';
@@ -374,18 +387,18 @@ export class AuthService {
         this.persistUsers();
 
         this.logService.record(
-            updated.active ? 'Usuario activado' : 'Usuario desactivado',
+            updated.active ? 'Usuario habilitado' : 'Usuario deshabilitado',
             updated.active
-                ? `${actor} activó al usuario ${updated.fullName}.`
-                : `${actor} desactivó al usuario ${updated.fullName}. Motivo: ${reason}.`,
+                ? `${actor} habilitó al usuario ${updated.fullName}.`
+                : `${actor} deshabilitó al usuario ${updated.fullName}. Motivo: ${reason}.`,
             actor,
             updated.id
         );
 
-        return { ok: true, message: `Usuario ${updated.active ? 'activado' : 'desactivado'} correctamente.` };
+        return { ok: true, message: `Usuario ${updated.active ? 'habilitado' : 'deshabilitado'} correctamente.` };
     }
 
-    deleteUser(id: string): AuthResult {
+    deleteUser(id: string, deletionReason?: string): AuthResult {
         if (!this.isAdmin()) {
             return { ok: false, message: 'Solo un administrador puede eliminar usuarios.' };
         }
@@ -403,11 +416,31 @@ export class AuthService {
             return { ok: false, message: 'No puedes eliminar al último administrador activo.' };
         }
 
+        const reason = (deletionReason ?? '').trim();
+
+        if (!reason) {
+            return { ok: false, message: 'Escribe el motivo de la eliminación.' };
+        }
+
+        const actor = this.currentUser()?.fullName ?? 'Sistema';
+        this._deletedUsers.update((records) => [
+            {
+                id: user.id,
+                fullName: user.fullName,
+                cedula: user.cedula,
+                role: user.role,
+                deletedBy: actor,
+                deletionReason: reason,
+                deletedAt: new Date().toISOString()
+            },
+            ...records
+        ]);
+        this.persistDeletedUsers();
+
         this._users.update((users) => users.filter((item) => item.id !== id));
         this.persistUsers();
 
-        const actor = this.currentUser()?.fullName ?? 'Sistema';
-        this.logService.record('Usuario eliminado', `${actor} eliminó al usuario ${user.fullName}.`, actor, user.id);
+        this.logService.record('Usuario eliminado', `${actor} eliminó al usuario ${user.fullName}. Motivo: ${reason}.`, actor, user.id);
 
         return { ok: true, message: 'Usuario eliminado correctamente.' };
     }
@@ -448,6 +481,8 @@ export class AuthService {
         this._users.set(normalizedUsers);
         this.persistUsers();
 
+        this._deletedUsers.set(this.storage.read<DeletedUserRecord[]>(STORAGE_KEYS.deletedUsers, []));
+
         const sessionId = this.storage.read<string | null>(STORAGE_KEYS.session, null);
         const sessionUser = sessionId ? normalizedUsers.find((user) => user.id === sessionId && user.active) : null;
 
@@ -462,11 +497,25 @@ export class AuthService {
         this.storage.write(STORAGE_KEYS.users, this._users());
     }
 
+    private persistDeletedUsers(): void {
+        this.storage.write(STORAGE_KEYS.deletedUsers, this._deletedUsers());
+    }
+
+    private deletedUserRecord(cedula: string): DeletedUserRecord | undefined {
+        return this._deletedUsers().find((record) => record.cedula === cedula);
+    }
+
+    private deletedUserMessage(record: DeletedUserRecord): string {
+        const reason = record.deletionReason.trim();
+        const reasonText = reason ? ` Motivo: ${reason}${/[.!?]$/.test(reason) ? '' : '.'}` : '';
+        return `Esta cuenta fue eliminada por ${record.deletedBy}.${reasonText} Si deseas volver a ingresar, un administrador debe crear tu cuenta nuevamente.`;
+    }
+
     private deactivatedUserMessage(user: AppUser): string {
         const deactivatedBy = user.deactivatedBy ?? 'un administrador';
         const reason = user.deactivationReason?.trim();
         const reasonText = reason ? ` Motivo: ${reason}${/[.!?]$/.test(reason) ? '' : '.'}` : '';
-        return `Esta cuenta fue desactivada por ${deactivatedBy}.${reasonText} Contacta a un administrador.`;
+        return `Esta cuenta fue deshabilitada por ${deactivatedBy}.${reasonText} Contacta a un administrador.`;
     }
 
     private isLastActiveAdmin(id: string): boolean {

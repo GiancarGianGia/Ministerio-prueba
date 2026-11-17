@@ -100,7 +100,7 @@ export class Actividad {
         if (action.includes('cread') || action.includes('registrad') || action.includes('activad') || action.includes('ejemplo')) {
             return 'success';
         }
-        if (action.includes('desactiv')) {
+        if (action.includes('desactiv') || action.includes('deshabilit')) {
             return 'warn';
         }
         if (action.includes('sesión') || action.includes('actualiz')) {
