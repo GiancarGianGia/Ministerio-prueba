@@ -73,7 +73,14 @@
                             </div>
                         </td>
                         <td><p-tag [value]="user.role" [severity]="getRoleSeverity(user.role)" /></td>
-                        <td><p-tag [value]="user.active ? 'Activo' : 'Inactivo'" [severity]="user.active ? 'success' : 'danger'" /></td>
+                        <td>
+                            <p-tag [value]="user.active ? 'Activo' : 'Inactivo'" [severity]="user.active ? 'success' : 'danger'" />
+                            @if (!user.active && user.deactivatedBy) {
+                                <small class="deactivation-detail" [title]="user.deactivationReason || ''">
+                                    Desactivado por {{ user.deactivatedBy }}{{ user.deactivationReason ? ': ' + user.deactivationReason : '' }}
+                                </small>
+                            }
+                        </td>
                         <td>{{ user.createdAt | date: 'dd/MM/yyyy' }}</td>
                         <td>{{ user.lastLogin ? (user.lastLogin | date: 'dd/MM/yyyy HH:mm') : 'Sin acceso' }}</td>
                         <td>
@@ -189,6 +196,16 @@
                     </div>
                 </div>
 
+                @if (editDeactivationRequired) {
+                    <div class="form-field form-field-full">
+                        <label for="userDeactivationReason">Motivo de la desactivación *</label>
+                        <textarea pTextarea id="userDeactivationReason" rows="3" [(ngModel)]="editDeactivationReason" placeholder="Ingrese el motivo por el cual se desactiva la cuenta..."></textarea>
+                        @if (editDeactivationReasonError()) {
+                            <small class="field-error">{{ editDeactivationReasonError() }}</small>
+                        }
+                    </div>
+                }
+
                 @if (editingSelf) {
                     <section class="form-field form-field-full security-questions-section" aria-labelledby="security-questions-title">
                     <h2 id="security-questions-title" class="security-questions-title">
@@ -258,5 +275,23 @@
             <ng-template #footer>
                 <p-button label="Cancelar" icon="pi pi-times" severity="secondary" [outlined]="true" styleClass="btn-cancelar" (click)="hideDialog()" />
                 <p-button [label]="editing ? 'Guardar cambios' : 'Crear usuario'" icon="pi pi-check" (click)="saveUser()" />
+            </ng-template>
+        </p-dialog>
+
+        <p-dialog [(visible)]="deactivateDialog" [style]="{ width: '480px', maxWidth: '95vw' }" header="Desactivar usuario" [modal]="true">
+            <p class="deactivate-description">
+                <strong>{{ deactivateTarget?.fullName }}</strong> dejará de poder iniciar sesión hasta que un administrador reactive la cuenta.
+            </p>
+            <div class="form-field form-field-full mt-3">
+                <label for="deactivateReason">Motivo de la desactivación *</label>
+                <textarea pTextarea id="deactivateReason" rows="3" [(ngModel)]="deactivateReason" placeholder="Ingrese el motivo por el cual se desactiva la cuenta..."></textarea>
+                @if (deactivateReasonError()) {
+                    <small class="field-error">{{ deactivateReasonError() }}</small>
+                }
+            </div>
+
+            <ng-template #footer>
+                <p-button label="Cancelar" icon="pi pi-times" severity="secondary" [outlined]="true" styleClass="btn-cancelar" (click)="deactivateDialog = false" />
+                <p-button label="Desactivar" icon="pi pi-power-off" severity="warn" (click)="confirmDeactivate()" />
             </ng-template>
         </p-dialog>

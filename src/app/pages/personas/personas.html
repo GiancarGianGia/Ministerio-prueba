@@ -12,7 +12,7 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div class="mini-stat">
                 <span>Total de trabajadores</span>
                 <strong>{{ stats().total }}</strong>
@@ -20,10 +20,6 @@
             <div class="mini-stat">
                 <span>Activos</span>
                 <strong>{{ stats().active }}</strong>
-            </div>
-            <div class="mini-stat">
-                <span>Pendientes</span>
-                <strong>{{ stats().pending }}</strong>
             </div>
             <div class="mini-stat">
                 <span>Egresados</span>
@@ -416,6 +412,20 @@
                                 <div class="form-field">
                                     <label for="laborPayroll">Código de nómina</label>
                                     <input pInputText id="laborPayroll" [(ngModel)]="person.laborData.payrollCode" [disabled]="true" placeholder="Ingrese..." />
+                                </div>
+                                <div class="form-field">
+                                    <label for="laborPersonStatus">Estado laboral *</label>
+                                    <p-select
+                                        id="laborPersonStatus"
+                                        [options]="statusOptions"
+                                        optionLabel="label"
+                                        optionValue="value"
+                                        placeholder="Seleccione..."
+                                        [(ngModel)]="person.status"
+                                        appendTo="body"
+                                        scrollHeight="200px"
+                                        styleClass="w-full"
+                                    />
                                 </div>
 
                                 <div class="form-field">

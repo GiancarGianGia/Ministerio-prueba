@@ -2,7 +2,7 @@
 
 Aplicación Angular + PrimeNG para actualizar y administrar a los trabajadores del Ministerio del Poder Popular para el Proceso Social de Trabajo en Caracas, Venezuela. El sistema está enfocado en la actualización y administración de datos de trabajadores ya existentes (cargados desde base de datos o precargados).
 
-> **Nota importante:** En esta plataforma únicamente se registran los usuarios con rol de **Administrador**. Los trabajadores no se registran desde la interfaz pública, sino que se gestionan, consultan, actualizan e inhabilitan.
+> **Nota importante:** En esta plataforma únicamente se registran los usuarios con rol de **Administrador**. Los trabajadores provienen de la base de datos institucional y el sistema permite consultar, actualizar y gestionar su estado (Activo o Egresado).
 
 ## Funcionalidades
 
@@ -17,9 +17,9 @@ Aplicación Angular + PrimeNG para actualizar y administrar a los trabajadores d
 - Dirección de habitación con estado, municipio y parroquia dependientes, selección de tipo de dirección por grupos de radios (vía, edificación, inmueble y zona) con sus detalles y punto de referencias; estado, ciudad y dirección se gestionan en esta sección.
 - Calendarios en formato día/mes/año y validación de fechas imposibles.
 - Validación de cédulas y teléfonos con estructura venezolana en los formularios.
-- Inhabilitación de trabajadores con motivo obligatorio y registro en bitácora.
+- Control de estado laboral del trabajador (Activo o Egresado).
 - Exportación en formatos CSV y Excel; el Excel incluye la cantidad de hijos sin exportar sus datos individuales.
-- Administración de usuarios administradores (crear, editar datos básicos, activar/desactivar y eliminar). La cédula es ineditable porque proviene de la base de datos cuando el usuario crea su cuenta, y la contraseña junto con las preguntas de seguridad solo pueden verlas y cambiarlas el propio usuario desde su propia cuenta.
+- Administración de usuarios administradores (crear, editar datos básicos, activar/desactivar con motivo obligatorio y eliminar). La cédula es ineditable porque proviene de la base de datos cuando el usuario crea su cuenta, y la contraseña junto con las preguntas de seguridad solo pueden verlas y cambiarlas el propio usuario desde su propia cuenta.
 - Bitácora automática de ingresos, actualizaciones y cambios de estado.
 - Persistencia local en el navegador (`localStorage`) preparada para futura integración con API/BD.
 
@@ -56,7 +56,7 @@ npm test -- --watch=false
 
 - `src/app/pages/auth`: inicio de sesión y registro de administradores.
 - `src/app/pages/dashboard`: panel principal con últimos trabajadores actualizados.
-- `src/app/pages/personas`: listado, filtros, inhabilitación y formulario modal por pestañas para actualizar trabajadores.
+- `src/app/pages/personas`: listado, filtros y formulario modal por pestañas para actualizar y consultar trabajadores.
 - `src/app/pages/usuarios`: administración de usuarios administradores.
 - `src/app/pages/actividad`: bitácora de auditoría del sistema.
 - `src/app/services`: modelos de datos, servicios de trabajadores, autenticación y bitácora.

@@ -72,8 +72,6 @@ export class Dashboard {
         switch (status) {
             case 'Activo':
                 return 'success';
-            case 'Pendiente':
-                return 'warn';
             case 'Egresado':
                 return 'danger';
             default:
@@ -101,7 +99,7 @@ export class Dashboard {
         if (action.includes('elimin')) {
             return 'tone-red';
         }
-        if (action.includes('desactiv') || action.includes('Pendiente')) {
+        if (action.includes('desactiv') || action.includes('egresad')) {
             return 'tone-orange';
         }
         if (action.includes('Trabajador') || action.includes('Persona') || action.includes('activ')) {

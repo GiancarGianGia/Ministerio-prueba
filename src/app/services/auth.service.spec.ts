@@ -129,7 +129,7 @@ describe('AuthService', () => {
         expect(res.ok).toBeFalse();
     });
 
-    it('incluye al administrador que desactivó la cuenta en el mensaje de acceso', () => {
+    it('exige un motivo para desactivar y muestra quién y por qué al iniciar sesión', () => {
         service.login('V-00000000', 'admin123');
         const created = service.createUser({
             fullName: 'Gian Pérez',
@@ -143,14 +143,25 @@ describe('AuthService', () => {
 
         const gian = service.users().find((user) => user.cedula === 'V-12345678');
         expect(gian).toBeDefined();
-        const deactivated = service.toggleUser(gian!.id);
-        expect(deactivated.ok).toBeTrue();
 
-        const expectedMessage = 'Esta cuenta fue desactivada por Administrador del Sistema. Contacta a un administrador.';
+        const withoutReason = service.toggleUser(gian!.id);
+        expect(withoutReason.ok).toBeFalse();
+        expect(withoutReason.message).toBe('Escribe el motivo de la desactivación.');
+
+        const deactivated = service.toggleUser(gian!.id, 'Incumplimiento de las normas internas.');
+        expect(deactivated.ok).toBeTrue();
+        expect(service.users().find((user) => user.id === gian!.id)?.deactivationReason).toBe('Incumplimiento de las normas internas.');
+
+        const expectedMessage = 'Esta cuenta fue desactivada por Administrador del Sistema. Motivo: Incumplimiento de las normas internas. Contacta a un administrador.';
         expect(service.login('V-12345678', 'Clave123@').message).toBe(expectedMessage);
         expect(service.getSecurityQuestions('V-12345678').message).toBe(expectedMessage);
         expect(service.verifySecurityQuestions('V-12345678', [{ question: '¿En qué ciudad naciste?', answer: 'Caracas' }]).message).toBe(expectedMessage);
         expect(service.resetPassword('V-12345678', 'NuevaClave1@').message).toBe(expectedMessage);
+
+        expect(service.toggleUser(gian!.id).ok).toBeTrue();
+        const reactivated = service.users().find((user) => user.id === gian!.id);
+        expect(reactivated?.deactivationReason).toBeUndefined();
+        expect(reactivated?.deactivatedBy).toBeUndefined();
     });
 
     describe('restricciones de gestión de cuentas', () => {

@@ -1495,23 +1495,9 @@ export class Personas {
     }
 
     exportCsv(): void {
-        const header = ['Código', 'Nombres', 'Apellidos', 'Tipo de documento', 'Documento', 'Teléfono', 'Ciudad', 'Estado', 'Cargo', 'Estado del trabajador', 'Última actualización'];
-        const rows = this.filteredPersons().map((person) => [
-            person.id,
-            [person.firstName, person.secondName].filter(Boolean).join(' '),
-            [person.lastName, person.secondLastName].filter(Boolean).join(' '),
-            person.documentType,
-            person.documentNumber,
-            person.phone,
-            person.city,
-            person.department,
-            person.type,
-            person.status,
-            new Date(person.updatedAt || person.createdAt).toLocaleString('es-VE')
-        ]);
-
-        const csv = [header, ...rows]
-            .map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(','))
+        const { headers, rows } = this.buildExportTable();
+        const csv = [headers, ...rows]
+            .map((row) => row.map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`).join(','))
             .join('\r\n');
 
         const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -1523,26 +1509,120 @@ export class Personas {
         URL.revokeObjectURL(url);
     }
 
-    exportExcel(): void {
+    private buildExportTable(): { headers: string[]; rows: (string | number)[][] } {
+        const yesNo = (value: boolean | undefined): string => (value === undefined ? '' : value ? 'Sí' : 'No');
+        const text = (...parts: (string | number | undefined | null)[]): string =>
+            parts.filter((part) => part !== undefined && part !== null && String(part).trim() !== '').join(' ');
+        const fullName = (item: { firstName?: string; secondName?: string; lastName?: string; secondLastName?: string }): string =>
+            [item.firstName, item.secondName, item.lastName, item.secondLastName].filter(Boolean).join(' ');
+        const childrenSummary = (person: Person): string =>
+            (person.familyData?.children ?? [])
+                .map((child) => text(child.name, child.birthDate ? `(${child.birthDate})` : '', child.documentNumber ? `- ${child.documentNumber}` : ''))
+                .join('; ');
+        const familyMembersSummary = (person: Person): string =>
+            (person.familyMembers ?? [])
+                .map((member) =>
+                    text(
+                        fullName(member),
+                        member.relationship ? `(${member.relationship})` : '',
+                        member.hasDocument && member.documentNumber ? `- ${member.documentNumber}` : '- Sin documento'
+                    )
+                )
+                .join('; ');
+
         const headers = [
             'Código',
-            'Nombres',
-            'Apellidos',
             'Tipo de documento',
-            'Documento',
-            'Cantidad de hijos',
+            'Nro. de documento',
+            'Primer nombre',
+            'Segundo nombre',
+            'Primer apellido',
+            'Segundo apellido',
+            'Lugar de nacimiento',
             'Fecha de nacimiento',
-            'Género',
-            'Teléfono',
+            'Sexo',
+            'Teléfono personal',
+            'Teléfono de habitación',
+            'Correo electrónico',
+            'RIF',
             'Dirección',
             'Ciudad',
             'Departamento',
             'Cargo',
-            'Estado',
+            'Estado del trabajador',
             'Observaciones',
             'Fecha de registro',
             'Última actualización',
             'Registrado por',
+            'Estado civil',
+            'Cónyuge',
+            'Documento del cónyuge',
+            'Teléfono del cónyuge',
+            '¿Cónyuge trabaja en el MPPPST?',
+            'Departamento del cónyuge',
+            'Cantidad de hijos',
+            'Hijos registrados',
+            'Familiares registrados',
+            'Situación de vacaciones',
+            'Inicio de las últimas vacaciones',
+            'Fin de las últimas vacaciones',
+            'Días pendientes de vacaciones',
+            'Observaciones de vacaciones',
+            'Contacto de emergencia',
+            'Teléfono de emergencia',
+            'Parentesco del contacto de emergencia',
+            'Contacto de emergencia secundario',
+            'Teléfono de emergencia secundario',
+            'Grupo sanguíneo',
+            'Lateralidad',
+            '¿Enfermedad ocupacional?',
+            'Descripción de la enfermedad ocupacional',
+            '¿Posee discapacidad?',
+            'Tipo de discapacidad',
+            'Grado de discapacidad',
+            'Código CONAPDIS',
+            'Descripción de la discapacidad',
+            '¿Posee alguna patología?',
+            'Descripción de la patología',
+            'Medicación de la patología',
+            'Alergias',
+            'Observaciones médicas',
+            'Municipio',
+            'Parroquia',
+            'Tipo de vía',
+            'Detalles de la vía',
+            'Tipo de edificación',
+            'Detalles de la edificación',
+            'Tipo de unidad',
+            'Detalles de la unidad',
+            'Tipo de zona',
+            'Detalles de la zona',
+            'Punto de referencia',
+            'Tipo de vivienda',
+            'Condición de la vivienda',
+            'Años viviendo en la dirección',
+            'Número de habitaciones',
+            'Número de personas en el hogar',
+            '¿Posee servicios básicos?',
+            'Observaciones de vivienda',
+            'Registro militar',
+            'Número de registro militar',
+            'Talla de camisa',
+            'Talla de pantalón',
+            'Talla de calzado',
+            'Talla de chaqueta',
+            'Observaciones adicionales',
+            'Ubicación administrativa',
+            'Estado administrativo',
+            'Ubicación física',
+            'Código de teléfono de oficina',
+            'Teléfono de oficina',
+            'Cargo titular',
+            'Tipo de trabajador',
+            'Código de nómina',
+            'Fecha de ingreso al MPPPST',
+            'Fecha de ingreso a la administración pública',
+            'Observaciones laborales',
             'Nivel académico',
             'Especialidad',
             '¿Graduado(a)?',
@@ -1552,34 +1632,125 @@ export class Personas {
             'Opciones de estudio',
             '¿Desea participar como facilitador?'
         ];
-        const rows = this.filteredPersons().map((person) => [
-            person.id,
-            [person.firstName, person.secondName].filter(Boolean).join(' '),
-            [person.lastName, person.secondLastName].filter(Boolean).join(' '),
-            person.documentType,
-            person.documentNumber,
-            person.familyData?.numberOfChildren ?? person.familyData?.children?.length ?? 0,
-            person.birthDate,
-            person.gender,
-            person.phone,
-            person.address,
-            person.city,
-            person.department,
-            person.type,
-            person.status,
-            person.notes,
-            new Date(person.createdAt).toLocaleString('es-VE'),
-            new Date(person.updatedAt).toLocaleString('es-VE'),
-            person.createdBy,
-            person.academicData?.academicLevel ?? '',
-            person.academicData?.specialty ?? '',
-            person.academicData?.graduated === undefined ? '' : person.academicData.graduated ? 'Sí' : 'No',
-            person.academicData?.university ?? '',
-            person.academicData?.completionYear ?? '',
-            person.academicData?.continueStudies ?? '',
-            person.academicData?.studyOptions ?? '',
-            person.academicData?.wantsToFacilitate === undefined ? '' : person.academicData.wantsToFacilitate ? 'Sí' : 'No'
-        ]);
+
+        const rows = this.filteredPersons().map((person) => {
+            const family = person.familyData;
+            const vacation = person.vacationData;
+            const medical = person.medicalData;
+            const housing = person.housingData;
+            const additional = person.additionalData;
+            const labor = person.laborData;
+            const academic = person.academicData;
+
+            return [
+                person.id,
+                person.documentType,
+                person.documentNumber,
+                person.firstName,
+                person.secondName ?? '',
+                person.lastName,
+                person.secondLastName ?? '',
+                person.birthPlace ?? '',
+                person.birthDate,
+                person.gender,
+                person.phone,
+                person.homePhone ?? '',
+                person.email ?? '',
+                person.rif ?? '',
+                person.address,
+                person.city,
+                person.department,
+                person.type,
+                person.status,
+                person.notes,
+                new Date(person.createdAt).toLocaleString('es-VE'),
+                new Date(person.updatedAt).toLocaleString('es-VE'),
+                person.createdBy,
+                family?.maritalStatus ?? '',
+                family?.spouseName ?? '',
+                family?.spouseDocumentNumber ?? '',
+                family?.spousePhone ?? '',
+                yesNo(family?.spouseWorksAtMpppst),
+                family?.spouseMpppstDepartment ?? '',
+                family?.numberOfChildren ?? family?.children?.length ?? 0,
+                childrenSummary(person),
+                familyMembersSummary(person),
+                vacation?.status ?? '',
+                vacation?.lastVacationStart ?? '',
+                vacation?.lastVacationEnd ?? '',
+                vacation?.pendingDays ?? '',
+                vacation?.observations ?? '',
+                medical?.emergencyContactName ?? '',
+                medical?.emergencyContactPhone ?? '',
+                medical?.emergencyContactRelationship ?? '',
+                medical?.secondaryEmergencyContactName ?? '',
+                medical?.secondaryEmergencyContactPhone ?? '',
+                medical?.bloodType ?? '',
+                medical?.laterality ?? '',
+                yesNo(medical?.hasOccupationalDisease),
+                medical?.occupationalDiseaseDescription ?? '',
+                yesNo(medical?.hasDisability),
+                medical?.disabilityType ?? '',
+                medical?.disabilityGrade ?? '',
+                medical?.conapdisCode ?? '',
+                medical?.disabilityDescription ?? '',
+                yesNo(medical?.hasPathology),
+                medical?.pathologyDescription ?? '',
+                medical?.pathologyMedication ?? '',
+                medical?.allergies ?? '',
+                medical?.observations ?? '',
+                housing?.municipality ?? '',
+                housing?.parish ?? '',
+                housing?.thoroughfareType ?? '',
+                housing?.thoroughfareDetails ?? '',
+                housing?.buildingType ?? '',
+                housing?.buildingDetails ?? '',
+                housing?.unitType ?? '',
+                housing?.unitDetails ?? '',
+                housing?.zoneType ?? '',
+                housing?.zoneDetails ?? '',
+                housing?.referencePoint ?? '',
+                housing?.housingType ?? '',
+                housing?.housingCondition ?? '',
+                housing?.yearsAtAddress ?? '',
+                housing?.numberOfRooms ?? '',
+                housing?.numberOfPeopleInHouse ?? '',
+                yesNo(housing?.hasBasicServices),
+                housing?.observations ?? '',
+                additional?.militaryRegistration ?? '',
+                additional?.militaryRegistrationNumber ?? '',
+                additional?.shirtSize ?? '',
+                additional?.pantsSize ?? '',
+                additional?.shoeSize ?? '',
+                additional?.jacketSize ?? '',
+                additional?.observations ?? '',
+                labor?.administrativeLocation ?? '',
+                labor?.administrativeState ?? '',
+                labor?.physicalLocation ?? '',
+                labor?.officePhoneCode ?? '',
+                labor?.officePhone ?? '',
+                labor?.titularPosition ?? '',
+                labor?.workerType ?? '',
+                labor?.payrollCode ?? '',
+                labor?.mpppstEntryDate ?? '',
+                labor?.publicAdministrationEntryDate ?? '',
+                labor?.observations ?? '',
+                academic?.academicLevel ?? '',
+                academic?.specialty ?? '',
+                yesNo(academic?.graduated),
+                academic?.university ?? '',
+                academic?.completionYear ?? '',
+                academic?.continueStudies ?? '',
+                academic?.studyOptions ?? '',
+                yesNo(academic?.wantsToFacilitate)
+            ];
+        });
+
+        return { headers, rows };
+    }
+
+    exportExcel(): void {
+        const { headers, rows } = this.buildExportTable();
         const worksheetRows = [headers, ...rows];
         const columnName = (index: number): string => {
             let name = '';
@@ -1676,8 +1847,6 @@ export class Personas {
         switch (status) {
             case 'Activo':
                 return 'success';
-            case 'Pendiente':
-                return 'warn';
             case 'Egresado':
                 return 'danger';
             default:

@@ -20,7 +20,6 @@ export class PersonService {
         return {
             total: persons.length,
             active: persons.filter((person) => person.status === 'Activo').length,
-            pending: persons.filter((person) => person.status === 'Pendiente').length,
             egresados: persons.filter((person) => person.status === 'Egresado').length,
             thisMonth: persons.filter((person) => {
                 const date = new Date(person.updatedAt || person.createdAt);
@@ -126,7 +125,7 @@ export class PersonService {
                 city: person.city ?? '',
                 department: person.department ?? '',
                 type: person.type ?? '',
-                status: person.status === 'Inactivo' ? 'Egresado' : (person.status ?? 'Activo'),
+                status: person.status === 'Egresado' || person.status === 'Inactivo' ? 'Egresado' : 'Activo',
                 notes: legacyCargo ? legacyCargo[2].trim() : notes,
                 createdAt: person.createdAt ?? '',
                 updatedAt: person.updatedAt ?? '',
@@ -409,7 +408,7 @@ export class PersonService {
                 city: 'Caracas',
                 department: 'Distrito Capital',
                 type: 'Analista',
-                status: 'Pendiente',
+                status: 'Activo',
                 notes: 'Dirección de Inspección del Trabajo.',
                 familyData: { maritalStatus: 'Casado/a', numberOfChildren: 3, children: [] },
                 vacationData: { status: 'No ha tomado vacaciones', pendingDays: 12, observations: '' },
@@ -435,7 +434,7 @@ export class PersonService {
                 city: 'Caracas',
                 department: 'Distrito Capital',
                 type: 'Pasante',
-                status: 'Pendiente',
+                status: 'Activo',
                 notes: 'Dirección de Talento Humano.',
                 familyData: { maritalStatus: 'Soltero/a', numberOfChildren: 0, children: [] },
                 vacationData: { status: 'Solicitadas pendientes', pendingDays: 3, observations: 'Pendiente de aprobación por la dirección.' },

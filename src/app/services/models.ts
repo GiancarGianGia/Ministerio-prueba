@@ -28,6 +28,7 @@ export interface AppUser {
     createdAt: string;
     createdBy: string;
     deactivatedBy?: string;
+    deactivationReason?: string;
     lastLogin?: string;
     securityQuestions?: SecurityQuestion[];
 }
@@ -48,6 +49,7 @@ export interface UpdateUserInput {
     active: boolean;
     password?: string;
     securityQuestions?: SecurityQuestion[];
+    deactivationReason?: string;
 }
 
 export interface ChildData {
@@ -311,7 +313,7 @@ export const PERSON_TYPES = [
     'Pasante en Programación',
 ];
 
-export const PERSON_STATUSES = ['Activo', 'Pendiente', 'Egresado'];
+export const PERSON_STATUSES = ['Activo', 'Egresado'];
 
 export const DEPARTMENTS = [
     'Amazonas',

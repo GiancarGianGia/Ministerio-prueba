@@ -1,3 +1,4 @@
+/// <reference types="jasmine" />
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
@@ -234,7 +235,7 @@ describe('Personas Component - Búsqueda de trabajadores', () => {
         expect(personService.persons().find((item) => item.id === person.id)?.firstName).toBe('Actualizado');
     });
 
-    it('debe exportar únicamente la cantidad de hijos en Excel', async () => {
+    it('debe exportar toda la información familiar en Excel', async () => {
         personService.add(
             {
                 firstName: 'Cuenta',
@@ -253,7 +254,7 @@ describe('Personas Component - Búsqueda de trabajadores', () => {
                 familyData: {
                     maritalStatus: 'Soltero/a',
                     numberOfChildren: 2,
-                    children: [{ name: 'Dato de hijo que no se exporta', birthDate: '2020-01-01' }]
+                    children: [{ name: 'Dato de hijo exportado', birthDate: '2020-01-01' }]
                 }
             },
             'Admin'
@@ -274,7 +275,55 @@ describe('Personas Component - Búsqueda de trabajadores', () => {
         const worksheet = strFromU8(workbook['xl/worksheets/sheet1.xml']);
 
         expect(worksheet).toContain('Cantidad de hijos');
-        expect(worksheet).toContain('<c r="F2" t="inlineStr"><is><t xml:space="preserve">2</t></is></c>');
-        expect(worksheet).not.toContain('Dato de hijo que no se exporta');
+        const headerRow = /<row r="1">([\s\S]*?)<\/row>/.exec(worksheet)?.[1] ?? '';
+        const column = /<c r="([A-Z]+)1" t="inlineStr"><is><t xml:space="preserve">Cantidad de hijos<\/t><\/is><\/c>/.exec(headerRow)?.[1];
+        expect(column).toBeDefined();
+        expect(worksheet).toContain(`<c r="${column}2" t="inlineStr"><is><t xml:space="preserve">2</t></is></c>`);
+        expect(worksheet).toContain('Dato de hijo exportado');
+    });
+
+    it('debe exportar todos los campos del trabajador en CSV', async () => {
+        personService.add(
+            {
+                firstName: 'Cuenta',
+                lastName: 'Completa',
+                documentType: DOCUMENT_TYPES[0],
+                documentNumber: 'V-77777777',
+                birthDate: '1990-06-10',
+                gender: GENDERS[0],
+                phone: '+58 414 2222222',
+                address: '',
+                city: 'Caracas',
+                department: 'Distrito Capital',
+                type: 'Analista',
+                status: 'Activo',
+                notes: '',
+                familyData: {
+                    maritalStatus: 'Casado/a',
+                    numberOfChildren: 1,
+                    children: [{ name: 'Hija en CSV', birthDate: '2018-05-01' }]
+                }
+            },
+            'Admin'
+        );
+        component.searchTerm.set('Cuenta');
+
+        const createObjectUrl = spyOn(URL, 'createObjectURL').and.returnValue('blob:csv-test');
+        spyOn(URL, 'revokeObjectURL');
+        spyOn(HTMLAnchorElement.prototype, 'click');
+
+        component.exportCsv();
+
+        const file = createObjectUrl.calls.mostRecent().args[0];
+        if (!(file instanceof Blob)) {
+            throw new Error('La exportación no generó un archivo CSV.');
+        }
+        const content = await file.text();
+
+        expect(content).toContain('"Cantidad de hijos"');
+        expect(content).toContain('"Hijos registrados"');
+        expect(content).toContain('"Familiares registrados"');
+        expect(content).toContain('"Observaciones laborales"');
+        expect(content).toContain('Hija en CSV');
     });
 });

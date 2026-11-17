@@ -299,6 +299,13 @@ export class AuthService {
             return { ok: false, message: 'No puedes quitar el acceso al último administrador activo.' };
         }
 
+        const isDeactivating = user.active && !input.active;
+        const deactivationReason = (input.deactivationReason ?? '').trim();
+
+        if (isDeactivating && !deactivationReason) {
+            return { ok: false, message: 'Escribe el motivo de la desactivación.' };
+        }
+
         const actor = this.currentUser()?.fullName ?? 'Sistema';
         const updated: AppUser = {
             ...user,
@@ -315,12 +322,8 @@ export class AuthService {
                       }))
                     : user.securityQuestions,
             ...(input.active
-                ? { deactivatedBy: undefined }
-                : user.active
-                  ? { deactivatedBy: actor }
-                  : user.deactivatedBy
-                    ? { deactivatedBy: user.deactivatedBy }
-                    : {})
+                ? { deactivatedBy: undefined, deactivationReason: undefined }
+                : { deactivatedBy: user.deactivatedBy ?? actor, deactivationReason: user.deactivationReason ?? (deactivationReason || undefined) })
         };
 
         this._users.update((users) => users.map((item) => (item.id === id ? updated : item)));
@@ -335,7 +338,7 @@ export class AuthService {
         return { ok: true, message: 'Usuario actualizado correctamente.' };
     }
 
-    toggleUser(id: string): AuthResult {
+    toggleUser(id: string, deactivationReason?: string): AuthResult {
         if (!this.isAdmin()) {
             return { ok: false, message: 'Solo un administrador puede cambiar el estado de los usuarios.' };
         }
@@ -353,16 +356,24 @@ export class AuthService {
             return { ok: false, message: 'No puedes desactivar al último administrador activo.' };
         }
 
+        const reason = (deactivationReason ?? '').trim();
+
+        if (user.active && !reason) {
+            return { ok: false, message: 'Escribe el motivo de la desactivación.' };
+        }
+
         const actor = this.currentUser()?.fullName ?? 'Sistema';
         const updated: AppUser = user.active
-            ? { ...user, active: false, deactivatedBy: actor }
-            : { ...user, active: true, deactivatedBy: undefined };
+            ? { ...user, active: false, deactivatedBy: actor, deactivationReason: reason }
+            : { ...user, active: true, deactivatedBy: undefined, deactivationReason: undefined };
         this._users.update((users) => users.map((item) => (item.id === id ? updated : item)));
         this.persistUsers();
 
         this.logService.record(
             updated.active ? 'Usuario activado' : 'Usuario desactivado',
-            `${actor} ${updated.active ? 'activó' : 'desactivó'} al usuario ${updated.fullName}.`,
+            updated.active
+                ? `${actor} activó al usuario ${updated.fullName}.`
+                : `${actor} desactivó al usuario ${updated.fullName}. Motivo: ${reason}.`,
             actor,
             updated.id
         );
@@ -426,6 +437,7 @@ export class AuthService {
                   createdAt: user.createdAt ?? new Date().toISOString(),
                   createdBy: user.createdBy ?? 'Sistema',
                   ...(user.deactivatedBy ? { deactivatedBy: user.deactivatedBy } : {}),
+                  ...(user.deactivationReason ? { deactivationReason: user.deactivationReason } : {}),
                   ...(user.lastLogin ? { lastLogin: user.lastLogin } : {}),
                   ...(user.securityQuestions ? { securityQuestions: user.securityQuestions } : {})
               }))
@@ -450,7 +462,9 @@ export class AuthService {
 
     private deactivatedUserMessage(user: AppUser): string {
         const deactivatedBy = user.deactivatedBy ?? 'un administrador';
-        return `Esta cuenta fue desactivada por ${deactivatedBy}. Contacta a un administrador.`;
+        const reason = user.deactivationReason?.trim();
+        const reasonText = reason ? ` Motivo: ${reason}${/[.!?]$/.test(reason) ? '' : '.'}` : '';
+        return `Esta cuenta fue desactivada por ${deactivatedBy}.${reasonText} Contacta a un administrador.`;
     }
 
     private isLastActiveAdmin(id: string): boolean {

@@ -12,6 +12,7 @@ import { PasswordModule } from 'primeng/password';
 import { SelectModule } from 'primeng/select';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
+import { TextareaModule } from 'primeng/textarea';
 import { ToastModule } from 'primeng/toast';
 import { AuthService } from '@/app/services/auth.service';
 import { AppUser, NewUserInput, SECURITY_QUESTIONS, SecurityQuestion, TagSeverity, UpdateUserInput } from '@/app/services/models';
@@ -35,6 +36,7 @@ import { DocumentPrefixSelect } from '@/app/components/document-prefix-select/do
         SelectModule,
         TableModule,
         TagModule,
+        TextareaModule,
         ToastModule
     ],
     providers: [MessageService, ConfirmationService],
@@ -60,6 +62,18 @@ export class Usuarios {
     editing = false;
 
     editingSelf = false;
+
+    editingOriginalActive = false;
+
+    editDeactivationReason = '';
+
+    deactivateDialog = false;
+
+    deactivateTarget: AppUser | null = null;
+
+    deactivateReason = '';
+
+    deactivateSubmitted = false;
 
     submitted = false;
 
@@ -88,6 +102,8 @@ export class Usuarios {
     openNew(): void {
         this.editing = false;
         this.editingSelf = false;
+        this.editingOriginalActive = false;
+        this.editDeactivationReason = '';
         this.editingId = null;
         this.submitted = false;
         this.cedulaTouched = false;
@@ -106,6 +122,8 @@ export class Usuarios {
     editUser(user: AppUser): void {
         this.editing = true;
         this.editingSelf = this.isCurrentUser(user);
+        this.editingOriginalActive = user.active;
+        this.editDeactivationReason = '';
         this.editingId = user.id;
         this.submitted = false;
         this.cedulaTouched = false;
@@ -132,6 +150,16 @@ export class Usuarios {
         this.submitted = false;
         this.cedulaTouched = false;
         this.confirmPassword = '';
+        this.editDeactivationReason = '';
+        this.editingOriginalActive = false;
+    }
+
+    get editDeactivationRequired(): boolean {
+        return this.editing && this.editingOriginalActive && !this.userForm.active;
+    }
+
+    editDeactivationReasonError(): string {
+        return this.submitted && this.editDeactivationRequired && !this.editDeactivationReason.trim() ? 'Escribe el motivo de la desactivación.' : '';
     }
 
     fullNameError(): string {
@@ -216,8 +244,12 @@ export class Usuarios {
             (q.question && !q.answer.trim()) || (!q.question && q.answer.trim())
         );
 
-        if (nameErr || cedulaErr || passErr || confirmPassErr || sqErr) {
-            const firstError = nameErr || cedulaErr || passErr || confirmPassErr || (sqErr ? 'Completa o limpia las preguntas de seguridad incompletas.' : null);
+        const deactivationErr = this.editDeactivationRequired && !this.editDeactivationReason.trim()
+            ? 'Escribe el motivo de la desactivación.'
+            : null;
+
+        if (nameErr || cedulaErr || passErr || confirmPassErr || sqErr || deactivationErr) {
+            const firstError = nameErr || cedulaErr || passErr || confirmPassErr || (sqErr ? 'Completa o limpia las preguntas de seguridad incompletas.' : null) || deactivationErr;
             this.messageService.add({
                 severity: 'error',
                 summary: 'Formulario con errores',
@@ -239,6 +271,7 @@ export class Usuarios {
                 cedula: composeDocumentNumber(this.cedulaPrefix, this.userForm.cedula),
                 role: 'Administrador',
                 active: this.userForm.active,
+                ...(this.editDeactivationRequired ? { deactivationReason: this.editDeactivationReason.trim() } : {}),
                 ...(this.editingSelf ? { password: this.userForm.password, securityQuestions } : {})
             };
             result = this.auth.updateUser(this.editingId, input);
@@ -268,11 +301,57 @@ export class Usuarios {
     }
 
     toggleUser(user: AppUser): void {
+        if (!user.active) {
+            this.activateUser(user);
+            return;
+        }
+
+        this.deactivateTarget = user;
+        this.deactivateReason = '';
+        this.deactivateSubmitted = false;
+        this.deactivateDialog = true;
+    }
+
+    deactivateReasonError(): string {
+        return this.deactivateSubmitted && !this.deactivateReason.trim() ? 'Escribe el motivo de la desactivación.' : '';
+    }
+
+    confirmDeactivate(): void {
+        this.deactivateSubmitted = true;
+
+        const target = this.deactivateTarget;
+        if (!target || !this.deactivateReason.trim()) {
+            return;
+        }
+
+        const result = this.auth.toggleUser(target.id, this.deactivateReason);
+
+        if (!result.ok) {
+            this.messageService.add({
+                severity: 'error',
+                summary: 'No se pudo desactivar',
+                detail: result.message,
+                life: 4000
+            });
+            return;
+        }
+
+        this.deactivateDialog = false;
+        this.deactivateTarget = null;
+        this.messageService.add({
+            severity: 'success',
+            summary: 'Usuario desactivado',
+            detail: `${target.fullName} fue desactivado. El motivo quedó registrado.`,
+            life: 4000
+        });
+    }
+
+    private activateUser(user: AppUser): void {
         this.confirmationService.confirm({
-            message: `¿Deseas ${user.active ? 'desactivar' : 'activar'} a ${user.fullName}?`,
-            header: user.active ? 'Desactivar usuario' : 'Activar usuario',
+            message: `¿Deseas activar a ${user.fullName}?`,
+            header: 'Activar usuario',
             icon: 'pi pi-exclamation-triangle',
-            acceptLabel: user.active ? 'Desactivar' : 'Activar',
+            acceptLabel: 'Activar',
             rejectLabel: 'Cancelar',
             accept: () => {
                 const result = this.auth.toggleUser(user.id);
