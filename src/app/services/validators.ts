@@ -1,6 +1,6 @@
 import { DOCUMENT_PREFIX_OPTIONS, DOCUMENT_TYPES } from './models';
 
-const VENEZUELAN_MOBILE_CODES = ['412', '414', '416', '424', '426'];
+const VENEZUELAN_MOBILE_CODES = ['412', '414', '416', '422', '424', '426'];
 
 const NAME_PATTERN = /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]+$/;
 

@@ -84,6 +84,7 @@ export interface FamilyMember {
     hasDocument: boolean;
     documentType?: string;
     documentNumber?: string;
+    certificateNumber?: string;
     firstName?: string;
     secondName?: string;
     lastName?: string;
@@ -117,12 +118,19 @@ export interface VacationData {
     observations?: string;
 }
 
+export interface ChronicPathology {
+    pathology: string;
+    treatment?: string;
+    observation?: string;
+}
+
 export interface MedicalData {
     emergencyContactName?: string;
     emergencyContactPhone?: string;
     emergencyContactRelationship?: string;
     secondaryEmergencyContactName?: string;
     secondaryEmergencyContactPhone?: string;
+    secondaryEmergencyContactRelationship?: string;
     bloodType?: string;
     laterality?: string;
     hasOccupationalDisease: boolean;
@@ -132,9 +140,7 @@ export interface MedicalData {
     disabilityGrade?: string;
     conapdisCode?: string;
     disabilityDescription?: string;
-    hasPathology: boolean;
-    pathologyDescription?: string;
-    pathologyMedication?: string;
+    chronicPathologies: ChronicPathology[];
     allergies?: string;
     observations?: string;
 }
@@ -184,12 +190,16 @@ export interface LaborData {
     observations?: string;
 }
 
-export interface AcademicData {
-    academicLevel?: string;
+export interface AcademicTitle {
+    academicLevel: string;
     specialty?: string;
     graduated?: boolean;
     university?: string;
     completionYear?: string;
+}
+
+export interface AcademicData {
+    titles: AcademicTitle[];
     continueStudies?: string;
     studyOptions?: string;
     wantsToFacilitate?: boolean;
@@ -455,7 +465,7 @@ export const FAMILY_RELATIONSHIPS = [
     'Otro'
 ];
 
-export const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+export const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'Desconoce'];
 
 export const HOUSING_TYPES = ['Casa', 'Apartamento', 'Habitación', 'Rancho', 'Otro'];
 
@@ -472,33 +482,58 @@ export const ADDRESS_ZONE_TYPES = ['Barrio', 'Caserío', 'Conjunto residencial',
 export const LATERALITY_OPTIONS = ['Diestro', 'Zurdo', 'Ambidiestro'];
 
 export const DISABILITY_TYPES = [
-    'Física / Motora',
+    'Genitourinaria',
+    'Mental Intelectual',
+    'Mental Psicosocial',
+    'Respiratoria',
+    'Cardiovascular',
+    'Sensitiva',
+    'Voz y Habla',
     'Visual',
-    'Auditiva',
-    'Intelectual',
-    'Psicosocial / Mental',
+    'Metabólica',
     'Múltiple',
-    'Otra'
+    'Neurológica',
+    'Músculo esquelética'
 ];
 
-export const DISABILITY_GRADES = ['Leve', 'Moderada', 'Severa', 'Grave / Completa'];
+export const DISABILITY_GRADES = ['Leve', 'Moderado', 'Grave', 'Completo'];
 
-export const MILITARY_REGISTRATION_OPTIONS = [
-    'Inscrito',
-    'No inscrito',
-    'En trámite',
-    'Exento'
+export const MILITARY_REGISTRATION_OPTIONS = ['Sí', 'No'];
+
+export const SHIRT_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
+
+export const PANTS_SIZES = ['26', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', '48', '50', '54'];
+
+export const SHOE_SIZES = ['35', '36', '37', '38', '39', '40', '42', '43', '44', '45', '46', '47'];
+
+export const JACKET_SIZES = ['SS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'XXXXL'];
+
+export const PERSONAL_PHONE_CODES = ['0412', '0414', '0416', '0422', '0424', '0426'];
+
+export const HOME_PHONE_CODES = ['0212', '0232', '0234', '0235', '0236', '0237'];
+
+export const EMERGENCY_CONTACT_RELATIONSHIPS = ['Padre', 'Madre', 'Hermano(a)', 'Tío(a)', 'Primo(a)', 'Abuelo(a)', 'Otro familiar', 'Cónyuge', 'Nieto(a)'];
+
+export const CHRONIC_PATHOLOGIES = [
+    'Insuficiencia Renal Crónica terminal',
+    'Diabetes Mellitus Tipo I',
+    'Diabetes Mellitus Tipo II',
+    'Hipertensión Arterial',
+    'Artritis Reumatoidea',
+    'Hemofilia',
+    'VIH / Sida',
+    'Fibrosis Quística',
+    'Epilepsia',
+    'Enfermedad de Parkinson',
+    'Artritis Idiopática Juvenil',
+    'Insuficiencia Renal',
+    'Esclerosis Múltiple',
+    'Hepatitis B',
+    'Hepatitis C',
+    'Hipertiroidismo',
+    'Hipotiroidismo',
+    'No Aplica'
 ];
-
-export const SHIRT_SIZES = ['SS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
-
-export const PANTS_SIZES = ['26', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', '48'];
-
-export const SHOE_SIZES = ['34', '35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46'];
-
-export const JACKET_SIZES = ['SS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
-
-export const PERSONAL_PHONE_CODES = ['0412', '0414', '0416', '0424', '0426'];
 
 export const OFFICE_PHONE_CODES = [
     '0212',

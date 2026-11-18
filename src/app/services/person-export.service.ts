@@ -101,6 +101,24 @@ export class PersonExportService {
                     )
                 )
                 .join('; ');
+        const chronicPathologiesSummary = (person: Person): string =>
+            (person.medicalData?.chronicPathologies ?? [])
+                .filter((row) => row.pathology?.trim() || row.treatment?.trim() || row.observation?.trim())
+                .map((row) => text(row.pathology || 'Sin especificar', row.treatment ? `Tratamiento: ${row.treatment}` : '', row.observation ? `Observación: ${row.observation}` : ''))
+                .join('; ');
+        const academicTitlesSummary = (person: Person): string =>
+            (person.academicData?.titles ?? [])
+                .filter((title) => title.academicLevel?.trim() || title.specialty?.trim() || title.university?.trim() || title.completionYear?.trim())
+                .map((title) =>
+                    text(
+                        title.academicLevel,
+                        title.specialty ? `(${title.specialty})` : '',
+                        title.graduated === undefined ? '' : title.graduated ? 'Graduado(a)' : 'No graduado(a)',
+                        title.university,
+                        title.completionYear
+                    )
+                )
+                .join('; ');
 
         const headers = [
             'Código',
@@ -145,6 +163,7 @@ export class PersonExportService {
             'Parentesco del contacto de emergencia',
             'Contacto de emergencia secundario',
             'Teléfono de emergencia secundario',
+            'Parentesco del contacto de emergencia secundario',
             'Grupo sanguíneo',
             'Lateralidad',
             '¿Enfermedad ocupacional?',
@@ -154,9 +173,7 @@ export class PersonExportService {
             'Grado de discapacidad',
             'Código CONAPDIS',
             'Descripción de la discapacidad',
-            '¿Posee alguna patología?',
-            'Descripción de la patología',
-            'Medicación de la patología',
+            'Patologías crónicas',
             'Alergias',
             'Observaciones médicas',
             'Municipio',
@@ -195,11 +212,7 @@ export class PersonExportService {
             'Fecha de ingreso al MPPPST',
             'Fecha de ingreso a la administración pública',
             'Observaciones laborales',
-            'Nivel académico',
-            'Especialidad',
-            '¿Graduado(a)?',
-            'Universidad',
-            'Año de culminación (real o estimado)',
+            'Títulos académicos',
             '¿Desea continuar sus estudios?',
             'Opciones de estudio',
             '¿Desea participar como facilitador?'
@@ -257,6 +270,7 @@ export class PersonExportService {
                 medical?.emergencyContactRelationship ?? '',
                 medical?.secondaryEmergencyContactName ?? '',
                 medical?.secondaryEmergencyContactPhone ?? '',
+                medical?.secondaryEmergencyContactRelationship ?? '',
                 medical?.bloodType ?? '',
                 medical?.laterality ?? '',
                 yesNo(medical?.hasOccupationalDisease),
@@ -266,9 +280,7 @@ export class PersonExportService {
                 medical?.disabilityGrade ?? '',
                 medical?.conapdisCode ?? '',
                 medical?.disabilityDescription ?? '',
-                yesNo(medical?.hasPathology),
-                medical?.pathologyDescription ?? '',
-                medical?.pathologyMedication ?? '',
+                chronicPathologiesSummary(person),
                 medical?.allergies ?? '',
                 medical?.observations ?? '',
                 housing?.municipality ?? '',
@@ -307,11 +319,7 @@ export class PersonExportService {
                 labor?.mpppstEntryDate ?? '',
                 labor?.publicAdministrationEntryDate ?? '',
                 labor?.observations ?? '',
-                academic?.academicLevel ?? '',
-                academic?.specialty ?? '',
-                yesNo(academic?.graduated),
-                academic?.university ?? '',
-                academic?.completionYear ?? '',
+                academicTitlesSummary(person),
                 academic?.continueStudies ?? '',
                 academic?.studyOptions ?? '',
                 yesNo(academic?.wantsToFacilitate)

@@ -187,7 +187,7 @@ select {
 
 .layout-main-container {
     margin-left: 17.5rem;
-    padding: 6.5rem 2rem 1.5rem;
+    padding: 6.5rem 2rem 4.75rem;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
@@ -198,16 +198,26 @@ select {
 }
 
 .layout-footer {
+    position: fixed;
+    left: 17.5rem;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
     display: flex;
     align-items: center;
     gap: 0.45rem;
     flex-wrap: wrap;
-    padding: 1.25rem 0 0;
-    margin-top: 2rem;
+    padding: 0.85rem 2rem;
     border-top: 1px solid var(--registro-border);
+    background: #fff;
+    box-shadow: 0 -6px 18px rgba(15, 23, 42, 0.06);
     color: var(--registro-muted);
     font-size: 0.76rem;
     font-weight: 600;
+}
+
+.layout-static-inactive .layout-footer {
+    left: 0;
 }
 
 .layout-footer-separator {
@@ -765,6 +775,23 @@ select {
 .phone-input-row .phone-code-select {
     flex: 0 0 8.5rem;
     width: 8.5rem;
+}
+
+.pathology-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+    gap: 0.5rem;
+    align-items: start;
+}
+
+.pathology-row > input {
+    width: 100%;
+}
+
+@media (max-width: 767px) {
+    .pathology-row {
+        grid-template-columns: 1fr;
+    }
 }
 
 .secret-input {
@@ -1696,7 +1723,12 @@ select {
 
     .layout-main-container {
         margin-left: 0;
-        padding: 6rem 1rem 1rem;
+        padding: 6rem 1rem 6rem;
+    }
+
+    .layout-footer {
+        left: 0;
+        padding: 0.85rem 1rem;
     }
 
     .layout-static .layout-sidebar {
@@ -1738,6 +1770,10 @@ select {
 @media (max-width: 640px) {
     .form-grid {
         grid-template-columns: 1fr;
+    }
+
+    .layout-main-container {
+        padding-bottom: 7.5rem;
     }
 
     .page-header h1 {

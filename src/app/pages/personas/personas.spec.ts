@@ -176,11 +176,12 @@ describe('Personas Component - Búsqueda de trabajadores', () => {
     it('debe avisar inmediatamente cuando el año académico es imposible', () => {
         const notify = spyOn(messageService, 'add');
         component.editPerson(personService.persons()[0]);
-        component.person.academicData!.completionYear = '1800';
+        component.addAcademicTitle();
+        component.person.academicData!.titles[0].completionYear = '1800';
 
-        component.onCompletionYearChange();
+        component.onCompletionYearChange(0);
 
-        expect(component.completionYearError()).toContain('El año debe estar entre');
+        expect(component.completionYearError(0)).toContain('El año debe estar entre');
         expect(notify).toHaveBeenCalledWith(
             jasmine.objectContaining({
                 severity: 'error',
@@ -228,11 +229,57 @@ describe('Personas Component - Búsqueda de trabajadores', () => {
         component.person.housingData!.parish = 'El Recreo';
         component.person.housingData!.thoroughfareType = 'Avenida';
         component.person.housingData!.referencePoint = 'Frente a la plaza Bolívar';
+        component.person.academicData!.continueStudies = 'No';
 
         component.savePerson();
 
         expect(component.personDialog).toBeFalse();
         expect(personService.persons().find((item) => item.id === person.id)?.firstName).toBe('Actualizado');
+    });
+
+    it('no debe guardar si no se indica si desea continuar sus estudios', () => {
+        const notify = spyOn(messageService, 'add');
+        const person = personService.persons()[0];
+        component.editPerson(person);
+        component.person.familyData!.maritalStatus = 'Soltero/a';
+        component.person.email = 'continuar@dominio.com';
+        component.person.laborData!.administrativeState = 'Distrito Capital';
+        component.person.laborData!.physicalLocation = 'Torre Ministerial, piso 3';
+        component.person.laborData!.officePhoneCode = '0212';
+        component.person.laborData!.officePhone = '5551234';
+        component.person.housingData!.municipality = 'Libertador';
+        component.person.housingData!.parish = 'El Recreo';
+        component.person.housingData!.thoroughfareType = 'Avenida';
+        component.person.housingData!.referencePoint = 'Frente a la plaza Bolívar';
+        component.person.academicData!.continueStudies = '';
+
+        component.savePerson();
+
+        expect(component.personDialog).toBeTrue();
+        expect(component.activeEditTab).toBe('6');
+        expect(notify).toHaveBeenCalledWith(
+            jasmine.objectContaining({
+                severity: 'error',
+                summary: 'Datos académicos incompletos'
+            })
+        );
+    });
+
+    it('debe limpiar las opciones de estudio cuando no desea continuar estudios', () => {
+        component.editPerson(personService.persons()[0]);
+        component.person.academicData!.studyOptions = 'Postgrado';
+
+        component.onContinueStudiesChange('No');
+
+        expect(component.person.academicData!.studyOptions).toBe('');
+    });
+
+    it('debe usar las listas oficiales de discapacidad, tallas y sangre', () => {
+        expect(component.disabilityTypeOptions.map((option) => option.value)).toContain('Músculo esquelética');
+        expect(component.disabilityGradeOptions.map((option) => option.value)).toEqual(['Leve', 'Moderado', 'Grave', 'Completo']);
+        expect(component.bloodTypeOptions.map((option) => option.value)).toContain('Desconoce');
+        expect(component.shirtSizeOptions.map((option) => option.value)).toContain('XS');
+        expect(component.shoeSizeOptions.map((option) => option.value)).not.toContain('41');
     });
 
     it('debe exportar toda la información familiar en Excel', async () => {
@@ -333,5 +380,177 @@ describe('Personas Component - Búsqueda de trabajadores', () => {
         expect(content).toContain('"Observaciones laborales"');
         expect(content).toContain('Hija en CSV');
         expect(content).toContain('Esperanza');
+    });
+
+    it('debe agregar y eliminar patologías crónicas', () => {
+        component.addChronicPathology();
+        component.addChronicPathology();
+        const rows = component.person.medicalData!.chronicPathologies;
+        expect(rows.length).toBe(2);
+
+        rows[0].pathology = 'Diabetes Mellitus Tipo II';
+        component.removeChronicPathology(0);
+
+        expect(component.person.medicalData!.chronicPathologies.length).toBe(1);
+        expect(component.person.medicalData!.chronicPathologies[0].pathology).toBe('');
+    });
+
+    it('debe ofrecer el catálogo de tratamientos y conservar los ya registrados', () => {
+        const added = personService.add(
+            {
+                firstName: 'Cuenta',
+                lastName: 'Tratamiento',
+                documentType: DOCUMENT_TYPES[0],
+                documentNumber: 'V-44444444',
+                birthDate: '1987-07-07',
+                gender: GENDERS[0],
+                phone: '+58 412 5555555',
+                address: '',
+                city: 'Caracas',
+                department: 'Distrito Capital',
+                type: 'Analista',
+                status: 'Activo',
+                notes: '',
+                medicalData: {
+                    hasOccupationalDisease: false,
+                    hasDisability: false,
+                    chronicPathologies: [{ pathology: 'Hipertensión Arterial', treatment: 'Losartán', observation: '' }]
+                }
+            },
+            'Admin'
+        );
+
+        expect(component.treatmentOptions.length).toBeGreaterThan(1000);
+
+        component.editPerson(added);
+
+        expect(component.chronicTreatmentOptions.some((option) => option.value === 'Losartán')).toBeTrue();
+    });
+
+    it('debe validar el contacto de emergencia cuando se empieza a llenar', () => {
+        component.submitted = true;
+        component.person.medicalData!.emergencyContactName = 'Ana Silva';
+
+        expect(component.emergencyContactError(1)).toContain('parentesco');
+
+        component.person.medicalData!.emergencyContactRelationship = 'Madre';
+        component.emergencyPhoneCode = '0422';
+        component.emergencyPhoneNumber = '1234567';
+
+        expect(component.emergencyContactError(1)).toBe('');
+        expect(component.emergencyContactError(2)).toBe('');
+    });
+
+    it('debe exportar las patologías crónicas y el parentesco del segundo contacto en CSV', async () => {
+        personService.add(
+            {
+                firstName: 'Cuenta',
+                lastName: 'Medica',
+                documentType: DOCUMENT_TYPES[0],
+                documentNumber: 'V-66666666',
+                birthDate: '1985-02-20',
+                gender: GENDERS[0],
+                phone: '+58 416 3333333',
+                address: '',
+                city: 'Caracas',
+                department: 'Distrito Capital',
+                type: 'Analista',
+                status: 'Activo',
+                notes: '',
+                medicalData: {
+                    hasOccupationalDisease: false,
+                    hasDisability: false,
+                    chronicPathologies: [{ pathology: 'Hipertensión Arterial', treatment: 'Losartán', observation: 'Control mensual' }],
+                    secondaryEmergencyContactRelationship: 'Hermano(a)'
+                }
+            },
+            'Admin'
+        );
+        component.searchTerm.set('Medica');
+
+        const createObjectUrl = spyOn(URL, 'createObjectURL').and.returnValue('blob:csv-medica');
+        spyOn(URL, 'revokeObjectURL');
+        spyOn(HTMLAnchorElement.prototype, 'click');
+
+        component.exportCsv();
+
+        const file = createObjectUrl.calls.mostRecent().args[0];
+        if (!(file instanceof Blob)) {
+            throw new Error('La exportación no generó un archivo CSV.');
+        }
+        const content = await file.text();
+
+        expect(content).toContain('"Patologías crónicas"');
+        expect(content).toContain('Hipertensión Arterial');
+        expect(content).toContain('Parentesco del contacto de emergencia secundario');
+        expect(content).toContain('Hermano(a)');
+    });
+
+    it('debe agregar y eliminar títulos académicos', () => {
+        component.addAcademicTitle();
+        component.addAcademicTitle();
+        const titles = component.person.academicData!.titles;
+        expect(titles.length).toBe(2);
+
+        titles[0].academicLevel = 'Universitario';
+        component.removeAcademicTitle(1);
+
+        expect(component.person.academicData!.titles.length).toBe(1);
+        expect(component.person.academicData!.titles[0].academicLevel).toBe('Universitario');
+    });
+
+    it('debe exigir nivel y graduación en un título iniciado', () => {
+        component.addAcademicTitle();
+        component.person.academicData!.titles[0].specialty = 'Contaduría';
+        component.submitted = true;
+
+        expect(component.academicTitleError(0)).toContain('nivel académico');
+
+        component.person.academicData!.titles[0].academicLevel = 'Universitario';
+        expect(component.academicTitleError(0)).toContain('graduado');
+
+        component.person.academicData!.titles[0].graduated = true;
+        expect(component.academicTitleError(0)).toBe('');
+    });
+
+    it('debe exportar los títulos académicos en CSV', async () => {
+        personService.add(
+            {
+                firstName: 'Cuenta',
+                lastName: 'Academica',
+                documentType: DOCUMENT_TYPES[0],
+                documentNumber: 'V-55555555',
+                birthDate: '1989-09-09',
+                gender: GENDERS[0],
+                phone: '+58 424 4444444',
+                address: '',
+                city: 'Caracas',
+                department: 'Distrito Capital',
+                type: 'Analista',
+                status: 'Activo',
+                notes: '',
+                academicData: {
+                    titles: [{ academicLevel: 'Postgrado', specialty: 'Gerencia', graduated: true, university: 'Universidad Central de Venezuela', completionYear: '2015' }],
+                    continueStudies: 'Sí'
+                }
+            },
+            'Admin'
+        );
+        component.searchTerm.set('Academica');
+
+        const createObjectUrl = spyOn(URL, 'createObjectURL').and.returnValue('blob:csv-academica');
+        spyOn(URL, 'revokeObjectURL');
+        spyOn(HTMLAnchorElement.prototype, 'click');
+
+        component.exportCsv();
+
+        const file = createObjectUrl.calls.mostRecent().args[0];
+        if (!(file instanceof Blob)) {
+            throw new Error('La exportación no generó un archivo CSV.');
+        }
+        const content = await file.text();
+
+        expect(content).toContain('"Títulos académicos"');
+        expect(content).toContain('Postgrado (Gerencia) Graduado(a) Universidad Central de Venezuela 2015');
     });
 });

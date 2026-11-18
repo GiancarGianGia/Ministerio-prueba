@@ -1,4 +1,5 @@
         <p-toast />
+        <p-confirmDialog />
 
         <div class="page-header">
             <div>
@@ -150,7 +151,14 @@
             [maximizable]="true"
             [header]="viewMode ? 'Información del trabajador' : 'Actualizar datos del trabajador'"
             [modal]="true"
+            [closable]="false"
         >
+            <ng-template #header>
+                <span class="p-dialog-title">{{ viewMode ? 'Información del trabajador' : 'Actualizar datos del trabajador' }}</span>
+                <button type="button" class="p-dialog-header-close" (click)="hideDialog()" aria-label="Cerrar">
+                    <i class="pi pi-times"></i>
+                </button>
+            </ng-template>
             <fieldset [disabled]="viewMode" style="border: none; padding: 0; margin: 0">
             <p-tabs [(value)]="activeEditTab" [scrollable]="true">
                 <p-tablist>
@@ -298,7 +306,7 @@
                                     <div class="phone-input-row">
                                         <p-select
                                             inputId="editHomePhoneCode"
-                                            [options]="officePhoneCodeOptions"
+                                            [options]="homePhoneCodeOptions"
                                             optionLabel="label"
                                             optionValue="value"
                                             placeholder="Seleccione..."
@@ -505,7 +513,10 @@
                                     <div class="form-grid" style="margin: 0">
                                         <div class="form-field form-field-full" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.25rem">
                                             <label style="font-weight: 700; color: var(--primary-700, #1d4ed8)">Familiar {{ $index + 1 }}</label>
-                                            <p-button icon="pi pi-trash" severity="danger" [outlined]="true" size="small" (onClick)="removeFamilyMember($index)" ariaLabel="Eliminar familiar" />
+                                            <div style="display: flex; gap: 0.5rem">
+                                                <p-button icon="pi pi-times" severity="secondary" [outlined]="true" size="small" (onClick)="closeFamilyMember()" ariaLabel="Cerrar familiar" />
+                                                <p-button icon="pi pi-trash" severity="danger" [outlined]="true" size="small" (onClick)="removeFamilyMember($index)" ariaLabel="Eliminar familiar" />
+                                            </div>
                                         </div>
 
                                         @if (!familyMemberEditing) {
@@ -604,6 +615,11 @@
                                                 <label for="memberDocNumber-{{$index}}">Nro. de Documento</label>
                                                 <input pInputText id="memberDocNumber-{{$index}}" [(ngModel)]="member.documentNumber" placeholder="Ingrese..." />
                                             </div>
+                                        } @else {
+                                            <div class="form-field">
+                                                <label for="memberCertificateNumber-{{$index}}">Nro. de certificado de nacimiento</label>
+                                                <input pInputText id="memberCertificateNumber-{{$index}}" [(ngModel)]="member.certificateNumber" placeholder="Ingrese..." />
+                                            </div>
                                         }
 
                                         <div class="form-field">
@@ -673,7 +689,7 @@
                                             <div class="phone-input-row">
                                                 <p-select
                                                     inputId="memberHomePhoneCode-{{$index}}"
-                                                    [options]="officePhoneCodeOptions"
+                                                    [options]="homePhoneCodeOptions"
                                                     optionLabel="label"
                                                     optionValue="value"
                                                     placeholder="Seleccione..."
@@ -788,21 +804,26 @@
                         @if (person.medicalData) {
                             <div class="form-grid" style="margin-top: 1rem">
                                 <div class="form-field form-field-full">
-                                    <div style="display: flex; align-items: center; gap: 0.5rem">
-                                        <p-checkbox [(ngModel)]="person.medicalData.hasPathology" [binary]="true" inputId="hasPathology" />
-                                        <label for="hasPathology" style="margin: 0; cursor: pointer">Tiene patologías diagnosticadas</label>
-                                    </div>
+                                    <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--primary-700, #1d4ed8)">Patología(s) crónicas</h3>
+                                    <small style="color: var(--text-color-secondary, #64748b)">Registra cada patología diagnosticada con su tratamiento y observaciones.</small>
                                 </div>
-                                @if (person.medicalData.hasPathology) {
-                                    <div class="form-field">
-                                        <label for="pathDesc">Descripción de la patología</label>
-                                        <textarea pTextarea id="pathDesc" rows="2" [(ngModel)]="person.medicalData.pathologyDescription" placeholder="Nombre y descripción de la patología" style="width: 100%"></textarea>
+                                @for (row of person.medicalData.chronicPathologies; track $index) {
+                                    <div class="form-field form-field-full">
+                                        <div class="pathology-row">
+                                            <p-select [options]="chronicPathologyOptions" optionLabel="label" optionValue="value" placeholder="Patología" [(ngModel)]="row.pathology" appendTo="body" scrollHeight="300px" styleClass="w-full" [ariaLabel]="'Patología ' + ($index + 1)" />
+                                            <p-autoComplete [(ngModel)]="row.treatment" [suggestions]="filteredTreatments" (completeMethod)="filterTreatments($event)" placeholder="Buscar tratamiento..." [dropdown]="true" scrollHeight="300px" styleClass="w-full" [attr.aria-label]="'Tratamiento de la patología ' + ($index + 1)" />
+                                            <input pInputText [(ngModel)]="row.observation" placeholder="Observación(es)" [attr.aria-label]="'Observación de la patología ' + ($index + 1)" />
+                                            <p-button icon="pi pi-trash" severity="danger" [outlined]="true" size="small" (onClick)="removeChronicPathology($index)" ariaLabel="Eliminar patología" />
+                                        </div>
                                     </div>
-                                    <div class="form-field">
-                                        <label for="pathMed">Medicación</label>
-                                        <textarea pTextarea id="pathMed" rows="2" [(ngModel)]="person.medicalData.pathologyMedication" placeholder="Medicamentos que toma actualmente" style="width: 100%"></textarea>
+                                } @empty {
+                                    <div class="form-field form-field-full">
+                                        <small style="color: var(--text-color-secondary, #64748b)">No hay patologías registradas.</small>
                                     </div>
                                 }
+                                <div class="form-field form-field-full">
+                                    <p-button label="Agregar" icon="pi pi-plus" severity="secondary" [outlined]="true" size="small" (onClick)="addChronicPathology()" />
+                                </div>
 
                                 <div class="form-field form-field-full">
                                     <label for="allergies">Alergias conocidas</label>
@@ -810,38 +831,52 @@
                                 </div>
 
                                 <div class="form-field form-field-full">
-                                    <label style="font-weight: 700; color: var(--primary-700, #1d4ed8)">Contacto de emergencia</label>
+                                    <label style="font-weight: 700; color: var(--primary-700, #1d4ed8)">En caso de emergencia</label>
                                 </div>
                                 <div class="form-field">
-                                    <label for="emgName">Nombre completo</label>
-                                    <input pInputText id="emgName" [(ngModel)]="person.medicalData.emergencyContactName" placeholder="Nombre del contacto" />
+                                    <label for="emgName">Nombre(s) y apellido(s) *</label>
+                                    <input pInputText id="emgName" [(ngModel)]="person.medicalData.emergencyContactName" placeholder="Ingrese..." />
                                 </div>
                                 <div class="form-field">
-                                    <label for="emgPhone">Teléfono</label>
-                                    <input pInputText id="emgPhone" type="tel" [(ngModel)]="person.medicalData.emergencyContactPhone" (ngModelChange)="onOptionalPhoneChange('emergencyPhone', $event)" placeholder="+58 412 1234567" />
-                                    @if (optionalPhoneError('emergencyPhone', person.medicalData.emergencyContactPhone)) {
-                                        <small class="field-error">{{ optionalPhoneError('emergencyPhone', person.medicalData.emergencyContactPhone) }}</small>
-                                    }
+                                    <label for="emgPhone">Teléfono personal *</label>
+                                    <div class="phone-input-row">
+                                        <p-select inputId="emgPhoneCode" [options]="personalPhoneCodeOptions" optionLabel="label" optionValue="value" placeholder="Código" [(ngModel)]="emergencyPhoneCode" appendTo="body" styleClass="w-full phone-code-select" ariaLabel="Código del teléfono de emergencia" />
+                                        <input pInputText id="emgPhone" type="tel" [(ngModel)]="emergencyPhoneNumber" placeholder="1234567" />
+                                    </div>
                                 </div>
                                 <div class="form-field">
-                                    <label for="emgRel">Parentesco</label>
-                                    <input pInputText id="emgRel" [(ngModel)]="person.medicalData.emergencyContactRelationship" placeholder="Ej: Madre, Esposo/a, Hermano/a" />
+                                    <label for="emgRel">Parentesco *</label>
+                                    <p-select id="emgRel" [options]="emergencyRelationshipOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="person.medicalData.emergencyContactRelationship" appendTo="body" scrollHeight="300px" styleClass="w-full" />
                                 </div>
+                                @if (emergencyContactError(1)) {
+                                    <div class="form-field form-field-full">
+                                        <small class="field-error">{{ emergencyContactError(1) }}</small>
+                                    </div>
+                                }
 
                                 <div class="form-field form-field-full">
                                     <label style="font-weight: 700; color: var(--primary-700, #1d4ed8)">Segundo contacto de emergencia</label>
                                 </div>
                                 <div class="form-field">
-                                    <label for="emgName2">Nombre completo</label>
-                                    <input pInputText id="emgName2" [(ngModel)]="person.medicalData.secondaryEmergencyContactName" placeholder="Nombre del segundo contacto" />
+                                    <label for="emgName2">Nombre(s) y apellido(s) *</label>
+                                    <input pInputText id="emgName2" [(ngModel)]="person.medicalData.secondaryEmergencyContactName" placeholder="Ingrese..." />
                                 </div>
                                 <div class="form-field">
-                                    <label for="emgPhone2">Teléfono</label>
-                                    <input pInputText id="emgPhone2" type="tel" [(ngModel)]="person.medicalData.secondaryEmergencyContactPhone" (ngModelChange)="onOptionalPhoneChange('secondaryEmergencyPhone', $event)" placeholder="+58 412 1234567" />
-                                    @if (optionalPhoneError('secondaryEmergencyPhone', person.medicalData.secondaryEmergencyContactPhone)) {
-                                        <small class="field-error">{{ optionalPhoneError('secondaryEmergencyPhone', person.medicalData.secondaryEmergencyContactPhone) }}</small>
-                                    }
+                                    <label for="emgPhone2">Teléfono personal *</label>
+                                    <div class="phone-input-row">
+                                        <p-select inputId="emgPhoneCode2" [options]="personalPhoneCodeOptions" optionLabel="label" optionValue="value" placeholder="Código" [(ngModel)]="secondaryEmergencyPhoneCode" appendTo="body" styleClass="w-full phone-code-select" ariaLabel="Código del segundo teléfono de emergencia" />
+                                        <input pInputText id="emgPhone2" type="tel" [(ngModel)]="secondaryEmergencyPhoneNumber" placeholder="1234567" />
+                                    </div>
                                 </div>
+                                <div class="form-field">
+                                    <label for="emgRel2">Parentesco *</label>
+                                    <p-select id="emgRel2" [options]="emergencyRelationshipOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="person.medicalData.secondaryEmergencyContactRelationship" appendTo="body" scrollHeight="300px" styleClass="w-full" />
+                                </div>
+                                @if (emergencyContactError(2)) {
+                                    <div class="form-field form-field-full">
+                                        <small class="field-error">{{ emergencyContactError(2) }}</small>
+                                    </div>
+                                }
 
                                 <div class="form-field form-field-full">
                                     <label for="medObs">Observaciones médicas</label>
@@ -1064,7 +1099,7 @@
                                 </div>
                                 <div class="form-field">
                                     <label for="militaryRegNum">N°. de inscripción militar</label>
-                                    <input pInputText id="militaryRegNum" [(ngModel)]="person.additionalData.militaryRegistrationNumber" [disabled]="person.additionalData.militaryRegistration !== 'Inscrito'" placeholder="Ingrese..." />
+                                    <input pInputText id="militaryRegNum" [(ngModel)]="person.additionalData.militaryRegistrationNumber" [disabled]="person.additionalData.militaryRegistration !== 'Sí'" placeholder="Ingrese..." />
                                 </div>
 
                                 <div class="form-field">
@@ -1102,43 +1137,71 @@
                     </p-tabpanel>
                     <p-tabpanel value="6">
                         <div class="form-grid" style="margin-top: 1rem">
-                            <div class="form-field">
-                                <label for="academicLevel">Nivel académico *</label>
-                                <p-select id="academicLevel" [options]="academicLevelOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="person.academicData!.academicLevel" appendTo="body" [showClear]="true" styleClass="w-full"></p-select>
+                            <div class="form-field form-field-full">
+                                <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--primary-700, #1d4ed8)">Datos académicos</h3>
+                                <small style="color: var(--text-color-secondary, #64748b)">Registra cada título obtenido o en curso.</small>
+                            </div>
+                            @for (title of person.academicData!.titles; track $index) {
+                                <div class="form-field form-field-full">
+                                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem">
+                                        <label style="font-weight: 700; color: var(--primary-700, #1d4ed8); margin: 0">Título {{ $index + 1 }}</label>
+                                        <p-button icon="pi pi-trash" severity="danger" [outlined]="true" size="small" (onClick)="removeAcademicTitle($index)" ariaLabel="Eliminar título" />
+                                    </div>
+                                </div>
+                                <div class="form-field">
+                                    <label for="academicLevel-{{ $index }}">Nivel académico *</label>
+                                    <p-select [inputId]="'academicLevel-' + $index" [options]="academicLevelOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="title.academicLevel" appendTo="body" [showClear]="true" styleClass="w-full"></p-select>
+                                </div>
+                                <div class="form-field">
+                                    <label for="specialty-{{ $index }}">Especialidad</label>
+                                    <input pInputText id="specialty-{{ $index }}" [(ngModel)]="title.specialty" placeholder="Ingrese especialidad..." />
+                                </div>
+                                <div class="form-field">
+                                    <label for="graduated-{{ $index }}">¿Graduado(a)? *</label>
+                                    <p-select [inputId]="'graduated-' + $index" [options]="yesNoOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="title.graduated" appendTo="body" [showClear]="true" styleClass="w-full"></p-select>
+                                </div>
+                                <div class="form-field">
+                                    <label for="university-{{ $index }}">¿En qué universidad estudió o estudia?</label>
+                                    <input pInputText id="university-{{ $index }}" [(ngModel)]="title.university" placeholder="Ingrese el nombre de la universidad" />
+                                    @if (universityError($index)) {
+                                        <small class="field-error">{{ universityError($index) }}</small>
+                                    }
+                                </div>
+                                <div class="form-field form-field-full">
+                                    <label for="completionYear-{{ $index }}">Año en que culminó o estima culminar sus estudios</label>
+                                    <input pInputText id="completionYear-{{ $index }}" type="text" inputmode="numeric" [(ngModel)]="title.completionYear" (ngModelChange)="onCompletionYearChange($index)" placeholder="Ej. 2027" />
+                                    @if (completionYearError($index)) {
+                                        <small class="field-error">{{ completionYearError($index) }}</small>
+                                    }
+                                </div>
+                                @if (academicTitleError($index)) {
+                                    <div class="form-field form-field-full">
+                                        <small class="field-error">{{ academicTitleError($index) }}</small>
+                                    </div>
+                                }
+                            } @empty {
+                                <div class="form-field form-field-full">
+                                    <small style="color: var(--text-color-secondary, #64748b)">No hay títulos registrados.</small>
+                                </div>
+                            }
+                            <div class="form-field form-field-full">
+                                <p-button label="Agregar" icon="pi pi-plus" severity="secondary" [outlined]="true" size="small" (onClick)="addAcademicTitle()" />
+                            </div>
+
+                            <div class="form-field form-field-full" style="margin-top: 1rem; border-top: 1px solid var(--surface-200, #e2e8f0); padding-top: 1rem">
+                                <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--primary-700, #1d4ed8)">Datos académicos adicionales</h3>
                             </div>
                             <div class="form-field">
-                                <label for="specialty">Especialidad</label>
-                                <input pInputText id="specialty" [(ngModel)]="person.academicData!.specialty" placeholder="Ingrese especialidad..." />
-                            </div>
-                            <div class="form-field">
-                                <label for="graduated">¿Graduado(a)? *</label>
-                                <p-select id="graduated" [options]="yesNoOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="person.academicData!.graduated" appendTo="body" [showClear]="true" styleClass="w-full"></p-select>
-                            </div>
-                            <div class="form-field">
-                                <label for="continueStudies">¿Desea continuar sus estudios?</label>
-                                <p-select id="continueStudies" [options]="continueStudyOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="person.academicData!.continueStudies" appendTo="body" [showClear]="true" styleClass="w-full"></p-select>
+                                <label for="continueStudies">¿Desea continuar sus estudios? *</label>
+                                <p-select id="continueStudies" [options]="continueStudyOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="person.academicData!.continueStudies" (ngModelChange)="onContinueStudiesChange($event)" appendTo="body" styleClass="w-full"></p-select>
                             </div>
                             <div class="form-field">
                                 <label for="studyOptions">Opciones de estudio</label>
-                                <p-select id="studyOptions" [options]="studyOptionList" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="person.academicData!.studyOptions" appendTo="body" [showClear]="true" styleClass="w-full"></p-select>
+                                <p-select id="studyOptions" [options]="studyOptionList" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="person.academicData!.studyOptions" [disabled]="person.academicData!.continueStudies !== 'Sí'" appendTo="body" [showClear]="true" styleClass="w-full"></p-select>
                             </div>
                             <div class="form-field">
                                 <label for="facilitate">¿Le gustaría participar como facilitador?</label>
                                 <p-select id="facilitate" [options]="yesNoOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="person.academicData!.wantsToFacilitate" appendTo="body" [showClear]="true" styleClass="w-full"></p-select>
-                            </div>
-                            <div class="form-field">
-                                <label for="university">¿En qué universidad estudió o estudia?</label>
-                                <input pInputText id="university" [(ngModel)]="person.academicData!.university" placeholder="Ingrese el nombre de la universidad" />
-                                @if (universityError()) {
-                                    <small class="field-error">{{ universityError() }}</small>
-                                }
-                            </div>
-                            <div class="form-field">
-                                <label for="completionYear">Año en que culminó o estima culminar sus estudios</label>
-                                <input pInputText id="completionYear" type="text" inputmode="numeric" [(ngModel)]="person.academicData!.completionYear" (ngModelChange)="onCompletionYearChange()" placeholder="Ej. 2027" />
-                                @if (completionYearError()) {
-                                    <small class="field-error">{{ completionYearError() }}</small>
-                                }
                             </div>
                         </div>
                     </p-tabpanel>
@@ -1148,9 +1211,11 @@
 
             <ng-template #footer>
                 @if (viewMode) {
+                    <p-button label="Imprimir ficha" icon="pi pi-print" severity="info" [outlined]="true" (click)="printWorkerCard()" />
                     <p-button label="Cerrar" icon="pi pi-times" severity="secondary" [outlined]="true" styleClass="btn-cancelar" (click)="hideDialog()" />
                     <p-button label="Editar" icon="pi pi-pencil" (click)="viewMode = false" />
                 } @else {
+                    <p-button label="Imprimir ficha" icon="pi pi-print" severity="info" [outlined]="true" (click)="printWorkerCard()" />
                     <p-button label="Cancelar" icon="pi pi-times" severity="secondary" [outlined]="true" styleClass="btn-cancelar" (click)="hideDialog()" />
                     <p-button label="Guardar cambios" icon="pi pi-check" (onClick)="savePerson()" />
                 }

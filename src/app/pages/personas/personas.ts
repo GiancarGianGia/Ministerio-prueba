@@ -2,9 +2,11 @@ import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
-import { MessageService } from 'primeng/api';
+import { ConfirmationService, MessageService } from 'primeng/api';
+import { AutoCompleteModule } from 'primeng/autocomplete';
 import { ButtonModule } from 'primeng/button';
 import { CheckboxModule } from 'primeng/checkbox';
+import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { DatePickerModule } from 'primeng/datepicker';
 import { DialogModule } from 'primeng/dialog';
 import { IconFieldModule } from 'primeng/iconfield';
@@ -26,17 +28,21 @@ import {
     ADDRESS_THOROUGHFARE_TYPES,
     ADDRESS_UNIT_TYPES,
     ADDRESS_ZONE_TYPES,
+    AcademicTitle,
     BLOOD_TYPES,
+    CHRONIC_PATHOLOGIES,
     CITIES_BY_DEPARTMENT,
     ChildData,
     DEPARTMENTS,
     DISABILITY_GRADES,
     DISABILITY_TYPES,
     DOCUMENT_PREFIX_OPTIONS,
+    EMERGENCY_CONTACT_RELATIONSHIPS,
     FamilyData,
     FamilyMember,
     FAMILY_RELATIONSHIPS,
     GENDERS,
+    HOME_PHONE_CODES,
     HousingData,
     HOUSING_CONDITIONS,
     HOUSING_TYPES,
@@ -63,6 +69,7 @@ import {
     VacationData
 } from '@/app/services/models';
 import { PersonService } from '@/app/services/person.service';
+import { TREATMENT_CATALOG } from '@/app/services/treatment-catalog';
 import {
     composeDocumentNumber,
     composePhoneNumber,
@@ -103,9 +110,11 @@ import {
         InputIconModule,
         IconFieldModule,
         TabsModule,
-        CheckboxModule
+        CheckboxModule,
+        AutoCompleteModule,
+        ConfirmDialogModule
     ],
-    providers: [MessageService],
+    providers: [MessageService, ConfirmationService],
     templateUrl: './personas.html'
 })
 export class Personas {
@@ -114,6 +123,8 @@ export class Personas {
     private readonly auth = inject(AuthService);
 
     private readonly messageService = inject(MessageService);
+
+    private readonly confirmationService = inject(ConfirmationService);
 
     private readonly personExportService = inject(PersonExportService);
 
@@ -211,19 +222,33 @@ export class Personas {
 
     readonly relationshipOptions = FAMILY_RELATIONSHIPS.map((value) => ({ label: value, value }));
 
+    readonly emergencyRelationshipOptions = EMERGENCY_CONTACT_RELATIONSHIPS.map((value) => ({ label: value, value }));
+
+    readonly chronicPathologyOptions = CHRONIC_PATHOLOGIES.map((value) => ({ label: value, value }));
+
+    readonly treatmentOptions = TREATMENT_CATALOG.map((value) => ({ label: value, value }));
+
+    chronicTreatmentOptions: { label: string; value: string }[] = [...this.treatmentOptions];
+
+    /** Sugerencias filtradas del autocompletado de tratamientos */
+    filteredTreatments: string[] = [];
+
+    /** Snapshot del estado original del trabajador al abrir el modal */
+    private personSnapshot = '';
+
     readonly vacationStatusOptions = VACATION_STATUSES.map((value) => ({ label: value, value }));
 
     readonly bloodTypeOptions = BLOOD_TYPES.map((value) => ({ label: value, value }));
 
     readonly lateralityOptions = LATERALITY_OPTIONS.map((value) => ({ label: value, value }));
 
-    readonly disabilityTypeOptions = DISABILITY_TYPES.map((value) => ({ label: value, value }));
+    disabilityTypeOptions = DISABILITY_TYPES.map((value) => ({ label: value, value }));
 
-    readonly disabilityGradeOptions = DISABILITY_GRADES.map((value) => ({ label: value, value }));
+    disabilityGradeOptions = DISABILITY_GRADES.map((value) => ({ label: value, value }));
 
     readonly militaryRegistrationOptions = MILITARY_REGISTRATION_OPTIONS.map((value) => ({ label: value, value }));
 
-    readonly childrenCountOptions = Array.from({ length: 21 }, (_, index) => ({ label: String(index), value: index }));
+    readonly childrenCountOptions = Array.from({ length: 11 }, (_, index) => ({ label: String(index), value: index }));
 
     readonly shirtSizeOptions = SHIRT_SIZES.map((value) => ({ label: value, value }));
 
@@ -235,9 +260,9 @@ export class Personas {
 
     // Academic data options
     readonly academicLevelOptions = [
-        { label: 'Primario', value: 'Primario' },
-        { label: 'Secundario', value: 'Secundario' },
-        { label: 'Técnico', value: 'Técnico' },
+        { label: 'Primaria', value: 'Primaria' },
+        { label: 'Secundaria', value: 'Secundaria' },
+        { label: 'Técnico Superior', value: 'Técnico Superior' },
         { label: 'Universitario', value: 'Universitario' },
         { label: 'Postgrado', value: 'Postgrado' }
     ];
@@ -250,10 +275,11 @@ export class Personas {
         { label: 'No', value: 'No' }
     ];
     readonly studyOptionList = [
-        { label: 'Bachillerato', value: 'Bachillerato' },
-        { label: 'Licenciatura', value: 'Licenciatura' },
-        { label: 'Maestría', value: 'Maestría' },
-        { label: 'Doctorado', value: 'Doctorado' }
+        { label: 'Primaria', value: 'Primaria' },
+        { label: 'Secundaria', value: 'Secundaria' },
+        { label: 'Técnico Superior', value: 'Técnico Superior' },
+        { label: 'Universitario', value: 'Universitario' },
+        { label: 'Postgrado', value: 'Postgrado' }
     ];
 
     readonly housingTypeOptions = HOUSING_TYPES.map((value) => ({ label: value, value }));
@@ -272,6 +298,8 @@ export class Personas {
 
     readonly personalPhoneCodeOptions = PERSONAL_PHONE_CODES.map((value) => ({ label: value, value }));
 
+    readonly homePhoneCodeOptions = HOME_PHONE_CODES.map((value) => ({ label: value, value }));
+
     activeEditTab = '0';
 
     personDialog = false;
@@ -289,6 +317,14 @@ export class Personas {
     homePhoneCode = '';
 
     homePhoneNumber = '';
+
+    emergencyPhoneCode = '';
+
+    emergencyPhoneNumber = '';
+
+    secondaryEmergencyPhoneCode = '';
+
+    secondaryEmergencyPhoneNumber = '';
 
     spouseDocumentPrefix = '';
 
@@ -358,22 +394,34 @@ export class Personas {
             familyData: person.familyData ? { ...person.familyData, children: person.familyData.children ? [...person.familyData.children.map(c => ({ ...c }))] : [] } : this.emptyFamilyData(),
             familyMembers: (person.familyMembers ?? []).map((member) => ({ ...member })),
             vacationData: person.vacationData ? { ...person.vacationData } : this.emptyVacationData(),
-            medicalData: { ...this.emptyMedicalData(), ...person.medicalData },
+            medicalData: {
+                ...this.emptyMedicalData(),
+                ...person.medicalData,
+                chronicPathologies: (person.medicalData?.chronicPathologies ?? []).map((row) => ({ ...row }))
+            },
             housingData: person.housingData ? { ...person.housingData } : this.emptyHousingData(),
             additionalData: { ...this.emptyAdditionalData(), ...person.additionalData },
             laborData: person.laborData ? { ...person.laborData } : this.emptyLaborData(),
             academicData: {
-                academicLevel: '',
-                specialty: '',
-                graduated: false,
-                university: '',
                 continueStudies: '',
                 studyOptions: '',
                 wantsToFacilitate: false,
                 ...person.academicData,
-                completionYear: String(person.academicData?.completionYear ?? '')
+                titles: (person.academicData?.titles ?? []).map((title) => ({ ...title, completionYear: String(title.completionYear ?? '') }))
             }
         };
+        const catalog = new Set(TREATMENT_CATALOG);
+        const legacyTreatments = new Set(
+            (this.person.medicalData?.chronicPathologies ?? [])
+                .map((row) => (row.treatment ?? '').trim())
+                .filter((treatment) => treatment && !catalog.has(treatment))
+        );
+        this.chronicTreatmentOptions = [
+            ...Array.from(legacyTreatments, (value) => ({ label: value, value })),
+            ...this.treatmentOptions
+        ];
+        this.disabilityTypeOptions = this.withLegacyOption(DISABILITY_TYPES, this.person.medicalData?.disabilityType);
+        this.disabilityGradeOptions = this.withLegacyOption(DISABILITY_GRADES, this.person.medicalData?.disabilityGrade);
         this.birthDatePicker = this.fromStoredDate(this.person.birthDate);
         const personalPhone = splitPhoneNumber(this.person.phone);
         this.personalPhoneCode = personalPhone.code;
@@ -381,6 +429,12 @@ export class Personas {
         const homePhone = splitPhoneNumber(this.person.homePhone ?? '');
         this.homePhoneCode = homePhone.code;
         this.homePhoneNumber = homePhone.number;
+        const emergencyPhone = splitPhoneNumber(this.person.medicalData?.emergencyContactPhone ?? '');
+        this.emergencyPhoneCode = emergencyPhone.code;
+        this.emergencyPhoneNumber = emergencyPhone.number;
+        const secondaryEmergencyPhone = splitPhoneNumber(this.person.medicalData?.secondaryEmergencyContactPhone ?? '');
+        this.secondaryEmergencyPhoneCode = secondaryEmergencyPhone.code;
+        this.secondaryEmergencyPhoneNumber = secondaryEmergencyPhone.number;
         this.childBirthDatePickers = (this.person.familyData?.children ?? []).map((child) => this.fromStoredDate(child.birthDate));
         this.familyMemberBirthDatePickers = (this.person.familyMembers ?? []).map((member) => this.fromStoredDate(member.birthDate));
         this.selectedFamilyMemberIndex = -1;
@@ -408,13 +462,59 @@ export class Personas {
         this.clearValidationState();
         this.activeEditTab = '0';
         this.personDialog = true;
+        this.personSnapshot = this.serializePersonState();
     }
 
     hideDialog(): void {
+        if (!this.viewMode && this.hasUnsavedChanges()) {
+            this.confirmationService.confirm({
+                header: 'Cambios sin guardar',
+                message: 'Tienes cambios sin guardar. ¿Deseas salir sin guardar?',
+                icon: 'pi pi-exclamation-triangle',
+                acceptLabel: 'Salir sin guardar',
+                rejectLabel: 'Seguir editando',
+                acceptButtonStyleClass: 'p-button-danger',
+                rejectButtonStyleClass: 'p-button-secondary p-button-outlined',
+                accept: () => {
+                    this.forceCloseDialog();
+                }
+            });
+            return;
+        }
+        this.forceCloseDialog();
+    }
+
+    /** Cierra el diálogo sin verificar cambios */
+    private forceCloseDialog(): void {
         this.personDialog = false;
         this.viewMode = false;
         this.submitted = false;
+        this.personSnapshot = '';
         this.clearValidationState();
+    }
+
+    /** Detecta si el formulario actual difiere del estado original */
+    private hasUnsavedChanges(): boolean {
+        return this.personSnapshot !== '' && this.serializePersonState() !== this.personSnapshot;
+    }
+
+    /** Serializa el estado editable del trabajador para comparación */
+    private serializePersonState(): string {
+        return JSON.stringify({
+            person: this.person,
+            documentPrefix: this.documentPrefix,
+            personalPhoneCode: this.personalPhoneCode,
+            personalPhoneNumber: this.personalPhoneNumber,
+            homePhoneCode: this.homePhoneCode,
+            homePhoneNumber: this.homePhoneNumber,
+            emergencyPhoneCode: this.emergencyPhoneCode,
+            emergencyPhoneNumber: this.emergencyPhoneNumber,
+            secondaryEmergencyPhoneCode: this.secondaryEmergencyPhoneCode,
+            secondaryEmergencyPhoneNumber: this.secondaryEmergencyPhoneNumber,
+            spouseDocumentPrefix: this.spouseDocumentPrefix,
+            childDocumentPrefixes: this.childDocumentPrefixes,
+            citySelection: this.citySelection
+        });
     }
 
     onDepartmentChange(): void {
@@ -440,7 +540,7 @@ export class Personas {
     }
 
     private emptyMedicalData(): MedicalData {
-        return { hasDisability: false, hasOccupationalDisease: false, hasPathology: false };
+        return { hasDisability: false, hasOccupationalDisease: false, chronicPathologies: [] };
     }
 
     private emptyHousingData(): HousingData {
@@ -482,11 +582,7 @@ export class Personas {
             additionalData: this.emptyAdditionalData(),
             laborData: this.emptyLaborData(),
             academicData: {
-                academicLevel: '',
-                specialty: '',
-                graduated: false,
-                university: '',
-                completionYear: '',
+                titles: [],
                 continueStudies: '',
                 studyOptions: '',
                 wantsToFacilitate: false
@@ -553,7 +649,12 @@ export class Personas {
     }
 
     finishFamilyMemberEdit(): void {
+        this.closeFamilyMember();
+    }
+
+    closeFamilyMember(): void {
         this.familyMemberEditing = false;
+        this.selectedFamilyMemberIndex = -1;
     }
 
     get selectedFamilyMember(): FamilyMember | null {
@@ -570,18 +671,25 @@ export class Personas {
     }
 
     familyMemberDocument(member: FamilyMember): string {
-        return member.hasDocument && member.documentType && member.documentNumber ? composeDocumentNumber(member.documentType, member.documentNumber) : 'Sin documento';
+        if (!member.hasDocument) {
+            const certificate = member.certificateNumber?.trim();
+            return certificate ? `Certificado ${certificate}` : 'Sin documento';
+        }
+        return member.documentType && member.documentNumber ? composeDocumentNumber(member.documentType, member.documentNumber) : 'Sin documento';
     }
 
     familyMemberDocumentType(member: FamilyMember): string {
         if (!member.hasDocument) {
-            return 'Sin documento';
+            return member.certificateNumber?.trim() ? 'Certificado de nacimiento' : 'Sin documento';
         }
         return DOCUMENT_PREFIX_OPTIONS.find((option) => option.value === member.documentType)?.documentType ?? 'No registrado';
     }
 
     familyMemberDocumentNumber(member: FamilyMember): string {
-        return member.hasDocument && member.documentNumber ? member.documentNumber : 'Sin documento';
+        if (!member.hasDocument) {
+            return member.certificateNumber?.trim() || 'Sin documento';
+        }
+        return member.documentNumber || 'Sin documento';
     }
 
     onFamilyMemberDisabilityChange(index: number, value: boolean): void {
@@ -739,12 +847,55 @@ export class Personas {
         return validateChildBirthDate(child.birthDate) ?? '';
     }
 
-    universityError(): string {
-        return this.submitted || this.touchedFields.has('university') ? (validateAcademicInstitution(this.person.academicData?.university ?? '') ?? '') : '';
+    addAcademicTitle(): void {
+        this.person.academicData?.titles.push({ academicLevel: '', specialty: '', graduated: undefined, university: '', completionYear: '' });
     }
 
-    completionYearError(): string {
-        return this.submitted || this.touchedFields.has('completionYear') ? (validateAcademicCompletionYear(this.person.academicData?.completionYear ?? '') ?? '') : '';
+    removeAcademicTitle(index: number): void {
+        this.person.academicData?.titles.splice(index, 1);
+    }
+
+    universityError(index: number): string {
+        const title = this.person.academicData?.titles[index];
+        if (!title) {
+            return '';
+        }
+        return this.submitted || this.touchedFields.has(`university:${index}`) ? (validateAcademicInstitution(title.university ?? '') ?? '') : '';
+    }
+
+    completionYearError(index: number): string {
+        const title = this.person.academicData?.titles[index];
+        if (!title) {
+            return '';
+        }
+        return this.submitted || this.touchedFields.has(`completionYear:${index}`) ? (validateAcademicCompletionYear(title.completionYear ?? '') ?? '') : '';
+    }
+
+    academicTitleError(index: number): string {
+        return this.submitted ? (this.validateAcademicTitle(this.person.academicData?.titles[index]) ?? '') : '';
+    }
+
+    private validateAcademicTitle(title: AcademicTitle | undefined): string | null {
+        if (!title) {
+            return null;
+        }
+        const started = !!(
+            title.academicLevel?.trim() ||
+            title.specialty?.trim() ||
+            title.university?.trim() ||
+            title.completionYear?.trim() ||
+            title.graduated !== undefined
+        );
+        if (!started) {
+            return null;
+        }
+        if (!title.academicLevel) {
+            return 'Selecciona el nivel académico del título.';
+        }
+        if (title.graduated === undefined) {
+            return 'Selecciona si está graduado(a) en ese título.';
+        }
+        return null;
     }
 
     optionalCedulaError(field: string, value: string | undefined): string {
@@ -752,13 +903,6 @@ export class Personas {
             return '';
         }
         return this.validateOptionalCedula(field, value) ?? '';
-    }
-
-    optionalPhoneError(field: string, value: string | undefined): string {
-        if ((!this.submitted && !this.touchedFields.has(field)) || !value?.trim()) {
-            return '';
-        }
-        return validatePhone(value) ?? '';
     }
 
     onFirstNameChange(): void {
@@ -808,6 +952,58 @@ export class Personas {
         );
     }
 
+    private withLegacyOption(values: readonly string[], legacy?: string): { label: string; value: string }[] {
+        const current = (legacy ?? '').trim();
+        const options = values.map((value) => ({ label: value, value }));
+        return current && !values.includes(current) ? [{ label: current, value: current }, ...options] : options;
+    }
+
+    addChronicPathology(): void {
+        this.person.medicalData?.chronicPathologies.push({ pathology: '', treatment: '', observation: '' });
+    }
+
+    removeChronicPathology(index: number): void {
+        this.person.medicalData?.chronicPathologies.splice(index, 1);
+    }
+
+    filterTreatments(event: { query: string }): void {
+        const query = event.query.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        this.filteredTreatments = TREATMENT_CATALOG.filter((item) =>
+            item.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(query)
+        );
+    }
+
+    emergencyContactError(index: 1 | 2): string {
+        return this.submitted ? (this.validateEmergencyContact(index) ?? '') : '';
+    }
+
+    private validateEmergencyContact(index: 1 | 2): string | null {
+        const medical = this.person.medicalData;
+        if (!medical) {
+            return null;
+        }
+        const isPrimary = index === 1;
+        const name = (isPrimary ? medical.emergencyContactName : medical.secondaryEmergencyContactName)?.trim() ?? '';
+        const relationship = (isPrimary ? medical.emergencyContactRelationship : medical.secondaryEmergencyContactRelationship)?.trim() ?? '';
+        const code = isPrimary ? this.emergencyPhoneCode : this.secondaryEmergencyPhoneCode;
+        const digits = (isPrimary ? this.emergencyPhoneNumber : this.secondaryEmergencyPhoneNumber).replace(/\D/g, '');
+        const label = isPrimary ? 'contacto de emergencia' : 'segundo contacto de emergencia';
+
+        if (!name && !relationship && !code && !digits) {
+            return null;
+        }
+        if (!name) {
+            return `Escribe el nombre del ${label}.`;
+        }
+        if (!relationship) {
+            return `Selecciona el parentesco del ${label}.`;
+        }
+        if (!code || !/^\d{7}$/.test(digits)) {
+            return `Selecciona el código y escribe los 7 dígitos del teléfono del ${label}.`;
+        }
+        return null;
+    }
+
     onOccupationalDiseaseChange(value: boolean): void {
         if (!this.person.medicalData) {
             return;
@@ -835,7 +1031,7 @@ export class Personas {
             return;
         }
         this.person.additionalData.militaryRegistration = value;
-        if (value !== 'Inscrito') {
+        if (value !== 'Sí') {
             this.person.additionalData.militaryRegistrationNumber = '';
         }
     }
@@ -852,11 +1048,6 @@ export class Personas {
     onOptionalCedulaChange(field: string, value: string | undefined): void {
         this.touchedFields.add(field);
         this.notifyValidationError(field, this.validateOptionalCedula(field, value), 'Cédula inválida');
-    }
-
-    onOptionalPhoneChange(field: string, value: string | undefined): void {
-        this.touchedFields.add(field);
-        this.notifyValidationError(field, value?.trim() ? validatePhone(value) : null, 'Teléfono inválido');
     }
 
     onBirthDateChange(): void {
@@ -938,9 +1129,24 @@ export class Personas {
         return '';
     }
 
-    onCompletionYearChange(): void {
-        this.touchedFields.add('completionYear');
-        this.notifyValidationError('completionYear', validateAcademicCompletionYear(this.person.academicData?.completionYear ?? ''), 'Año de culminación inválido');
+    onContinueStudiesChange(value: string | undefined): void {
+        if (!this.person.academicData) {
+            return;
+        }
+        this.person.academicData.continueStudies = value;
+        if (value !== 'Sí') {
+            this.person.academicData.studyOptions = '';
+        }
+    }
+
+    onCompletionYearChange(index: number): void {
+        const title = this.person.academicData?.titles[index];
+        this.touchedFields.add(`completionYear:${index}`);
+        this.notifyValidationError(
+            `completionYear:${index}`,
+            validateAcademicCompletionYear(title?.completionYear ?? ''),
+            'Año de culminación inválido'
+        );
     }
 
     private validateNameOnChange(field: 'firstName' | 'secondName' | 'lastName' | 'secondLastName', value: string, label: string): void {
@@ -1322,6 +1528,16 @@ export class Personas {
             }
         }
 
+        for (const member of this.person.familyMembers ?? []) {
+            member.certificateNumber = member.certificateNumber?.trim() ?? '';
+            if (member.hasDocument) {
+                member.certificateNumber = '';
+            } else {
+                member.documentType = '';
+                member.documentNumber = '';
+            }
+        }
+
         const familyGroupError = this.validateFamilyMembers();
         if (familyGroupError) {
             this.activeEditTab = '8';
@@ -1334,48 +1550,63 @@ export class Personas {
             return;
         }
 
-        const universityErr = validateAcademicInstitution(this.person.academicData?.university ?? '');
-        if (universityErr) {
+        if (!this.person.academicData?.continueStudies) {
             this.activeEditTab = '6';
             this.messageService.add({
                 severity: 'error',
-                summary: 'Universidad inválida',
-                detail: universityErr,
+                summary: 'Datos académicos incompletos',
+                detail: 'Selecciona si desea continuar sus estudios.',
                 life: 4000
             });
             return;
         }
 
-        const completionYearErr = validateAcademicCompletionYear(this.person.academicData?.completionYear ?? '');
-        if (completionYearErr) {
-            this.activeEditTab = '6';
-            this.messageService.add({
-                severity: 'error',
-                summary: 'Año de culminación inválido',
-                detail: completionYearErr,
-                life: 4000
-            });
-            return;
-        }
-
-        const emergencyPhone = this.person.medicalData?.emergencyContactPhone?.trim();
-        if (emergencyPhone) {
-            const emergencyPhoneError = validatePhone(emergencyPhone);
-            if (emergencyPhoneError) {
-                this.activeEditTab = '3';
-                this.messageService.add({ severity: 'error', summary: 'Teléfono de emergencia inválido', detail: emergencyPhoneError, life: 4000 });
+        for (const title of this.person.academicData?.titles ?? []) {
+            const titleError = this.validateAcademicTitle(title);
+            if (titleError) {
+                this.activeEditTab = '6';
+                this.messageService.add({ severity: 'error', summary: 'Datos académicos incompletos', detail: titleError, life: 4000 });
+                return;
+            }
+            const universityErr = validateAcademicInstitution(title.university ?? '');
+            if (universityErr) {
+                this.activeEditTab = '6';
+                this.messageService.add({
+                    severity: 'error',
+                    summary: 'Universidad inválida',
+                    detail: universityErr,
+                    life: 4000
+                });
+                return;
+            }
+            const completionYearErr = validateAcademicCompletionYear(title.completionYear ?? '');
+            if (completionYearErr) {
+                this.activeEditTab = '6';
+                this.messageService.add({
+                    severity: 'error',
+                    summary: 'Año de culminación inválido',
+                    detail: completionYearErr,
+                    life: 4000
+                });
                 return;
             }
         }
 
-        const secondaryEmergencyPhone = this.person.medicalData?.secondaryEmergencyContactPhone?.trim();
-        if (secondaryEmergencyPhone) {
-            const secondaryEmergencyPhoneError = validatePhone(secondaryEmergencyPhone);
-            if (secondaryEmergencyPhoneError) {
+        for (const index of [1, 2] as const) {
+            const emergencyError = this.validateEmergencyContact(index);
+            if (emergencyError) {
                 this.activeEditTab = '3';
-                this.messageService.add({ severity: 'error', summary: 'Teléfono del segundo contacto inválido', detail: secondaryEmergencyPhoneError, life: 4000 });
+                this.messageService.add({ severity: 'error', summary: 'Contacto de emergencia incompleto', detail: emergencyError, life: 4000 });
                 return;
             }
+        }
+        if (this.person.medicalData) {
+            this.person.medicalData.emergencyContactPhone = this.emergencyPhoneCode
+                ? composePhoneNumber(this.emergencyPhoneCode, this.emergencyPhoneNumber.replace(/\D/g, ''))
+                : '';
+            this.person.medicalData.secondaryEmergencyContactPhone = this.secondaryEmergencyPhoneCode
+                ? composePhoneNumber(this.secondaryEmergencyPhoneCode, this.secondaryEmergencyPhoneNumber.replace(/\D/g, ''))
+                : '';
         }
 
         const labor = this.person.laborData;
@@ -1488,12 +1719,218 @@ export class Personas {
         }
 
         this.personDialog = false;
+        this.personSnapshot = '';
         this.messageService.add({
             severity: 'success',
             summary: 'Trabajador actualizado',
             detail: `${updated.firstName} ${updated.lastName} fue actualizado correctamente.`,
             life: 3000
         });
+    }
+
+    printWorkerCard(): void {
+        const p = this.person;
+        const fullName = [p.firstName, p.secondName, p.lastName, p.secondLastName].filter(Boolean).join(' ');
+        const doc = composeDocumentNumber(this.documentPrefix, p.documentNumber);
+        const phone = composePhoneNumber(this.personalPhoneCode, this.personalPhoneNumber.replace(/\D/g, ''));
+        const homePhone = this.homePhoneCode ? composePhoneNumber(this.homePhoneCode, this.homePhoneNumber.replace(/\D/g, '')) : '—';
+
+        const labor = p.laborData;
+        const medical = p.medicalData;
+        const housing = p.housingData;
+        const family = p.familyData;
+        const academic = p.academicData;
+        const additional = p.additionalData;
+        const vacation = p.vacationData;
+
+        const addressParts = [
+            housing?.thoroughfareType ? `${housing.thoroughfareType}: ${housing.thoroughfareDetails ?? ''}` : '',
+            housing?.buildingType ? `${housing.buildingType}: ${housing.buildingDetails ?? ''}` : '',
+            housing?.unitType ? `${housing.unitType}: ${housing.unitDetails ?? ''}` : '',
+            housing?.zoneType ? `${housing.zoneType}: ${housing.zoneDetails ?? ''}` : ''
+        ].filter(Boolean).join(' · ');
+
+        const pathologiesHtml = (medical?.chronicPathologies ?? [])
+            .map((row) => `<li><strong>${row.pathology}</strong>${row.treatment ? ` — ${row.treatment}` : ''}${row.observation ? ` (${row.observation})` : ''}</li>`)
+            .join('') || '<li>Ninguna registrada</li>';
+
+        const childrenHtml = (family?.children ?? [])
+            .map((c) => `<li>${c.name}${c.birthDate ? ` (${c.birthDate})` : ''}${c.documentNumber ? ` — ${c.documentNumber}` : ''}</li>`)
+            .join('') || '<li>Sin hijos registrados</li>';
+
+        const titlesHtml = (academic?.titles ?? [])
+            .map((t) => `<li>${t.academicLevel ?? ''}${t.specialty ? ` en ${t.specialty}` : ''} — ${t.university ?? ''}${t.completionYear ? ` (${t.completionYear})` : ''} ${t.graduated ? '✓ Graduado' : '○ No graduado'}</li>`)
+            .join('') || '<li>Sin títulos registrados</li>';
+
+        const familyMembersHtml = (p.familyMembers ?? [])
+            .map((m) => {
+                const mName = [m.firstName, m.secondName, m.lastName, m.secondLastName].filter(Boolean).join(' ') || 'Sin nombre';
+                return `<li>${mName} — ${m.relationship ?? 'Sin parentesco'}${m.documentNumber ? ` (${m.documentType ?? ''}${m.documentNumber})` : ''}</li>`;
+            })
+            .join('') || '<li>Sin integrantes registrados</li>';
+
+        const today = new Date();
+        const dateStr = `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth() + 1).toString().padStart(2, '0')}/${today.getFullYear()}`;
+
+        const printContent = `
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+            <meta charset="UTF-8">
+            <title>Ficha del Trabajador — ${fullName}</title>
+            <style>
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 10pt; color: #1a1a1a; line-height: 1.4; padding: 10mm; }
+                .print-header { text-align: center; margin-bottom: 8mm; border-bottom: 2px solid #1d4ed8; padding-bottom: 5mm; }
+                .print-header h1 { font-size: 13pt; font-weight: 800; color: #1d4ed8; letter-spacing: 0.5px; }
+                .print-header p { font-size: 8pt; color: #475569; margin-top: 1mm; }
+                .print-header .institution { font-size: 10pt; font-weight: 700; margin-bottom: 1mm; }
+                .section { margin-bottom: 5mm; }
+                .section-title { font-size: 10pt; font-weight: 800; color: #1d4ed8; border-bottom: 1px solid #dbeafe; padding-bottom: 1.5mm; margin-bottom: 3mm; }
+                .data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5mm 8mm; }
+                .data-grid.three-cols { grid-template-columns: 1fr 1fr 1fr; }
+                .data-item { display: flex; flex-direction: column; padding: 1mm 0; }
+                .data-item .label { font-size: 7pt; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.3px; }
+                .data-item .value { font-size: 9.5pt; font-weight: 600; color: #0f172a; }
+                .data-full { grid-column: 1 / -1; }
+                ul { margin: 1mm 0 0 5mm; padding: 0; }
+                ul li { font-size: 9pt; margin-bottom: 1mm; }
+                .print-footer { margin-top: 12mm; text-align: center; font-size: 7.5pt; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 3mm; }
+                .signature-area { display: grid; grid-template-columns: 1fr 1fr; gap: 15mm; margin-top: 15mm; }
+                .signature-line { border-top: 1px solid #334155; padding-top: 2mm; text-align: center; font-size: 8pt; color: #475569; }
+                @media print { body { padding: 5mm; } }
+            </style>
+        </head>
+        <body>
+            <div class="print-header">
+                <p class="institution">República Bolivariana de Venezuela</p>
+                <h1>MINISTERIO DEL PODER POPULAR PARA EL PROCESO SOCIAL DE TRABAJO</h1>
+                <p>Ficha del Trabajador — Generada el ${dateStr}</p>
+            </div>
+
+            <div class="section">
+                <div class="section-title">1. Datos Básicos</div>
+                <div class="data-grid">
+                    <div class="data-item"><span class="label">Nombre completo</span><span class="value">${fullName}</span></div>
+                    <div class="data-item"><span class="label">Documento de identidad</span><span class="value">${doc}</span></div>
+                    <div class="data-item"><span class="label">Fecha de nacimiento</span><span class="value">${p.birthDate || '—'}</span></div>
+                    <div class="data-item"><span class="label">Lugar de nacimiento</span><span class="value">${p.birthPlace || '—'}</span></div>
+                    <div class="data-item"><span class="label">Sexo</span><span class="value">${p.gender || '—'}</span></div>
+                    <div class="data-item"><span class="label">Estado civil</span><span class="value">${family?.maritalStatus || '—'}</span></div>
+                    <div class="data-item"><span class="label">Teléfono personal</span><span class="value">${phone}</span></div>
+                    <div class="data-item"><span class="label">Teléfono de habitación</span><span class="value">${homePhone}</span></div>
+                    <div class="data-item"><span class="label">Correo electrónico</span><span class="value">${p.email || '—'}</span></div>
+                    <div class="data-item"><span class="label">RIF</span><span class="value">${p.rif || '—'}</span></div>
+                    <div class="data-item"><span class="label">Estado</span><span class="value">${p.department || '—'}</span></div>
+                    <div class="data-item"><span class="label">Ciudad</span><span class="value">${p.city || '—'}</span></div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">2. Datos Laborales</div>
+                <div class="data-grid">
+                    <div class="data-item"><span class="label">Cargo</span><span class="value">${p.type || '—'}</span></div>
+                    <div class="data-item"><span class="label">Estatus</span><span class="value">${p.status}</span></div>
+                    <div class="data-item"><span class="label">Ubicación administrativa</span><span class="value">${labor?.administrativeLocation || '—'} (${labor?.administrativeState || '—'})</span></div>
+                    <div class="data-item"><span class="label">Ubicación física</span><span class="value">${labor?.physicalLocation || '—'}</span></div>
+                    <div class="data-item"><span class="label">Cargo titular</span><span class="value">${labor?.titularPosition || '—'}</span></div>
+                    <div class="data-item"><span class="label">Tipo de trabajador</span><span class="value">${labor?.workerType || '—'}</span></div>
+                    <div class="data-item"><span class="label">Código de nómina</span><span class="value">${labor?.payrollCode || '—'}</span></div>
+                    <div class="data-item"><span class="label">Teléfono de oficina</span><span class="value">${labor?.officePhoneCode ?? ''}${labor?.officePhone ?? ''}</span></div>
+                    <div class="data-item"><span class="label">Ingreso al MPPPST</span><span class="value">${labor?.mpppstEntryDate || '—'}</span></div>
+                    <div class="data-item"><span class="label">Ingreso Adm. Pública</span><span class="value">${labor?.publicAdministrationEntryDate || '—'}</span></div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">3. Datos Médicos</div>
+                <div class="data-grid">
+                    <div class="data-item"><span class="label">Tipo de sangre</span><span class="value">${medical?.bloodType || '—'}</span></div>
+                    <div class="data-item"><span class="label">Lateralidad</span><span class="value">${medical?.laterality || '—'}</span></div>
+                    <div class="data-item"><span class="label">Discapacidad</span><span class="value">${medical?.hasDisability ? `Sí — ${medical?.disabilityType ?? ''} (${medical?.disabilityGrade ?? ''})` : 'No'}</span></div>
+                    <div class="data-item"><span class="label">Enfermedad ocupacional</span><span class="value">${medical?.hasOccupationalDisease ? `Sí — ${medical?.occupationalDiseaseDescription ?? ''}` : 'No'}</span></div>
+                    <div class="data-item data-full"><span class="label">Alergias</span><span class="value">${medical?.allergies || 'Ninguna registrada'}</span></div>
+                    <div class="data-item data-full"><span class="label">Patologías crónicas</span><ul>${pathologiesHtml}</ul></div>
+                    <div class="data-item"><span class="label">Contacto de emergencia</span><span class="value">${medical?.emergencyContactName || '—'} (${medical?.emergencyContactRelationship || '—'}) — ${medical?.emergencyContactPhone || '—'}</span></div>
+                    <div class="data-item"><span class="label">2do contacto de emergencia</span><span class="value">${medical?.secondaryEmergencyContactName || '—'} (${medical?.secondaryEmergencyContactRelationship || '—'}) — ${medical?.secondaryEmergencyContactPhone || '—'}</span></div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">4. Datos Habitacionales</div>
+                <div class="data-grid">
+                    <div class="data-item"><span class="label">Municipio</span><span class="value">${housing?.municipality || '—'}</span></div>
+                    <div class="data-item"><span class="label">Parroquia</span><span class="value">${housing?.parish || '—'}</span></div>
+                    <div class="data-item data-full"><span class="label">Dirección</span><span class="value">${addressParts || '—'}</span></div>
+                    <div class="data-item"><span class="label">Punto de referencia</span><span class="value">${housing?.referencePoint || '—'}</span></div>
+                    <div class="data-item"><span class="label">Tipo de vivienda</span><span class="value">${housing?.housingType || '—'}</span></div>
+                    <div class="data-item"><span class="label">Condición</span><span class="value">${housing?.housingCondition || '—'}</span></div>
+                    <div class="data-item"><span class="label">Años en la dirección</span><span class="value">${housing?.yearsAtAddress ?? '—'}</span></div>
+                    <div class="data-item"><span class="label">Habitaciones</span><span class="value">${housing?.numberOfRooms ?? '—'}</span></div>
+                    <div class="data-item"><span class="label">Personas en la vivienda</span><span class="value">${housing?.numberOfPeopleInHouse ?? '—'}</span></div>
+                    <div class="data-item"><span class="label">Servicios básicos</span><span class="value">${housing?.hasBasicServices ? 'Sí' : 'No'}</span></div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">5. Grupo Familiar</div>
+                <div class="data-grid">
+                    <div class="data-item"><span class="label">Estado civil</span><span class="value">${family?.maritalStatus || '—'}</span></div>
+                    <div class="data-item"><span class="label">Número de hijos</span><span class="value">${family?.numberOfChildren ?? 0}</span></div>
+                    <div class="data-item"><span class="label">Cónyuge</span><span class="value">${family?.spouseName || '—'}</span></div>
+                    <div class="data-item data-full"><span class="label">Hijos</span><ul>${childrenHtml}</ul></div>
+                    <div class="data-item data-full"><span class="label">Integrantes del grupo familiar</span><ul>${familyMembersHtml}</ul></div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">6. Datos Académicos</div>
+                <div class="data-grid">
+                    <div class="data-item data-full"><span class="label">Títulos obtenidos</span><ul>${titlesHtml}</ul></div>
+                    <div class="data-item"><span class="label">¿Desea continuar estudios?</span><span class="value">${academic?.continueStudies || '—'}${academic?.continueStudies === 'Sí' && academic?.studyOptions ? ` (${academic.studyOptions})` : ''}</span></div>
+                    <div class="data-item"><span class="label">¿Desea facilitar conocimientos?</span><span class="value">${academic?.wantsToFacilitate ? 'Sí' : 'No'}</span></div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">7. Vacaciones</div>
+                <div class="data-grid three-cols">
+                    <div class="data-item"><span class="label">Estatus</span><span class="value">${vacation?.status || '—'}</span></div>
+                    <div class="data-item"><span class="label">Última salida</span><span class="value">${vacation?.lastVacationStart || '—'}</span></div>
+                    <div class="data-item"><span class="label">Último regreso</span><span class="value">${vacation?.lastVacationEnd || '—'}</span></div>
+                    <div class="data-item"><span class="label">Días pendientes</span><span class="value">${vacation?.pendingDays ?? '—'}</span></div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">8. Datos Adicionales</div>
+                <div class="data-grid three-cols">
+                    <div class="data-item"><span class="label">Inscripción militar</span><span class="value">${additional?.militaryRegistration || '—'}${additional?.militaryRegistration === 'Sí' && additional?.militaryRegistrationNumber ? ` (${additional.militaryRegistrationNumber})` : ''}</span></div>
+                    <div class="data-item"><span class="label">Talla de camisa</span><span class="value">${additional?.shirtSize || '—'}</span></div>
+                    <div class="data-item"><span class="label">Talla de pantalón</span><span class="value">${additional?.pantsSize || '—'}</span></div>
+                    <div class="data-item"><span class="label">Talla de calzado</span><span class="value">${additional?.shoeSize || '—'}</span></div>
+                    <div class="data-item"><span class="label">Talla de chaqueta</span><span class="value">${additional?.jacketSize || '—'}</span></div>
+                </div>
+            </div>
+
+            <div class="signature-area">
+                <div class="signature-line">Firma del trabajador</div>
+                <div class="signature-line">Firma del responsable</div>
+            </div>
+
+            <div class="print-footer">
+                MPPPST — Sistema de Gestión de Talento Humano · Documento generado automáticamente el ${dateStr}
+            </div>
+
+            <script>window.onload = function() { window.print(); };<\/script>
+        </body>
+        </html>`;
+
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+            printWindow.document.write(printContent);
+            printWindow.document.close();
+        }
     }
 
     exportCsv(): void {

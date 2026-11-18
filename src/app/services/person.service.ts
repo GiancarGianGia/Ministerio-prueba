@@ -1,5 +1,5 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { NewPersonInput, nextSequentialId, Person, PERSON_TYPES, STORAGE_KEYS } from './models';
+import { AcademicData, AdditionalData, MedicalData, NewPersonInput, nextSequentialId, Person, PERSON_TYPES, STORAGE_KEYS } from './models';
 import { LogService } from './log.service';
 import { StorageService } from './storage.service';
 
@@ -133,13 +133,102 @@ export class PersonService {
                 ...(person.familyData ? { familyData: person.familyData } : {}),
                 ...(person.familyMembers ? { familyMembers: person.familyMembers } : {}),
                 ...(person.vacationData ? { vacationData: person.vacationData } : {}),
-                ...(person.medicalData ? { medicalData: person.medicalData } : {}),
+                ...(person.medicalData ? { medicalData: this.normalizeMedicalData(person.medicalData) } : {}),
                 ...(person.housingData ? { housingData: person.housingData } : {}),
-                ...(person.additionalData ? { additionalData: person.additionalData } : {}),
+                ...(person.additionalData ? { additionalData: this.normalizeAdditionalData(person.additionalData) } : {}),
                 ...(laborData ? { laborData } : {}),
-                ...(person.academicData ? { academicData: person.academicData } : {})
+                ...(person.academicData ? { academicData: this.normalizeAcademicData(person.academicData) } : {})
             };
         });
+    }
+
+    private normalizeMedicalData(medical: MedicalData): MedicalData {
+        const legacy = { ...medical } as MedicalData & { hasPathology?: boolean; pathologyDescription?: string; pathologyMedication?: string };
+        const pathologyDescription = legacy.pathologyDescription;
+        const pathologyMedication = legacy.pathologyMedication;
+        delete legacy.hasPathology;
+        delete legacy.pathologyDescription;
+        delete legacy.pathologyMedication;
+
+        const chronicPathologies = Array.isArray(legacy.chronicPathologies) ? legacy.chronicPathologies.map((row) => ({ ...row })) : [];
+        if (chronicPathologies.length === 0 && (pathologyDescription?.trim() || pathologyMedication?.trim())) {
+            chronicPathologies.push({
+                pathology: '',
+                treatment: pathologyMedication?.trim() ?? '',
+                observation: pathologyDescription?.trim() ?? ''
+            });
+        }
+
+        return { ...legacy, chronicPathologies };
+    }
+
+    private normalizeAdditionalData(additional: AdditionalData): AdditionalData {
+        const normalized: AdditionalData = { ...additional };
+        const military = normalized.militaryRegistration;
+        if (military && military !== 'Sí' && military !== 'No') {
+            normalized.militaryRegistration = military === 'Inscrito' ? 'Sí' : 'No';
+        }
+        if (normalized.militaryRegistration !== 'Sí') {
+            normalized.militaryRegistrationNumber = '';
+        }
+        normalized.shirtSize = this.mapCatalogValue(normalized.shirtSize, { SS: 'XS', '2XL': 'XXL', '3XL': 'XXXL', '4XL': 'XXXL' });
+        normalized.jacketSize = this.mapCatalogValue(normalized.jacketSize, { '2XL': 'XXL', '3XL': 'XXXL', '4XL': 'XXXXL' });
+        normalized.shoeSize = this.mapCatalogValue(normalized.shoeSize, { '34': '35', '41': '42' });
+        return normalized;
+    }
+
+    private mapCatalogValue(value: string | undefined, mapping: Record<string, string>): string | undefined {
+        return value ? (mapping[value] ?? value) : value;
+    }
+
+    private normalizeAcademicLevel(value?: string): string {
+        const level = (value ?? '').trim();
+        const mapping: Record<string, string> = { Primario: 'Primaria', Secundario: 'Secundaria', 'Técnico': 'Técnico Superior' };
+        return mapping[level] ?? level;
+    }
+
+    private normalizeStudyOption(value?: string): string | undefined {
+        if (!value) {
+            return value;
+        }
+        const mapping: Record<string, string> = { Bachillerato: 'Secundaria', Licenciatura: 'Universitario', 'Maestría': 'Postgrado', Doctorado: 'Postgrado' };
+        return mapping[value] ?? value;
+    }
+
+    private normalizeAcademicData(academic: AcademicData): AcademicData {
+        const legacy = { ...academic } as AcademicData & {
+            academicLevel?: string;
+            specialty?: string;
+            graduated?: boolean;
+            university?: string;
+            completionYear?: string;
+        };
+        const legacyTitle = {
+            academicLevel: this.normalizeAcademicLevel(legacy.academicLevel),
+            specialty: legacy.specialty,
+            graduated: legacy.graduated,
+            university: legacy.university,
+            completionYear: legacy.completionYear === undefined ? '' : String(legacy.completionYear)
+        };
+        delete legacy.academicLevel;
+        delete legacy.specialty;
+        delete legacy.graduated;
+        delete legacy.university;
+        delete legacy.completionYear;
+
+        const titles = Array.isArray(legacy.titles)
+            ? legacy.titles.map((title) => ({
+                  ...title,
+                  academicLevel: this.normalizeAcademicLevel(title.academicLevel),
+                  completionYear: title.completionYear === undefined ? '' : String(title.completionYear)
+              }))
+            : [];
+        if (titles.length === 0 && (legacyTitle.academicLevel || legacyTitle.specialty?.trim() || legacyTitle.university?.trim() || legacyTitle.completionYear)) {
+            titles.push(legacyTitle);
+        }
+
+        legacy.studyOptions = this.normalizeStudyOption(legacy.studyOptions);
+        return { ...legacy, titles };
     }
 
     private cleanInput(input: NewPersonInput): NewPersonInput {
@@ -193,11 +282,7 @@ export class PersonService {
         });
 
         const academic = (level: string, specialty: string, university: string, completionYear: string): Person['academicData'] => ({
-            academicLevel: level,
-            specialty,
-            graduated: true,
-            university,
-            completionYear,
+            titles: [{ academicLevel: level, specialty, graduated: true, university, completionYear }],
             continueStudies: 'No',
             wantsToFacilitate: false
         });
@@ -205,7 +290,7 @@ export class PersonService {
         const medical = (laterality: string, bloodType: string, contact: string, relationship: string, phone: string): Person['medicalData'] => ({
             hasOccupationalDisease: false,
             hasDisability: false,
-            hasPathology: false,
+            chronicPathologies: [],
             laterality,
             bloodType,
             allergies: 'Ninguna',
@@ -215,9 +300,9 @@ export class PersonService {
             observations: ''
         });
 
-        const additional = (shirt: string, pants: string, shoe: string, jacket: string, military = 'No inscrito', militaryNumber = ''): Person['additionalData'] => ({
+        const additional = (shirt: string, pants: string, shoe: string, jacket: string, military = 'No', militaryNumber = ''): Person['additionalData'] => ({
             militaryRegistration: military,
-            militaryRegistrationNumber: military === 'Inscrito' ? militaryNumber : '',
+            militaryRegistrationNumber: military === 'Sí' ? militaryNumber : '',
             shirtSize: shirt,
             pantsSize: pants,
             shoeSize: shoe,
@@ -288,7 +373,7 @@ export class PersonService {
                 vacationData: { status: 'Solicitadas pendientes', pendingDays: 5, observations: 'Solicitud consignada ante Talento Humano.' },
                 medicalData: medical('Diestro', 'A+', 'María Contreras', 'Madre', '+58 414 5550203'),
                 housingData: housing('Altagracia', 'Av. Este 2, Sede del MPPPST', 'Diagonal a la Iglesia de Altagracia'),
-                additionalData: additional('L', '34', '41', 'L', 'Inscrito', 'M-15320'),
+                additionalData: additional('L', '34', '42', 'L', 'Sí', 'M-15320'),
                 academicData: academic('Universitario', 'Contaduría Pública', 'Universidad Central de Venezuela', '2008'),
                 laborData: labor('Oficina de Administración y Finanzas', 'Supervisor de Nómina', 'Sede del MPPPST, piso 2, oficina 2-B', '5550202', 'NOM-0002', 'Empleado fijo', '2012-06-15', '2009-02-01')
             },
@@ -363,7 +448,7 @@ export class PersonService {
                 medicalData: medical('Zurdo', 'O-', 'Rosa Díaz', 'Madre', '+58 416 5550405'),
                 housingData: housing('La Candelaria', 'Calle Real de Sabana Grande', 'Frente al mercado de Quinta Crespo'),
                 additionalData: additional('XL', '38', '43', 'XL'),
-                academicData: academic('Secundario', 'Mantenimiento General', 'Liceo Andrés Bello', '1993'),
+                academicData: academic('Secundaria', 'Mantenimiento General', 'Liceo Andrés Bello', '1993'),
                 laborData: labor('Dirección de Servicios Generales', 'Obrero de Mantenimiento', 'Galpón de Servicios Generales, planta baja', '5550404', 'NOM-0004', 'Obrero', '2005-04-11', '2005-04-11')
             },
             {
@@ -389,7 +474,7 @@ export class PersonService {
                 medicalData: medical('Diestro', 'AB+', 'Pedro Rojas', 'Padre', '+58 412 5550506'),
                 housingData: housing('San Pedro', 'Av. Este 4, Residencias Los Jardines', 'Al lado del Centro Comercial Los Jardines'),
                 additionalData: additional('M', '30', '38', 'M'),
-                academicData: academic('Técnico', 'Administración', 'Instituto Universitario de Administración', '2010'),
+                academicData: academic('Técnico Superior', 'Administración', 'Instituto Universitario de Administración', '2010'),
                 laborData: labor('Oficina de Atención al Ciudadano', 'Asistente Administrativo', 'Sede del MPPPST, mezzanina, oficina 0-2', '5550505', 'NOM-0005', 'Empleado fijo', '2014-10-20', '2011-03-07')
             },
             {
@@ -414,7 +499,7 @@ export class PersonService {
                 vacationData: { status: 'No ha tomado vacaciones', pendingDays: 12, observations: '' },
                 medicalData: medical('Diestro', 'A-', 'Luisa Molina', 'Madre', '+58 414 5550607'),
                 housingData: housing('El Valle', 'Calle Los Jardines, Casa 12', 'Frente a la cancha deportiva de El Valle'),
-                additionalData: additional('L', '36', '42', 'L', 'Exento', ''),
+                additionalData: additional('L', '36', '42', 'L', 'No', ''),
                 academicData: academic('Universitario', 'Ingeniería de Seguridad y Salud Laboral', 'Universidad Nacional Experimental Politécnica', '2005'),
                 laborData: labor('Dirección de Inspección del Trabajo', 'Analista de Seguridad y Salud Laboral', 'Sede del MPPPST, piso 1, oficina 1-D', '5550606', 'NOM-0006', 'Empleado fijo', '2008-01-14', '2006-05-02')
             },
@@ -466,7 +551,7 @@ export class PersonService {
                 vacationData: { status: 'Vacaciones tomadas', lastVacationStart: '2025-11-03', lastVacationEnd: '2025-11-17', pendingDays: 0, observations: '' },
                 medicalData: medical('Diestro', 'B-', 'Marta Ávila', 'Madre', '+58 416 5550809'),
                 housingData: housing('La Vega', 'Carretera Vieja Caracas-Los Teques', 'Frente a la entrada de La Vega'),
-                additionalData: additional('L', '36', '42', 'L', 'Inscrito', 'M-20871'),
+                additionalData: additional('L', '36', '42', 'L', 'Sí', 'M-20871'),
                 academicData: academic('Postgrado', 'Derecho Laboral', 'Universidad Central de Venezuela', '2003'),
                 laborData: labor('Dirección de Consultoría Jurídica', 'Abogado de Consultoría Jurídica', 'Sede del MPPPST, piso 5, oficina 5-B', '5550808', 'NOM-0008', 'Empleado fijo', '2004-02-09', '2001-08-20')
             }
