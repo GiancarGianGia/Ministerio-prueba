@@ -484,6 +484,28 @@ export class Personas {
         this.forceCloseDialog();
     }
 
+    /** Intercepta el cierre nativo del diálogo (X, Escape, clic fuera) */
+    onDialogHide(): void {
+        if (!this.viewMode && this.hasUnsavedChanges()) {
+            // Reabre el diálogo inmediatamente y muestra la confirmación
+            this.personDialog = true;
+            this.confirmationService.confirm({
+                header: 'Cambios sin guardar',
+                message: 'Tienes cambios sin guardar. ¿Deseas salir sin guardar?',
+                icon: 'pi pi-exclamation-triangle',
+                acceptLabel: 'Salir sin guardar',
+                rejectLabel: 'Seguir editando',
+                acceptButtonStyleClass: 'p-button-danger',
+                rejectButtonStyleClass: 'p-button-secondary p-button-outlined',
+                accept: () => {
+                    this.forceCloseDialog();
+                }
+            });
+            return;
+        }
+        this.forceCloseDialog();
+    }
+
     /** Cierra el diálogo sin verificar cambios */
     private forceCloseDialog(): void {
         this.personDialog = false;
