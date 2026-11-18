@@ -8,7 +8,7 @@ import { IconFieldModule } from 'primeng/iconfield';
 import { InputIconModule } from 'primeng/inputicon';
 import { InputTextModule } from 'primeng/inputtext';
 import { SelectModule } from 'primeng/select';
-import { TableModule } from 'primeng/table';
+import { Table, TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { ToastModule } from 'primeng/toast';
 import { AuthService } from '@/app/services/auth.service';
@@ -57,7 +57,7 @@ export class Actividad {
         return action ? this.logs().filter((log) => log.action === action) : this.logs();
     });
 
-    onGlobalFilter(table: any, event: Event): void {
+    onGlobalFilter(table: Table, event: Event): void {
         table.filterGlobal((event.target as HTMLInputElement).value, 'contains');
     }
 

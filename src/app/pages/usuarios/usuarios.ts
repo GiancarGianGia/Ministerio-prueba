@@ -15,7 +15,7 @@ import { TagModule } from 'primeng/tag';
 import { TextareaModule } from 'primeng/textarea';
 import { ToastModule } from 'primeng/toast';
 import { AuthService } from '@/app/services/auth.service';
-import { AppUser, NewUserInput, SECURITY_QUESTIONS, SecurityQuestion, TagSeverity, UpdateUserInput } from '@/app/services/models';
+import { AppUser, NewUserInput, SECURITY_QUESTIONS, SecurityQuestion, SelectOption, TagSeverity, UpdateUserInput } from '@/app/services/models';
 import { PASSWORD_CONFIRMATION_LABEL, PASSWORD_REQUIREMENTS, composeDocumentNumber, extractDocumentPrefix, missingPasswordRequirements, stripDocumentPrefix, validateIdentityDocument, validatePassword, validatePasswordConfirmation, validatePersonName } from '@/app/services/validators';
 import { DocumentPrefixSelect } from '@/app/components/document-prefix-select/document-prefix-select';
 
@@ -230,7 +230,7 @@ export class Usuarios {
         this.securityQuestionsForm[index].answer = (value ?? '').toUpperCase();
     }
 
-    availableQuestionsFor(index: number): { label: string; value: string }[] {
+    availableQuestionsFor(index: number): SelectOption[] {
         const usedQuestions = this.securityQuestionsForm
             .filter((_, i) => i !== index)
             .map((q) => q.question)

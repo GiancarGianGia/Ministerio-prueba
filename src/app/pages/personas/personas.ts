@@ -63,6 +63,7 @@ import {
     PERSON_TYPES,
     SHIRT_SIZES,
     SHOE_SIZES,
+    SelectOption,
     TagSeverity,
     USER_DOCUMENT_PREFIX_OPTIONS,
     VACATION_STATUSES,
@@ -201,19 +202,19 @@ export class Personas {
 
     readonly departmentOptions = DEPARTMENTS.map((value) => ({ label: value, value }));
 
-    get cityOptions(): { label: string; value: string }[] {
+    get cityOptions(): SelectOption[] {
         return [
             ...(CITIES_BY_DEPARTMENT[this.person.department] ?? []).map((value) => ({ label: value, value })),
             { label: 'Otro', value: 'Otro' }
         ];
     }
 
-    get housingMunicipalityOptions(): { label: string; value: string }[] {
+    get housingMunicipalityOptions(): SelectOption[] {
         const state = this.person.department;
         return state ? (MUNICIPALITIES_BY_STATE[state] ?? []).map((value) => ({ label: value, value })) : [];
     }
 
-    get housingParishOptions(): { label: string; value: string }[] {
+    get housingParishOptions(): SelectOption[] {
         const state = this.person.department;
         const municipality = this.person.housingData?.municipality;
         const key = state && municipality ? `${state}::${municipality}` : '';
@@ -230,7 +231,7 @@ export class Personas {
 
     readonly treatmentOptions = TREATMENT_CATALOG.map((value) => ({ label: value, value }));
 
-    chronicTreatmentOptions: { label: string; value: string }[] = [...this.treatmentOptions];
+    chronicTreatmentOptions: SelectOption[] = [...this.treatmentOptions];
 
     /** Sugerencias filtradas del autocompletado de tratamientos */
     filteredTreatments: string[] = [];
@@ -244,9 +245,9 @@ export class Personas {
 
     readonly lateralityOptions = LATERALITY_OPTIONS.map((value) => ({ label: value, value }));
 
-    disabilityTypeOptions: { label: string; value: string }[] = DISABILITY_TYPES.map((value) => ({ label: value, value }));
+    disabilityTypeOptions: SelectOption[] = DISABILITY_TYPES.map((value) => ({ label: value, value }));
 
-    disabilityGradeOptions: { label: string; value: string }[] = DISABILITY_GRADES.map((value) => ({ label: value, value }));
+    disabilityGradeOptions: SelectOption[] = DISABILITY_GRADES.map((value) => ({ label: value, value }));
 
     readonly militaryRegistrationOptions = MILITARY_REGISTRATION_OPTIONS.map((value) => ({ label: value, value }));
 
@@ -268,7 +269,7 @@ export class Personas {
         { label: 'Universitario', value: 'Universitario' },
         { label: 'Postgrado', value: 'Postgrado' }
     ];
-    readonly yesNoOptions = [
+    readonly yesNoOptions: SelectOption<boolean>[] = [
         { label: 'Sí', value: true },
         { label: 'No', value: false }
     ];
@@ -980,7 +981,7 @@ export class Personas {
         );
     }
 
-    private withLegacyOption(values: readonly string[], legacy?: string): { label: string; value: string }[] {
+    private withLegacyOption(values: readonly string[], legacy?: string): SelectOption[] {
         const current = (legacy ?? '').trim();
         const options = values.map((value) => ({ label: value, value }));
         return current && !values.includes(current) ? [{ label: current, value: current }, ...options] : options;

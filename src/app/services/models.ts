@@ -3,6 +3,11 @@ export type UserRole = (typeof USER_ROLES)[number];
 
 export type TagSeverity = 'success' | 'secondary' | 'info' | 'warn' | 'danger' | 'contrast';
 
+export interface SelectOption<T = string> {
+    label: string;
+    value: T;
+}
+
 export interface SecurityQuestion {
     question: string;
     answer: string;

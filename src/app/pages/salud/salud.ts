@@ -24,7 +24,8 @@ import {
     LATERALITY_OPTIONS,
     NewPersonInput,
     PERSONAL_PHONE_CODES,
-    Person
+    Person,
+    SelectOption
 } from '@/app/services/models';
 import { AuthService } from '@/app/services/auth.service';
 import { LogService } from '@/app/services/log.service';
@@ -217,7 +218,7 @@ export class Salud {
         };
     });
 
-    readonly yesNoOptions = [
+    readonly yesNoOptions: SelectOption<boolean>[] = [
         { label: 'Sí', value: true },
         { label: 'No', value: false }
     ];
@@ -232,13 +233,13 @@ export class Salud {
 
     readonly lateralityOptions = LATERALITY_OPTIONS.map((value) => ({ label: value, value }));
 
-    maritalStatusOptions: { label: string; value: string }[] = BENEFICIARY_MARITAL_STATUSES.map((value) => ({ label: value, value }));
+    maritalStatusOptions: SelectOption[] = BENEFICIARY_MARITAL_STATUSES.map((value) => ({ label: value, value }));
 
-    relationshipOptions: { label: string; value: string }[] = BENEFICIARY_RELATIONSHIPS.map((value) => ({ label: value, value }));
+    relationshipOptions: SelectOption[] = BENEFICIARY_RELATIONSHIPS.map((value) => ({ label: value, value }));
 
-    disabilityTypeOptions: { label: string; value: string }[] = DISABILITY_TYPES.map((value) => ({ label: value, value }));
+    disabilityTypeOptions: SelectOption[] = DISABILITY_TYPES.map((value) => ({ label: value, value }));
 
-    disabilityGradeOptions: { label: string; value: string }[] = DISABILITY_GRADES.map((value) => ({ label: value, value }));
+    disabilityGradeOptions: SelectOption[] = DISABILITY_GRADES.map((value) => ({ label: value, value }));
 
     dialogVisible = false;
 
@@ -673,7 +674,7 @@ export class Salud {
         this.disabilityGradeOptions = this.withLegacyOptions(DISABILITY_GRADES, this.member.disabilityGrade);
     }
 
-    private withLegacyOptions(values: readonly string[], legacy?: string): { label: string; value: string }[] {
+    private withLegacyOptions(values: readonly string[], legacy?: string): SelectOption[] {
         const current = (legacy ?? '').trim();
         const extras = current && !values.includes(current) ? [current] : [];
         return [...extras, ...values].map((value) => ({ label: value, value }));
