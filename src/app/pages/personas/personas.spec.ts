@@ -1,7 +1,7 @@
 /// <reference types="jasmine" />
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { providePrimeNG } from 'primeng/config';
 import { MessageService } from 'primeng/api';
 import { strFromU8, unzipSync } from 'fflate';
@@ -83,6 +83,16 @@ describe('Personas Component - Búsqueda de trabajadores', () => {
         // Debe encontrar únicamente a Esperanza (por su cédula)
         expect(results.length).toBe(1);
         expect(results[0].firstName).toBe('Esperanza');
+    });
+
+    it('debe abrir la administración de salud del trabajador seleccionado', () => {
+        const router = TestBed.inject(Router);
+        const navigateSpy = spyOn(router, 'navigate').and.resolveTo(true);
+        const person = component.persons()[0];
+
+        component.openHealth(person);
+
+        expect(navigateSpy).toHaveBeenCalledWith(['/salud'], { queryParams: { trabajador: person.id } });
     });
 
     it('no debe incluir un trabajador cuyo teléfono coincida con los dígitos buscados', () => {
@@ -279,7 +289,7 @@ describe('Personas Component - Búsqueda de trabajadores', () => {
         expect(component.disabilityGradeOptions.map((option) => option.value)).toEqual(['Leve', 'Moderado', 'Grave', 'Completo']);
         expect(component.bloodTypeOptions.map((option) => option.value)).toContain('Desconoce');
         expect(component.shirtSizeOptions.map((option) => option.value)).toContain('XS');
-        expect(component.shoeSizeOptions.map((option) => option.value)).not.toContain('41');
+        expect((component.shoeSizeOptions.map((option) => option.value) as readonly string[])).not.toContain('41');
     });
 
     it('debe exportar toda la información familiar en Excel', async () => {

@@ -97,7 +97,7 @@
                             Última actualización
                             <p-sortIcon field="updatedAt" />
                         </th>
-                        <th style="width: 8rem">Acciones</th>
+                        <th style="width: 11rem">Acciones</th>
                     </tr>
                 </ng-template>
 
@@ -130,6 +130,7 @@
                             <div class="table-actions">
                                 <p-button icon="pi pi-eye" ariaLabel="Ver información del trabajador" [rounded]="true" [outlined]="true" severity="info" (click)="viewPerson(person)" />
                                 <p-button icon="pi pi-pencil" ariaLabel="Editar trabajador" [rounded]="true" [outlined]="true" (click)="editPerson(person)" />
+                                <p-button icon="pi pi-heart" ariaLabel="Administrar salud del trabajador" [rounded]="true" [outlined]="true" severity="danger" (click)="openHealth(person)" />
                             </div>
                         </td>
                     </tr>

@@ -1,0 +1,430 @@
+<p-toast />
+<p-confirmDialog />
+
+<div class="page-header">
+    <div>
+        <span class="page-eyebrow">Gestión personal</span>
+        <h1>Administración de salud</h1>
+        <p>Consulta y actualiza el grupo familiar (beneficiarios) y sus datos de salud de cada trabajador.</p>
+    </div>
+    <div class="page-actions">
+        <p-button label="Agregar beneficiario" icon="pi pi-plus" (onClick)="openNewBeneficiary()" [disabled]="!selectedPerson()" />
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: 1.5rem">
+    <div class="card-header">
+        <div>
+            <h2>Trabajador</h2>
+            <p>Selecciona el trabajador cuyo grupo familiar deseas administrar.</p>
+        </div>
+        @if (selectedPerson(); as person) {
+            <span class="worker-summary">
+                <i class="pi pi-user"></i>
+                <span><strong>{{ personFullName(person) }}</strong> · {{ person.type }}</span>
+            </span>
+        }
+    </div>
+    <div class="form-grid">
+        <div class="form-field">
+            <label for="saludWorker">Trabajador *</label>
+            <p-select
+                inputId="saludWorker"
+                [options]="workerOptions()"
+                optionLabel="label"
+                optionValue="value"
+                placeholder="Seleccione..."
+                [filter]="true"
+                filterBy="label"
+                [showClear]="true"
+                [ngModel]="selectedWorkerId()"
+                (ngModelChange)="onWorkerChange($event)"
+                appendTo="body"
+                scrollHeight="320px"
+                styleClass="w-full"
+            />
+        </div>
+    </div>
+</div>
+
+@if (!selectedPerson()) {
+    <div class="card">
+        <div class="salud-empty">
+            <i class="pi pi-heart"></i>
+            <h3>Selecciona un trabajador</h3>
+            <p>Al elegir un trabajador podrás consultar su grupo familiar, registrar beneficiarios y actualizar sus datos de salud.</p>
+        </div>
+    </div>
+} @else {
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div class="mini-stat">
+            <span>Beneficiarios registrados</span>
+            <strong>{{ healthStats().total }}</strong>
+        </div>
+        <div class="mini-stat">
+            <span>Con discapacidad</span>
+            <strong>{{ healthStats().disabilities }}</strong>
+        </div>
+        <div class="mini-stat">
+            <span>Con alergias</span>
+            <strong>{{ healthStats().allergies }}</strong>
+        </div>
+    </div>
+
+    <div class="card">
+        <p-table
+            [value]="filteredBeneficiaries()"
+            [rows]="10"
+            [paginator]="true"
+            [rowsPerPageOptions]="[5, 10, 20, 50]"
+            [tableStyle]="{ 'min-width': '52rem' }"
+            [rowHover]="true"
+            currentPageReportTemplate="Mostrando {first} a {last} de {totalRecords} beneficiarios"
+            [showCurrentPageReport]="true"
+        >
+            <ng-template #caption>
+                <div class="table-caption">
+                    <div>
+                        <h2>Grupo familiar</h2>
+                        <p>{{ filteredBeneficiaries().length }} beneficiarios encontrados</p>
+                    </div>
+                    <div class="table-filters">
+                        <p-iconfield>
+                            <p-inputicon styleClass="pi pi-search" />
+                            <input
+                                pInputText
+                                type="text"
+                                [ngModel]="searchTerm()"
+                                (ngModelChange)="searchTerm.set($event)"
+                                placeholder="Buscar por nombre, documento o parentesco..."
+                            />
+                        </p-iconfield>
+                    </div>
+                </div>
+            </ng-template>
+            <ng-template #header>
+                <tr>
+                    <th>Nombre(s) y apellido(s)</th>
+                    <th>Nro. Doc. / Cert. Nac.</th>
+                    <th>Parentesco</th>
+                    <th>Edad</th>
+                    <th style="width: 9rem">Acciones</th>
+                </tr>
+            </ng-template>
+            <ng-template #body let-member>
+                <tr>
+                    <td>
+                        <div class="beneficiary-cell">
+                            <span class="beneficiary-avatar">{{ memberInitials(member) }}</span>
+                            <div class="beneficiary-info">
+                                <strong>{{ memberFullName(member) }}</strong>
+                                @if (member.hasDisability || member.hasAllergies) {
+                                    <div class="beneficiary-meta">
+                                        @if (member.hasDisability) {
+                                            <p-tag value="Discapacidad" severity="warn" [rounded]="true" />
+                                        }
+                                        @if (member.hasAllergies) {
+                                            <p-tag value="Alergias" severity="info" [rounded]="true" />
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </td>
+                    <td>{{ memberDocument(member) }}</td>
+                    <td>{{ member.relationship || 'No registrado' }}</td>
+                    <td>{{ memberAge(member) ?? '—' }}</td>
+                    <td>
+                        <div class="beneficiary-actions">
+                            <p-button icon="pi pi-pencil" [text]="true" [rounded]="true" severity="secondary" aria-label="Editar beneficiario" (onClick)="openEditBeneficiary(member)" />
+                            <p-button icon="pi pi-trash" [text]="true" [rounded]="true" severity="danger" aria-label="Eliminar beneficiario" (onClick)="confirmRemoveBeneficiary(member)" />
+                        </div>
+                    </td>
+                </tr>
+            </ng-template>
+            <ng-template #emptymessage>
+                <tr>
+                    <td colspan="5">No hay beneficiarios registrados para este trabajador. Usa "Agregar beneficiario" para registrarlos.</td>
+                </tr>
+            </ng-template>
+        </p-table>
+    </div>
+}
+
+<p-dialog
+    [(visible)]="dialogVisible"
+    [style]="{ width: '820px', maxWidth: '95vw' }"
+    [breakpoints]="{ '1199px': '85vw', '991px': '90vw', '575px': '95vw' }"
+    styleClass="person-dialog"
+    [header]="editingIndex >= 0 ? 'Editar beneficiario' : 'Registrar beneficiario'"
+    [modal]="true"
+    (onHide)="onDialogHide()"
+>
+    <div class="form-grid">
+        <div class="form-field">
+            <label for="beneficiaryHasDocument">¿Tiene documento de identidad?</label>
+            <p-select
+                inputId="beneficiaryHasDocument"
+                [options]="yesNoOptions"
+                optionLabel="label"
+                optionValue="value"
+                [(ngModel)]="member.hasDocument"
+                (ngModelChange)="onHasDocumentChange($event)"
+                appendTo="body"
+                scrollHeight="300px"
+                styleClass="w-full"
+            />
+        </div>
+        @if (member.hasDocument) {
+            <div class="form-field">
+                <label for="beneficiaryDocType">Tipo de Documento</label>
+                <p-select
+                    inputId="beneficiaryDocType"
+                    [options]="documentTypeSelectOptions"
+                    optionLabel="label"
+                    optionValue="value"
+                    placeholder="Seleccione..."
+                    [(ngModel)]="member.documentType"
+                    appendTo="body"
+                    scrollHeight="300px"
+                    styleClass="w-full"
+                />
+            </div>
+            <div class="form-field">
+                <label for="beneficiaryDocNumber">Nro. de Documento</label>
+                <input pInputText id="beneficiaryDocNumber" [(ngModel)]="member.documentNumber" placeholder="Ingrese..." />
+            </div>
+        } @else {
+            <div class="form-field">
+                <label for="beneficiaryCertificateNumber">Nro. de cert. de nacimiento *</label>
+                <input pInputText id="beneficiaryCertificateNumber" [(ngModel)]="member.certificateNumber" placeholder="Ingrese..." />
+            </div>
+        }
+
+        <div class="form-field">
+            <label for="beneficiaryFirstName">Primer nombre *</label>
+            <input pInputText id="beneficiaryFirstName" [(ngModel)]="member.firstName" placeholder="Ingrese..." />
+        </div>
+        <div class="form-field">
+            <label for="beneficiarySecondName">Segundo nombre</label>
+            <input pInputText id="beneficiarySecondName" [(ngModel)]="member.secondName" placeholder="Ingrese..." />
+        </div>
+        <div class="form-field">
+            <label for="beneficiaryLastName">Primer apellido *</label>
+            <input pInputText id="beneficiaryLastName" [(ngModel)]="member.lastName" placeholder="Ingrese..." />
+        </div>
+        <div class="form-field">
+            <label for="beneficiarySecondLastName">Segundo apellido</label>
+            <input pInputText id="beneficiarySecondLastName" [(ngModel)]="member.secondLastName" placeholder="Ingrese..." />
+        </div>
+
+        <div class="form-field">
+            <label for="beneficiaryGender">Sexo *</label>
+            <p-select
+                inputId="beneficiaryGender"
+                [options]="genderOptions"
+                optionLabel="label"
+                optionValue="value"
+                placeholder="Seleccione..."
+                [(ngModel)]="member.gender"
+                appendTo="body"
+                scrollHeight="300px"
+                styleClass="w-full"
+            />
+        </div>
+        <div class="form-field">
+            <label for="beneficiaryBirthDate">Fecha de nacimiento *</label>
+            <p-datepicker
+                inputId="beneficiaryBirthDate"
+                [(ngModel)]="birthDatePicker"
+                (ngModelChange)="onBirthDateChange($event)"
+                [minDate]="minBirthDate"
+                [maxDate]="todayDate"
+                dateFormat="dd/mm/yy"
+                placeholder="dd/mm/aaaa"
+                [showIcon]="true"
+                [readonlyInput]="true"
+                styleClass="w-full"
+            />
+        </div>
+        <div class="form-field">
+            <label for="beneficiaryMaritalStatus">Estado civil *</label>
+            <p-select
+                inputId="beneficiaryMaritalStatus"
+                [options]="maritalStatusOptions"
+                optionLabel="label"
+                optionValue="value"
+                placeholder="Seleccione..."
+                [(ngModel)]="member.maritalStatus"
+                appendTo="body"
+                scrollHeight="300px"
+                styleClass="w-full"
+            />
+        </div>
+        <div class="form-field">
+            <label for="beneficiaryRelationship">Parentesco *</label>
+            <p-select
+                inputId="beneficiaryRelationship"
+                [options]="relationshipOptions"
+                optionLabel="label"
+                optionValue="value"
+                placeholder="Seleccione..."
+                [(ngModel)]="member.relationship"
+                appendTo="body"
+                scrollHeight="300px"
+                styleClass="w-full"
+            />
+        </div>
+
+        <div class="form-field form-field-full">
+            <label for="beneficiaryPersonalPhone">Teléfono personal *</label>
+            <div class="phone-input-row">
+                <p-select
+                    inputId="beneficiaryPersonalPhoneCode"
+                    [options]="personalPhoneCodeOptions"
+                    optionLabel="label"
+                    optionValue="value"
+                    placeholder="Seleccione..."
+                    [(ngModel)]="member.personalPhoneCode"
+                    appendTo="body"
+                    scrollHeight="300px"
+                    styleClass="w-full phone-code-select"
+                />
+                <input pInputText id="beneficiaryPersonalPhone" inputmode="numeric" [(ngModel)]="member.personalPhone" placeholder="Ingrese..." />
+            </div>
+        </div>
+        <div class="form-field form-field-full">
+            <label for="beneficiaryHomePhone">Teléfono de habitación</label>
+            <div class="phone-input-row">
+                <p-select
+                    inputId="beneficiaryHomePhoneCode"
+                    [options]="homePhoneCodeOptions"
+                    optionLabel="label"
+                    optionValue="value"
+                    placeholder="Seleccione..."
+                    [(ngModel)]="member.homePhoneCode"
+                    appendTo="body"
+                    scrollHeight="300px"
+                    styleClass="w-full phone-code-select"
+                />
+                <input pInputText id="beneficiaryHomePhone" inputmode="numeric" [(ngModel)]="member.homePhone" placeholder="Ingrese..." />
+            </div>
+        </div>
+        <div class="form-field form-field-full">
+            <label for="beneficiaryEmail">Correo electrónico personal *</label>
+            <input pInputText id="beneficiaryEmail" type="email" [(ngModel)]="member.email" placeholder="Ingrese..." />
+        </div>
+
+        <div class="form-field form-field-full section-divider">
+            <h4>Datos Adicionales</h4>
+        </div>
+
+        <div class="form-field">
+            <label for="beneficiaryLaterality">Lateralidad *</label>
+            <p-select
+                inputId="beneficiaryLaterality"
+                [options]="lateralityOptions"
+                optionLabel="label"
+                optionValue="value"
+                placeholder="Seleccione..."
+                [(ngModel)]="member.laterality"
+                appendTo="body"
+                scrollHeight="300px"
+                styleClass="w-full"
+            />
+        </div>
+        <div class="form-field">
+            <label for="beneficiaryHasDisability">¿Tiene alguna discapacidad? *</label>
+            <p-select
+                inputId="beneficiaryHasDisability"
+                [options]="yesNoOptions"
+                optionLabel="label"
+                optionValue="value"
+                [(ngModel)]="member.hasDisability"
+                (ngModelChange)="onDisabilityChange($event)"
+                appendTo="body"
+                scrollHeight="300px"
+                styleClass="w-full"
+            />
+        </div>
+        <div class="form-field">
+            <label for="beneficiaryDisabilityType">Tipo de discapacidad</label>
+            <p-select
+                inputId="beneficiaryDisabilityType"
+                [options]="disabilityTypeOptions"
+                optionLabel="label"
+                optionValue="value"
+                placeholder="Seleccione..."
+                [(ngModel)]="member.disabilityType"
+                [disabled]="!member.hasDisability"
+                appendTo="body"
+                scrollHeight="300px"
+                styleClass="w-full"
+            />
+        </div>
+        <div class="form-field">
+            <label for="beneficiaryDisabilityGrade">Grado de discapacidad</label>
+            <p-select
+                inputId="beneficiaryDisabilityGrade"
+                [options]="disabilityGradeOptions"
+                optionLabel="label"
+                optionValue="value"
+                placeholder="Seleccione..."
+                [(ngModel)]="member.disabilityGrade"
+                [disabled]="!member.hasDisability"
+                appendTo="body"
+                scrollHeight="300px"
+                styleClass="w-full"
+            />
+        </div>
+        <div class="form-field">
+            <label for="beneficiaryConapdis">Código CONAPDIS</label>
+            <input pInputText id="beneficiaryConapdis" [(ngModel)]="member.conapdisCode" placeholder="Ingrese..." [disabled]="!member.hasDisability" />
+        </div>
+        <div class="form-field">
+            <label for="beneficiaryHasAllergies">Alergias *</label>
+            <p-select
+                inputId="beneficiaryHasAllergies"
+                [options]="yesNoOptions"
+                optionLabel="label"
+                optionValue="value"
+                [(ngModel)]="member.hasAllergies"
+                (ngModelChange)="onAllergiesChange($event)"
+                appendTo="body"
+                scrollHeight="300px"
+                styleClass="w-full"
+            />
+        </div>
+        <div class="form-field">
+            <label for="beneficiaryAllergyTypes">Tipo de alergias</label>
+            <input pInputText id="beneficiaryAllergyTypes" [(ngModel)]="member.allergyTypes" placeholder="Ingrese..." [disabled]="!member.hasAllergies" />
+        </div>
+        <div class="form-field form-field-full">
+            <label for="beneficiaryObservations">Observacion(es)</label>
+            <input pInputText id="beneficiaryObservations" [(ngModel)]="member.observations" placeholder="Ingrese..." />
+        </div>
+        <div class="form-field">
+            <label for="beneficiaryAdoption">¿Posee parentesco por adopción o colocación familiar?</label>
+            <p-select
+                inputId="beneficiaryAdoption"
+                [options]="yesNoOptions"
+                optionLabel="label"
+                optionValue="value"
+                [(ngModel)]="member.adoptedOrFoster"
+                (ngModelChange)="onAdoptionChange($event)"
+                appendTo="body"
+                scrollHeight="300px"
+                styleClass="w-full"
+            />
+        </div>
+        <div class="form-field">
+            <label for="beneficiaryCourtRegistry">N° Registro tribunal</label>
+            <input pInputText id="beneficiaryCourtRegistry" [(ngModel)]="member.courtRegistryNumber" placeholder="Ingrese..." [disabled]="!member.adoptedOrFoster" />
+        </div>
+    </div>
+
+    <ng-template #footer>
+        <p-button label="Cancelar" severity="secondary" [outlined]="true" styleClass="btn-cancelar" (onClick)="dialogVisible = false" />
+        <p-button [label]="editingIndex >= 0 ? 'Guardar cambios' : 'Agregar'" icon="pi pi-check" (onClick)="saveBeneficiary()" />
+    </ng-template>
+</p-dialog>

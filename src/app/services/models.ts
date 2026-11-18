@@ -241,6 +241,41 @@ export interface Person {
 
 export type NewPersonInput = Omit<Person, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>;
 
+// ==================== API & DTOs ====================
+
+export interface ApiResponse<T> {
+    success: boolean;
+    data: T;
+    message?: string;
+}
+
+export interface PaginatedMeta {
+    currentPage: number;
+    lastPage: number;
+    perPage: number;
+    total: number;
+}
+
+export interface PaginatedResponse<T> {
+    data: T[];
+    meta: PaginatedMeta;
+}
+
+export interface ApiErrorResponse {
+    success: false;
+    message: string;
+    errors?: Record<string, string[]>;
+}
+
+export type CreatePersonDto = Omit<Person, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>;
+export type UpdatePersonDto = Partial<CreatePersonDto>;
+
+export interface PersonFilters {
+    search: string;
+    type: string | null;
+    status: PersonStatus | null;
+}
+
 export interface ActivityLog {
     id: string;
     timestamp: string;
@@ -333,7 +368,8 @@ export const PERSON_TYPES = [
     'Consultor TIC',
     'Pasante en Informática',
     'Pasante en Programación',
-];
+] as const;
+export type PersonType = (typeof PERSON_TYPES)[number];
 
 export const PERSON_STATUSES = ['Activo', 'Egresado'] as const;
 export type PersonStatus = (typeof PERSON_STATUSES)[number];
@@ -363,7 +399,8 @@ export const DEPARTMENTS = [
     'Trujillo',
     'Yaracuy',
     'Zulia'
-];
+] as const;
+export type Department = (typeof DEPARTMENTS)[number];
 
 export const CITIES_BY_DEPARTMENT: Record<string, readonly string[]> = {
     Amazonas: ['Puerto Ayacucho', 'Maroa', 'San Fernando de Atabapo', 'La Esmeralda'],
@@ -447,9 +484,11 @@ export const MARITAL_STATUSES = [
     'Separado/a legalmente',
     'Comprometido/a',
     'Otro'
-];
+] as const;
+export type MaritalStatus = (typeof MARITAL_STATUSES)[number];
 
-export const VACATION_STATUSES = ['No ha tomado vacaciones', 'Vacaciones tomadas', 'Solicitadas pendientes', 'Vacaciones parciales'];
+export const VACATION_STATUSES = ['No ha tomado vacaciones', 'Vacaciones tomadas', 'Solicitadas pendientes', 'Vacaciones parciales'] as const;
+export type VacationStatus = (typeof VACATION_STATUSES)[number];
 
 export const FAMILY_RELATIONSHIPS = [
     'Madre',
@@ -463,23 +502,32 @@ export const FAMILY_RELATIONSHIPS = [
     'Primo/a',
     'Sobrino/a',
     'Otro'
-];
+] as const;
+export type FamilyRelationship = (typeof FAMILY_RELATIONSHIPS)[number];
 
-export const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'Desconoce'];
+export const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'Desconoce'] as const;
+export type BloodType = (typeof BLOOD_TYPES)[number];
 
-export const HOUSING_TYPES = ['Casa', 'Apartamento', 'Habitación', 'Rancho', 'Otro'];
+export const HOUSING_TYPES = ['Casa', 'Apartamento', 'Habitación', 'Rancho', 'Otro'] as const;
+export type HousingType = (typeof HOUSING_TYPES)[number];
 
-export const HOUSING_CONDITIONS = ['Propia', 'Alquilada', 'Familiar', 'Prestada', 'Otra'];
+export const HOUSING_CONDITIONS = ['Propia', 'Alquilada', 'Familiar', 'Prestada', 'Otra'] as const;
+export type HousingCondition = (typeof HOUSING_CONDITIONS)[number];
 
-export const ADDRESS_THOROUGHFARE_TYPES = ['Avenida', 'Calle', 'Carretera', 'Esquina', 'Vereda'];
+export const ADDRESS_THOROUGHFARE_TYPES = ['Avenida', 'Calle', 'Carretera', 'Esquina', 'Vereda'] as const;
+export type AddressThoroughfareType = (typeof ADDRESS_THOROUGHFARE_TYPES)[number];
 
-export const ADDRESS_BUILDING_TYPES = ['Casa', 'Edificio', 'Quinta'];
+export const ADDRESS_BUILDING_TYPES = ['Casa', 'Edificio', 'Quinta'] as const;
+export type AddressBuildingType = (typeof ADDRESS_BUILDING_TYPES)[number];
 
-export const ADDRESS_UNIT_TYPES = ['Apt', 'Local', 'Oficina'];
+export const ADDRESS_UNIT_TYPES = ['Apt', 'Local', 'Oficina'] as const;
+export type AddressUnitType = (typeof ADDRESS_UNIT_TYPES)[number];
 
-export const ADDRESS_ZONE_TYPES = ['Barrio', 'Caserío', 'Conjunto residencial', 'Sector', 'Urbanización', 'Zona'];
+export const ADDRESS_ZONE_TYPES = ['Barrio', 'Caserío', 'Conjunto residencial', 'Sector', 'Urbanización', 'Zona'] as const;
+export type AddressZoneType = (typeof ADDRESS_ZONE_TYPES)[number];
 
-export const LATERALITY_OPTIONS = ['Diestro', 'Zurdo', 'Ambidiestro'];
+export const LATERALITY_OPTIONS = ['Diestro', 'Zurdo', 'Ambidiestro'] as const;
+export type LateralityOption = (typeof LATERALITY_OPTIONS)[number];
 
 export const DISABILITY_TYPES = [
     'Genitourinaria',
@@ -494,25 +542,35 @@ export const DISABILITY_TYPES = [
     'Múltiple',
     'Neurológica',
     'Músculo esquelética'
-];
+] as const;
+export type DisabilityType = (typeof DISABILITY_TYPES)[number];
 
-export const DISABILITY_GRADES = ['Leve', 'Moderado', 'Grave', 'Completo'];
+export const DISABILITY_GRADES = ['Leve', 'Moderado', 'Grave', 'Completo'] as const;
+export type DisabilityGrade = (typeof DISABILITY_GRADES)[number];
 
-export const MILITARY_REGISTRATION_OPTIONS = ['Sí', 'No'];
+export const MILITARY_REGISTRATION_OPTIONS = ['Sí', 'No'] as const;
+export type MilitaryRegistrationOption = (typeof MILITARY_REGISTRATION_OPTIONS)[number];
 
-export const SHIRT_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
+export const SHIRT_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'] as const;
+export type ShirtSize = (typeof SHIRT_SIZES)[number];
 
-export const PANTS_SIZES = ['26', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', '48', '50', '54'];
+export const PANTS_SIZES = ['26', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', '48', '50', '54'] as const;
+export type PantsSize = (typeof PANTS_SIZES)[number];
 
-export const SHOE_SIZES = ['35', '36', '37', '38', '39', '40', '42', '43', '44', '45', '46', '47'];
+export const SHOE_SIZES = ['35', '36', '37', '38', '39', '40', '42', '43', '44', '45', '46', '47'] as const;
+export type ShoeSize = (typeof SHOE_SIZES)[number];
 
-export const JACKET_SIZES = ['SS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'XXXXL'];
+export const JACKET_SIZES = ['SS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'XXXXL'] as const;
+export type JacketSize = (typeof JACKET_SIZES)[number];
 
-export const PERSONAL_PHONE_CODES = ['0412', '0414', '0416', '0422', '0424', '0426'];
+export const PERSONAL_PHONE_CODES = ['0412', '0414', '0416', '0422', '0424', '0426'] as const;
+export type PersonalPhoneCode = (typeof PERSONAL_PHONE_CODES)[number];
 
-export const HOME_PHONE_CODES = ['0212', '0232', '0234', '0235', '0236', '0237'];
+export const HOME_PHONE_CODES = ['0212', '0232', '0234', '0235', '0236', '0237'] as const;
+export type HomePhoneCode = (typeof HOME_PHONE_CODES)[number];
 
-export const EMERGENCY_CONTACT_RELATIONSHIPS = ['Padre', 'Madre', 'Hermano(a)', 'Tío(a)', 'Primo(a)', 'Abuelo(a)', 'Otro familiar', 'Cónyuge', 'Nieto(a)'];
+export const EMERGENCY_CONTACT_RELATIONSHIPS = ['Padre', 'Madre', 'Hermano(a)', 'Tío(a)', 'Primo(a)', 'Abuelo(a)', 'Otro familiar', 'Cónyuge', 'Nieto(a)'] as const;
+export type EmergencyContactRelationship = (typeof EMERGENCY_CONTACT_RELATIONSHIPS)[number];
 
 export const CHRONIC_PATHOLOGIES = [
     'Insuficiencia Renal Crónica terminal',
@@ -533,7 +591,8 @@ export const CHRONIC_PATHOLOGIES = [
     'Hipertiroidismo',
     'Hipotiroidismo',
     'No Aplica'
-];
+] as const;
+export type ChronicPathologyType = (typeof CHRONIC_PATHOLOGIES)[number];
 
 export const OFFICE_PHONE_CODES = [
     '0212',
@@ -591,7 +650,8 @@ export const OFFICE_PHONE_CODES = [
     '0293',
     '0294',
     '0295'
-];
+] as const;
+export type OfficePhoneCode = (typeof OFFICE_PHONE_CODES)[number];
 
 export function createEntityId(prefix: string): string {
     const random = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID().slice(0, 8) : Math.random().toString(36).slice(2, 10);

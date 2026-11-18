@@ -34,6 +34,7 @@ export class AppMenu {
         this.model = [
             { label: 'Panel principal', icon: 'pi pi-fw pi-home', routerLink: ['/'] },
             { label: 'Trabajadores', icon: 'pi pi-fw pi-users', routerLink: ['/personas'] },
+            { label: 'Salud', icon: 'pi pi-fw pi-heart', routerLink: ['/salud'] },
             ...adminItems,
             { label: 'Registro de actividad', icon: 'pi pi-fw pi-history', routerLink: ['/actividad'] },
             {

@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterModule } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { ConfirmationService, MessageService } from 'primeng/api';
 import { AutoCompleteModule } from 'primeng/autocomplete';
 import { ButtonModule } from 'primeng/button';
@@ -128,6 +128,8 @@ export class Personas {
 
     private readonly personExportService = inject(PersonExportService);
 
+    private readonly router = inject(Router);
+
     readonly persons = this.personService.persons;
 
     readonly stats = this.personService.stats;
@@ -242,9 +244,9 @@ export class Personas {
 
     readonly lateralityOptions = LATERALITY_OPTIONS.map((value) => ({ label: value, value }));
 
-    disabilityTypeOptions = DISABILITY_TYPES.map((value) => ({ label: value, value }));
+    disabilityTypeOptions: { label: string; value: string }[] = DISABILITY_TYPES.map((value) => ({ label: value, value }));
 
-    disabilityGradeOptions = DISABILITY_GRADES.map((value) => ({ label: value, value }));
+    disabilityGradeOptions: { label: string; value: string }[] = DISABILITY_GRADES.map((value) => ({ label: value, value }));
 
     readonly militaryRegistrationOptions = MILITARY_REGISTRATION_OPTIONS.map((value) => ({ label: value, value }));
 
@@ -386,6 +388,10 @@ export class Personas {
     viewPerson(person: Person): void {
         this.viewMode = true;
         this.openPersonDialog(person);
+    }
+
+    openHealth(person: Person): void {
+        this.router.navigate(['/salud'], { queryParams: { trabajador: person.id } });
     }
 
     private openPersonDialog(person: Person): void {
