@@ -3,16 +3,19 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
+import { DialogModule } from 'primeng/dialog';
 import { InputTextModule } from 'primeng/inputtext';
 import { PasswordModule } from 'primeng/password';
+import { SelectModule } from 'primeng/select';
 import { AuthService } from '@/app/services/auth.service';
+import { SECURITY_QUESTIONS, SecurityQuestion, SelectOption } from '@/app/services/models';
 import { PASSWORD_CONFIRMATION_LABEL, PASSWORD_REQUIREMENTS, composeDocumentNumber, missingPasswordRequirements, validateIdentityDocument, validatePassword, validatePasswordConfirmation, validatePersonName } from '@/app/services/validators';
 import { DocumentPrefixSelect } from '@/app/components/document-prefix-select/document-prefix-select';
 
 @Component({
     selector: 'app-register',
     standalone: true,
-    imports: [CommonModule, FormsModule, RouterModule, ButtonModule, DocumentPrefixSelect, InputTextModule, PasswordModule],
+    imports: [CommonModule, FormsModule, RouterModule, ButtonModule, DialogModule, DocumentPrefixSelect, InputTextModule, PasswordModule, SelectModule],
     template: `
         <div class="auth-page">
             <div class="auth-shell">
@@ -33,7 +36,7 @@ import { DocumentPrefixSelect } from '@/app/components/document-prefix-select/do
                         <div class="auth-steps">
                             <div class="auth-step">
                                 <span>1</span>
-                                <div><strong>Completa tus datos</strong><small>Nombre, cédula y una contraseña segura.</small></div>
+                                <div><strong>Completa tus datos</strong><small>Nombre, cédula, contraseña y preguntas de seguridad.</small></div>
                             </div>
                             <div class="auth-step">
                                 <span>2</span>
@@ -129,6 +132,44 @@ import { DocumentPrefixSelect } from '@/app/components/document-prefix-select/do
                                 </div>
                             </div>
 
+                            <section class="security-questions-section" aria-labelledby="registerSecurityTitle">
+                                <div class="security-questions-header">
+                                    <div>
+                                        <h3 id="registerSecurityTitle" class="security-questions-title">
+                                            <i class="pi pi-shield" aria-hidden="true"></i>
+                                            Preguntas de seguridad *
+                                        </h3>
+                                        <p class="security-questions-description">
+                                            Se usarán para verificar tu identidad si olvidas la contraseña.
+                                        </p>
+                                    </div>
+                                    <p-button
+                                        type="button"
+                                        [label]="hasSecurityQuestions() ? 'Editar' : 'Configurar'"
+                                        [icon]="hasSecurityQuestions() ? 'pi pi-pencil' : 'pi pi-plus'"
+                                        severity="secondary"
+                                        [outlined]="true"
+                                        (onClick)="openSecurityDialog()"
+                                    />
+                                </div>
+
+                                @if (hasSecurityQuestions()) {
+                                    <ul class="security-summary">
+                                        @for (sq of securityQuestions(); track sq.question) {
+                                            <li>
+                                                <i class="pi pi-check-circle" aria-hidden="true"></i>
+                                                <span>{{ sq.question }}</span>
+                                            </li>
+                                        }
+                                    </ul>
+                                } @else {
+                                    <p class="security-summary-empty">
+                                        <i class="pi pi-exclamation-circle" aria-hidden="true"></i>
+                                        <span>Aún no has configurado tus preguntas de seguridad.</span>
+                                    </p>
+                                }
+                            </section>
+
                             @if (error) {
                                 <div class="auth-error">
                                     <i class="pi pi-exclamation-circle"></i>
@@ -142,6 +183,71 @@ import { DocumentPrefixSelect } from '@/app/components/document-prefix-select/do
 
                             <p-button type="submit" label="Crear cuenta y entrar" icon="pi pi-user-plus" styleClass="w-full" [loading]="loading" />
                         </form>
+
+                        <p-dialog
+                            [(visible)]="securityDialogVisible"
+                            header="Preguntas de seguridad"
+                            [modal]="true"
+                            [draggable]="false"
+                            [resizable]="false"
+                            [style]="{ width: 'min(34rem, 92vw)' }"
+                            styleClass="security-dialog"
+                            (onHide)="onSecurityDialogHide()"
+                        >
+                            <p class="security-questions-description">
+                                Configura hasta 3 preguntas de seguridad. La primera es obligatoria y las demás opcionales.
+                            </p>
+
+                            @for (sq of securityDraft; track $index) {
+                                <div class="security-question-card" [class.is-invalid]="!!securityQuestionError($index)">
+                                    <label class="security-question-label" [for]="'securityQuestion' + $index">
+                                        Pregunta {{ $index + 1 }} {{ $index === 0 ? '*' : '(opcional)' }}
+                                    </label>
+                                    <p-select
+                                        [inputId]="'securityQuestion' + $index"
+                                        [options]="availableQuestionsFor($index)"
+                                        optionLabel="label"
+                                        optionValue="value"
+                                        placeholder="Selecciona una pregunta..."
+                                        [(ngModel)]="securityDraft[$index].question"
+                                        appendTo="body"
+                                        [showClear]="true"
+                                        styleClass="w-full"
+                                    />
+                                    <label class="security-question-label security-answer-label" [for]="'securityAnswer' + $index">Respuesta</label>
+                                    <div class="secret-input">
+                                        <input
+                                            pInputText
+                                            [id]="'securityAnswer' + $index"
+                                            [type]="securityAnswerVisible[$index] ? 'text' : 'password'"
+                                            [ngModel]="securityDraft[$index].answer"
+                                            (ngModelChange)="onSecurityAnswerChange($index, $event)"
+                                            [disabled]="!securityDraft[$index].question"
+                                            placeholder="Selecciona una pregunta y escribe tu respuesta"
+                                            autocomplete="off"
+                                        />
+                                        <button
+                                            type="button"
+                                            class="secret-input-toggle"
+                                            [attr.aria-label]="securityAnswerVisible[$index] ? 'Ocultar respuesta' : 'Mostrar respuesta'"
+                                            [attr.title]="securityAnswerVisible[$index] ? 'Ocultar respuesta' : 'Mostrar respuesta'"
+                                            [disabled]="!securityDraft[$index].answer"
+                                            (click)="toggleSecurityAnswerVisibility($index)"
+                                        >
+                                            <i class="pi" [class.pi-eye]="!securityAnswerVisible[$index]" [class.pi-eye-slash]="securityAnswerVisible[$index]"></i>
+                                        </button>
+                                    </div>
+                                    @if (securityQuestionError($index)) {
+                                        <small class="field-error">{{ securityQuestionError($index) }}</small>
+                                    }
+                                </div>
+                            }
+
+                            <ng-template #footer>
+                                <p-button label="Cancelar" icon="pi pi-times" severity="secondary" [outlined]="true" (onClick)="closeSecurityDialog()" />
+                                <p-button label="Guardar preguntas" icon="pi pi-check" (onClick)="saveSecurityQuestions()" />
+                            </ng-template>
+                        </p-dialog>
 
                         <div class="auth-note">
                             <i class="pi pi-info-circle"></i>
@@ -177,6 +283,22 @@ export class Register {
     submitted = false;
 
     cedulaTouched = false;
+
+    readonly securityQuestionOptions: SelectOption[] = SECURITY_QUESTIONS.map((q) => ({ label: q, value: q }));
+
+    securityQuestionsForm: { question: string; answer: string }[] = [
+        { question: '', answer: '' },
+        { question: '', answer: '' },
+        { question: '', answer: '' }
+    ];
+
+    securityAnswerVisible: boolean[] = [false, false, false];
+
+    securityDialogVisible = false;
+
+    securityDialogSubmitted = false;
+
+    securityDraft: { question: string; answer: string }[] = this.emptySecurityForm();
 
     readonly passwordRequirements = PASSWORD_REQUIREMENTS;
 
@@ -227,6 +349,92 @@ export class Register {
         return (this.password.length > 0 || this.confirmPassword.length > 0) && this.missingPasswordRules().length > 0;
     }
 
+    openSecurityDialog(): void {
+        this.securityDraft = this.securityQuestionsForm.map((q) => ({ ...q }));
+        this.securityAnswerVisible = [false, false, false];
+        this.securityDialogSubmitted = false;
+        this.securityDialogVisible = true;
+    }
+
+    closeSecurityDialog(): void {
+        this.securityDialogVisible = false;
+    }
+
+    onSecurityDialogHide(): void {
+        this.securityDraft = this.emptySecurityForm();
+        this.securityDialogSubmitted = false;
+        this.securityAnswerVisible = [false, false, false];
+    }
+
+    saveSecurityQuestions(): void {
+        this.securityDialogSubmitted = true;
+
+        if (this.securityQuestionsError()) {
+            return;
+        }
+
+        this.securityQuestionsForm = this.securityDraft.map((q) => ({ question: q.question, answer: q.answer.trim() }));
+        this.securityDialogVisible = false;
+    }
+
+    hasSecurityQuestions(): boolean {
+        const first = this.securityQuestionsForm[0];
+        return !!first?.question && !!first.answer.trim();
+    }
+
+    securityQuestionError(index: number): string {
+        if (!this.securityDialogSubmitted) return '';
+        const q = this.securityDraft[index];
+        if (!q.question) {
+            if (index === 0) return 'Selecciona la primera pregunta de seguridad.';
+            return q.answer.trim() ? 'Selecciona la pregunta correspondiente a esta respuesta.' : '';
+        }
+        if (!q.answer.trim()) {
+            return 'Escribe la respuesta para esta pregunta.';
+        }
+        return '';
+    }
+
+    securityQuestionsError(): string {
+        for (let index = 0; index < this.securityDraft.length; index += 1) {
+            const error = this.securityQuestionError(index);
+            if (error) {
+                return error;
+            }
+        }
+        return '';
+    }
+
+    toggleSecurityAnswerVisibility(index: number): void {
+        this.securityAnswerVisible[index] = !this.securityAnswerVisible[index];
+    }
+
+    onSecurityAnswerChange(index: number, value: string): void {
+        this.securityDraft[index].answer = (value ?? '').toUpperCase();
+    }
+
+    availableQuestionsFor(index: number): SelectOption[] {
+        const usedQuestions = this.securityDraft
+            .filter((_, i) => i !== index)
+            .map((q) => q.question)
+            .filter(Boolean);
+        return this.securityQuestionOptions.filter((opt) => !usedQuestions.includes(opt.value));
+    }
+
+    securityQuestions(): SecurityQuestion[] {
+        return this.securityQuestionsForm
+            .filter((q) => q.question && q.answer.trim())
+            .map((q) => ({ question: q.question, answer: q.answer.trim() }));
+    }
+
+    private emptySecurityForm(): { question: string; answer: string }[] {
+        return [
+            { question: '', answer: '' },
+            { question: '', answer: '' },
+            { question: '', answer: '' }
+        ];
+    }
+
     submit(): void {
         this.submitted = true;
         this.error = '';
@@ -255,8 +463,14 @@ export class Register {
             return;
         }
 
+        if (!this.hasSecurityQuestions()) {
+            this.error = 'Configura al menos una pregunta de seguridad antes de crear la cuenta.';
+            this.openSecurityDialog();
+            return;
+        }
+
         this.loading = true;
-        const result = this.auth.register(this.fullName, composeDocumentNumber(this.cedulaPrefix, this.cedula), this.password);
+        const result = this.auth.register(this.fullName, composeDocumentNumber(this.cedulaPrefix, this.cedula), this.password, this.securityQuestions());
 
         if (!result.ok) {
             this.error = result.message;

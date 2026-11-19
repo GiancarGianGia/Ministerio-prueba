@@ -1,5 +1,5 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { AppUser, AuthResult, DeletedUserRecord, NewUserInput, nextSequentialId, STORAGE_KEYS, UpdateUserInput, UserRole } from './models';
+import { AppUser, AuthResult, DeletedUserRecord, NewUserInput, SecurityQuestion, nextSequentialId, STORAGE_KEYS, UpdateUserInput, UserRole } from './models';
 import { LogService } from './log.service';
 import { StorageService } from './storage.service';
 import { normalizeCedula, validateCedula, validatePassword } from './validators';
@@ -71,7 +71,7 @@ export class AuthService {
         return { ok: true, message: 'Sesión iniciada correctamente.' };
     }
 
-    register(fullName: string, cedula: string, password: string): AuthResult {
+    register(fullName: string, cedula: string, password: string, securityQuestions?: SecurityQuestion[]): AuthResult {
         const name = fullName.trim();
         const normalizedCedula = normalizeCedula(cedula);
 
@@ -102,7 +102,14 @@ export class AuthService {
             active: true,
             createdAt: new Date().toISOString(),
             createdBy: 'Auto-registro',
-            lastLogin: new Date().toISOString()
+            lastLogin: new Date().toISOString(),
+            ...(securityQuestions && securityQuestions.length > 0
+                ? {
+                      securityQuestions: securityQuestions
+                          .filter((question) => question.question && question.answer.trim())
+                          .map((question) => ({ question: question.question, answer: question.answer.trim().toUpperCase() }))
+                  }
+                : {})
         };
 
         this._users.update((users) => [...users, newUser]);

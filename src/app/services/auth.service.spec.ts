@@ -69,6 +69,31 @@ describe('AuthService', () => {
         expect(service.register('Diana R.', 'V-18745679', 'Clave123@').ok).toBeTrue();
     });
 
+    it('register() debe guardar las preguntas de seguridad con la respuesta en mayúsculas', () => {
+        const result = service.register('Elena Paz', 'V-18745680', 'Clave123@', [
+            { question: '¿En qué ciudad naciste?', answer: '  caracas ' }
+        ]);
+
+        expect(result.ok).toBeTrue();
+        expect(service.currentUser()?.securityQuestions).toEqual([
+            { question: '¿En qué ciudad naciste?', answer: 'CARACAS' }
+        ]);
+    });
+
+    it('register() con preguntas permite recuperar la contraseña con las respuestas correctas', () => {
+        service.register('Elena Paz', 'V-18745681', 'Clave123@', [
+            { question: '¿En qué ciudad naciste?', answer: 'caracas' }
+        ]);
+        service.logout();
+
+        expect(service.resetPassword('V-18745681', 'Nueva123@').ok).toBeFalse();
+
+        const result = service.resetPassword('V-18745681', 'Nueva123@', [
+            { question: '¿En qué ciudad naciste?', answer: 'CARACAS' }
+        ]);
+        expect(result.ok).toBeTrue();
+    });
+
     it('migrates stored accounts while keeping only supported account fields', () => {
         localStorage.setItem(
             'registro.usuarios.v1',

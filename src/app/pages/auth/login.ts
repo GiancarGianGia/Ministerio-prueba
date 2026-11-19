@@ -104,12 +104,6 @@ import { DocumentPrefixSelect } from '@/app/components/document-prefix-select/do
                             <p-button type="submit" label="Ingresar al sistema" icon="pi pi-sign-in" styleClass="w-full" [loading]="loading" />
                         </form>
 
-                        <div class="auth-demo">
-                            <span class="auth-demo-title">Acceso de prueba</span>
-                            <div><strong>V-00000000</strong> / <strong>ADMIN123</strong></div>
-                            <button type="button" class="auth-link" (click)="loginDemo()">Usar credenciales de administrador</button>
-                        </div>
-
                         <p class="auth-switch">¿No tienes cuenta? <a routerLink="/auth/registro">Crear una cuenta</a></p>
                     </div>
                 </section>
@@ -323,13 +317,6 @@ export class Login {
             return;
         }
         this.router.navigate(['/']);
-    }
-
-    loginDemo(): void {
-        this.cedulaPrefix = 'V';
-        this.cedula = '00000000';
-        this.password = 'ADMIN123';
-        this.submit();
     }
 
     openForgotDialog(): void {
