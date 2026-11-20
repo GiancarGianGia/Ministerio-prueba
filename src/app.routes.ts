@@ -4,7 +4,6 @@ import { Actividad } from './app/pages/actividad/actividad';
 import { Dashboard } from './app/pages/dashboard/dashboard';
 import { Notfound } from './app/pages/notfound/notfound';
 import { Personas } from './app/pages/personas/personas';
-import { Salud } from './app/pages/salud/salud';
 import { Usuarios } from './app/pages/usuarios/usuarios';
 import { adminGuard, authGuard } from './app/services/auth.guard';
 
@@ -16,7 +15,6 @@ export const appRoutes: Routes = [
         children: [
             { path: '', component: Dashboard },
             { path: 'personas', component: Personas },
-            { path: 'salud', component: Salud },
             { path: 'registro', redirectTo: 'personas', pathMatch: 'full' },
             { path: 'usuarios', component: Usuarios, canActivate: [adminGuard] },
             { path: 'actividad', component: Actividad }

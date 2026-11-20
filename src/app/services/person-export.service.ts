@@ -1,14 +1,12 @@
 import { Injectable } from '@angular/core';
 import { strToU8, zipSync } from 'fflate';
-import { Person } from './models';
+import { familyMemberName, isChildMember, isSpouseMember, Person } from './models';
 
 @Injectable({ providedIn: 'root' })
 export class PersonExportService {
     exportToCsv(persons: Person[]): void {
         const { headers, rows } = this.buildExportTable(persons);
-        const csv = [headers, ...rows]
-            .map((row) => row.map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`).join(','))
-            .join('\r\n');
+        const csv = [headers, ...rows].map((row) => row.map((value) => this.toCsvCell(value)).join(',')).join('\r\n');
 
         const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
         this.downloadBlob(blob, `trabajadores-${this.currentDateSuffix()}.csv`);
@@ -85,17 +83,16 @@ export class PersonExportService {
         const yesNo = (value: boolean | undefined): string => (value === undefined ? '' : value ? 'Sí' : 'No');
         const text = (...parts: (string | number | undefined | null)[]): string =>
             parts.filter((part) => part !== undefined && part !== null && String(part).trim() !== '').join(' ');
-        const fullName = (item: { firstName?: string; secondName?: string; lastName?: string; secondLastName?: string }): string =>
-            [item.firstName, item.secondName, item.lastName, item.secondLastName].filter(Boolean).join(' ');
         const childrenSummary = (person: Person): string =>
-            (person.familyData?.children ?? [])
-                .map((child) => text(child.name, child.birthDate ? `(${child.birthDate})` : '', child.documentNumber ? `- ${child.documentNumber}` : ''))
+            (person.familyMembers ?? [])
+                .filter(isChildMember)
+                .map((child) => text(familyMemberName(child), child.birthDate ? `(${child.birthDate})` : '', child.documentNumber ? `- ${child.documentNumber}` : ''))
                 .join('; ');
         const familyMembersSummary = (person: Person): string =>
             (person.familyMembers ?? [])
                 .map((member) =>
                     text(
-                        fullName(member),
+                        familyMemberName(member),
                         member.relationship ? `(${member.relationship})` : '',
                         member.hasDocument && member.documentNumber ? `- ${member.documentNumber}` : '- Sin documento'
                     )
@@ -226,6 +223,10 @@ export class PersonExportService {
             const additional = person.additionalData;
             const labor = person.laborData;
             const academic = person.academicData;
+            const spouse = (person.familyMembers ?? []).find(isSpouseMember);
+            const spouseName = spouse ? familyMemberName(spouse) : '';
+            const spouseDocument = spouse?.documentNumber ? (spouse.documentType ? `${spouse.documentType}-${spouse.documentNumber}` : spouse.documentNumber) : '';
+            const spousePhone = spouse ? text(spouse.personalPhoneCode, spouse.personalPhone) || text(spouse.homePhoneCode, spouse.homePhone) : '';
 
             return [
                 person.id,
@@ -252,12 +253,12 @@ export class PersonExportService {
                 new Date(person.updatedAt).toLocaleString('es-VE'),
                 person.createdBy,
                 family?.maritalStatus ?? '',
-                family?.spouseName ?? '',
-                family?.spouseDocumentNumber ?? '',
-                family?.spousePhone ?? '',
-                yesNo(family?.spouseWorksAtMpppst),
+                spouseName,
+                spouseDocument,
+                spousePhone,
+                yesNo(family?.spouseWorksAtMpppst || !!family?.spouseMpppstDepartment?.trim()),
                 family?.spouseMpppstDepartment ?? '',
-                family?.numberOfChildren ?? family?.children?.length ?? 0,
+                family?.numberOfChildren ?? 0,
                 childrenSummary(person),
                 familyMembersSummary(person),
                 vacation?.status ?? '',
@@ -327,6 +328,12 @@ export class PersonExportService {
         });
 
         return { headers, rows };
+    }
+
+    private toCsvCell(value: unknown): string {
+        const text = String(value ?? '');
+        const neutralized = /^[\t\r\n ]*[=+\-@]/.test(text) ? `'${text}` : text;
+        return `"${neutralized.replace(/"/g, '""')}"`;
     }
 
     private downloadBlob(blob: Blob, filename: string): void {

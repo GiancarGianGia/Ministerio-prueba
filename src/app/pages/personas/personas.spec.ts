@@ -1,7 +1,7 @@
 /// <reference types="jasmine" />
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter, Router } from '@angular/router';
+import { provideRouter } from '@angular/router';
 import { providePrimeNG } from 'primeng/config';
 import { MessageService } from 'primeng/api';
 import { strFromU8, unzipSync } from 'fflate';
@@ -85,14 +85,22 @@ describe('Personas Component - Búsqueda de trabajadores', () => {
         expect(results[0].firstName).toBe('Esperanza');
     });
 
-    it('debe abrir la administración de salud del trabajador seleccionado', () => {
-        const router = TestBed.inject(Router);
-        const navigateSpy = spyOn(router, 'navigate').and.resolveTo(true);
-        const person = component.persons()[0];
+    it('debe escapar los datos del trabajador en la ficha imprimible', () => {
+        const write = jasmine.createSpy('write');
+        spyOn(window, 'open').and.returnValue({ document: { write, close: () => {} } } as unknown as Window);
 
-        component.openHealth(person);
+        component.person = { ...component.persons()[0], firstName: '<img src=x onerror="alert(1)">' };
+        component.documentPrefix = 'V';
+        component.personalPhoneCode = '+58';
+        component.personalPhoneNumber = '4121234567';
+        component.homePhoneCode = '';
+        component.homePhoneNumber = '';
 
-        expect(navigateSpy).toHaveBeenCalledWith(['/salud'], { queryParams: { trabajador: person.id } });
+        component.printWorkerCard();
+
+        const html = write.calls.mostRecent().args[0] as string;
+        expect(html).not.toContain('<img src=x');
+        expect(html).toContain('&lt;img src=x');
     });
 
     it('no debe incluir un trabajador cuyo teléfono coincida con los dígitos buscados', () => {
@@ -200,31 +208,6 @@ describe('Personas Component - Búsqueda de trabajadores', () => {
         );
     });
 
-    it('no debe guardar un trabajador si la fecha de nacimiento de un hijo es imposible', () => {
-        const notify = spyOn(messageService, 'add');
-        const person = personService.persons()[0];
-        component.editPerson(person);
-        component.person.familyData!.children = [{ name: 'Hijo válido', birthDate: '2020-02-31' }];
-        component.person.familyData!.maritalStatus = 'Soltero/a';
-        component.person.email = 'hijo@dominio.com';
-
-        component.onChildBirthDateChange(0);
-
-        expect(component.childBirthDateError(0)).toContain('fecha válida en el calendario');
-        expect(notify).toHaveBeenCalledWith(
-            jasmine.objectContaining({
-                severity: 'error',
-                summary: 'Fecha de nacimiento del hijo/a inválida'
-            })
-        );
-
-        component.savePerson();
-
-        expect(component.personDialog).toBeTrue();
-        expect(component.activeEditTab).toBe('8');
-        expect(personService.persons().find((item) => item.id === person.id)?.firstName).toBe(person.firstName);
-    });
-
     it('debe guardar los cambios del trabajador', () => {
         const person = personService.persons()[0];
         component.editPerson(person);
@@ -275,6 +258,145 @@ describe('Personas Component - Búsqueda de trabajadores', () => {
         );
     });
 
+    it('debe bloquear el guardado de un menor de 9 años sin representante verificado en Sigefirrhh', () => {
+        const person = personService.persons()[0];
+        component.editPerson(person);
+        component.person.familyMembers = [
+            {
+                hasDocument: true,
+                hasDisability: false,
+                hasAllergies: false,
+                adoptedOrFoster: false,
+                firstName: 'Camila',
+                lastName: 'Gómez',
+                gender: 'Femenino',
+                birthDate: '2022-03-15',
+                maritalStatus: 'Soltero/a',
+                relationship: 'Hijo/a',
+                personalPhoneCode: '0412',
+                personalPhone: '5550000',
+                email: 'camila@dominio.com',
+                laterality: 'Diestro',
+                documentType: 'V',
+                documentNumber: '30123456'
+            }
+        ];
+
+        const validate = (component as unknown as { validateFamilyMembers(): string | null }).validateFamilyMembers();
+
+        expect(validate).toContain('documento del representante');
+        expect(component.familyMemberMedicalAllowed(component.person.familyMembers![0])).toBeFalse();
+    });
+
+    it('debe habilitar la atención médica cuando el representante está ACTIVO en Sigefirrhh', () => {
+        const person = personService.persons()[0];
+        component.editPerson(person);
+        component.person.familyMembers = [
+            {
+                hasDocument: true,
+                hasDisability: false,
+                hasAllergies: false,
+                adoptedOrFoster: false,
+                firstName: 'Camila',
+                lastName: 'Gómez',
+                gender: 'Femenino',
+                birthDate: '2022-03-15',
+                maritalStatus: 'Soltero/a',
+                relationship: 'Hijo/a',
+                personalPhoneCode: '0412',
+                personalPhone: '5550000',
+                email: 'camila@dominio.com',
+                laterality: 'Diestro',
+                documentType: 'V',
+                documentNumber: '30123456',
+                representativeDocumentType: 'V',
+                representativeDocumentNumber: '77888999'
+            }
+        ];
+
+        component.verifyFamilyMemberRepresentative(0);
+
+        const member = component.person.familyMembers![0];
+        expect(member.representativeName).toBe('Esperanza Gómez Valero');
+        expect(member.representativeStatus).toBe('ACTIVO');
+        expect(member.identitySource).toBe('SIGEFIRRHH');
+        expect(member.medicalAttentionEnabled).toBeTrue();
+        expect(component.familyMemberMedicalAllowed(member)).toBeTrue();
+        expect((component as unknown as { validateFamilyMembers(): string | null }).validateFamilyMembers()).toBeNull();
+    });
+
+    it('debe rechazar como representante a un trabajador EGRESADO', () => {
+        const egressed = personService.add(
+            {
+                firstName: 'Pedro',
+                lastName: 'Colmenares',
+                documentType: DOCUMENT_TYPES[0],
+                documentNumber: 'V-11567890',
+                birthDate: '1975-01-10',
+                gender: GENDERS[1],
+                phone: '+58 412 9999999',
+                address: '',
+                city: 'Caracas',
+                department: 'Distrito Capital',
+                type: 'Analista',
+                status: 'Egresado',
+                notes: ''
+            },
+            'Admin'
+        );
+        const person = personService.persons().find((item) => item.id !== egressed.id)!;
+        component.editPerson(person);
+        component.person.familyMembers = [
+            {
+                hasDocument: true,
+                hasDisability: false,
+                hasAllergies: false,
+                adoptedOrFoster: false,
+                firstName: 'Camila',
+                lastName: 'Gómez',
+                gender: 'Femenino',
+                birthDate: '2022-03-15',
+                documentType: 'V',
+                documentNumber: '30123456',
+                representativeDocumentType: 'V',
+                representativeDocumentNumber: '11567890'
+            }
+        ];
+
+        component.verifyFamilyMemberRepresentative(0);
+
+        const member = component.person.familyMembers![0];
+        expect(member.representativeName).toBeFalsy();
+        expect(member.medicalAttentionEnabled).toBeFalsy();
+        expect(component.familyMemberMedicalAllowed(member)).toBeFalse();
+    });
+
+    it('debe consultar el documento de un mayor de 9 años en la data SAIME', () => {
+        const person = personService.persons()[0];
+        component.editPerson(person);
+        component.person.familyMembers = [
+            {
+                hasDocument: true,
+                hasDisability: false,
+                hasAllergies: false,
+                adoptedOrFoster: false,
+                firstName: '',
+                lastName: '',
+                gender: '',
+                birthDate: '2010-01-01',
+                documentType: 'V',
+                documentNumber: '24123456'
+            }
+        ];
+
+        component.lookupFamilyMemberInSaime(0);
+
+        const member = component.person.familyMembers![0];
+        expect(member.firstName).toBe('Leonardo');
+        expect(member.lastName).toBe('Pérez');
+        expect(member.identitySource).toBe('SAIME');
+    });
+
     it('debe limpiar las opciones de estudio cuando no desea continuar estudios', () => {
         component.editPerson(personService.persons()[0]);
         component.person.academicData!.studyOptions = 'Postgrado';
@@ -310,9 +432,19 @@ describe('Personas Component - Búsqueda de trabajadores', () => {
                 notes: '',
                 familyData: {
                     maritalStatus: 'Soltero/a',
-                    numberOfChildren: 2,
-                    children: [{ name: 'Dato de hijo exportado', birthDate: '2020-01-01' }]
-                }
+                    numberOfChildren: 2
+                },
+                familyMembers: [
+                    {
+                        hasDocument: false,
+                        firstName: 'Dato de hijo exportado',
+                        birthDate: '2020-01-01',
+                        relationship: 'Hijo/a',
+                        hasDisability: false,
+                        hasAllergies: false,
+                        adoptedOrFoster: false
+                    }
+                ]
             },
             'Admin'
         );
@@ -364,9 +496,19 @@ describe('Personas Component - Búsqueda de trabajadores', () => {
                 notes: '',
                 familyData: {
                     maritalStatus: 'Casado/a',
-                    numberOfChildren: 1,
-                    children: [{ name: 'Hija en CSV', birthDate: '2018-05-01' }]
-                }
+                    numberOfChildren: 1
+                },
+                familyMembers: [
+                    {
+                        hasDocument: false,
+                        firstName: 'Hija en CSV',
+                        birthDate: '2018-05-01',
+                        relationship: 'Hijo/a',
+                        hasDisability: false,
+                        hasAllergies: false,
+                        adoptedOrFoster: false
+                    }
+                ]
             },
             'Admin'
         );

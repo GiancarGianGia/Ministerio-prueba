@@ -1,7 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterModule } from '@angular/router';
 import { ConfirmationService, MessageService } from 'primeng/api';
 import { AutoCompleteModule } from 'primeng/autocomplete';
 import { ButtonModule } from 'primeng/button';
@@ -32,7 +31,6 @@ import {
     BLOOD_TYPES,
     CHRONIC_PATHOLOGIES,
     CITIES_BY_DEPARTMENT,
-    ChildData,
     DEPARTMENTS,
     DISABILITY_GRADES,
     DISABILITY_TYPES,
@@ -46,6 +44,8 @@ import {
     HousingData,
     HOUSING_CONDITIONS,
     HOUSING_TYPES,
+    isChildMember,
+    isSpouseMember,
     JACKET_SIZES,
     LaborData,
     LATERALITY_OPTIONS,
@@ -65,11 +65,11 @@ import {
     SHOE_SIZES,
     SelectOption,
     TagSeverity,
-    USER_DOCUMENT_PREFIX_OPTIONS,
     VACATION_STATUSES,
     VacationData
 } from '@/app/services/models';
 import { PersonService } from '@/app/services/person.service';
+import { IdentityVerificationService } from '@/app/services/identity-verification.service';
 import { TREATMENT_CATALOG } from '@/app/services/treatment-catalog';
 import {
     composeDocumentNumber,
@@ -82,7 +82,6 @@ import {
     validateAcademicCompletionYear,
     validateAcademicInstitution,
     validateBirthDate,
-    validateCedula,
     validateChildBirthDate,
     validateDocument,
     validateEmail,
@@ -95,7 +94,6 @@ import {
     standalone: true,
     imports: [
         CommonModule,
-        RouterModule,
         FormsModule,
         TableModule,
         ButtonModule,
@@ -116,6 +114,58 @@ import {
         ConfirmDialogModule
     ],
     providers: [MessageService, ConfirmationService],
+    styles: [
+        `
+            :host ::ng-deep p-tab.tab-attention {
+                box-shadow: inset 0 0 0 2px #dc2626;
+                border-radius: 0.375rem;
+                color: #b91c1c;
+            }
+
+            .member-notice,
+            .member-verified,
+            .member-medical {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                padding: 0.65rem 0.85rem;
+                border-radius: 0.5rem;
+                font-size: 0.85rem;
+                line-height: 1.35;
+            }
+
+            .member-notice {
+                background: #eff6ff;
+                border: 1px solid #bfdbfe;
+                color: #1d4ed8;
+            }
+
+            .member-verified {
+                background: #ecfdf5;
+                border: 1px solid #a7f3d0;
+                color: #047857;
+            }
+
+            .member-medical {
+                background: #ecfdf5;
+                border: 1px solid #a7f3d0;
+                color: #047857;
+            }
+
+            .member-medical-blocked {
+                background: #fef2f2;
+                border: 1px solid #fecaca;
+                color: #b91c1c;
+            }
+
+            .member-verified-row {
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
+                flex-wrap: wrap;
+            }
+        `
+    ],
     templateUrl: './personas.html'
 })
 export class Personas {
@@ -129,7 +179,7 @@ export class Personas {
 
     private readonly personExportService = inject(PersonExportService);
 
-    private readonly router = inject(Router);
+    private readonly identityVerification = inject(IdentityVerificationService);
 
     readonly persons = this.personService.persons;
 
@@ -195,8 +245,6 @@ export class Personas {
         label: title.split(' — ')[1]?.split(' (')[0] ?? documentType,
         value
     }));
-
-    readonly cedulaPrefixOptions = USER_DOCUMENT_PREFIX_OPTIONS;
 
     readonly genderOptions = GENDERS.map((value) => ({ label: value, value }));
 
@@ -303,7 +351,24 @@ export class Personas {
 
     readonly homePhoneCodeOptions = HOME_PHONE_CODES.map((value) => ({ label: value, value }));
 
+    private static readonly TAB_ORDER = ['0', '7', '8', '2', '3', '4', '5', '6'] as const;
+
+    private static readonly TAB_LABELS: Record<string, string> = {
+        '0': 'Datos Básicos',
+        '7': 'Datos laborales',
+        '8': 'Grupo Familiar',
+        '2': 'Vacaciones',
+        '3': 'Datos médicos',
+        '4': 'Datos habitacionales',
+        '5': 'Datos adicionales',
+        '6': 'Datos académicos'
+    };
+
     activeEditTab = '0';
+
+    readonly showValidationHighlights = signal(false);
+
+    private tabSnapshots: Record<string, string> = {};
 
     personDialog = false;
 
@@ -329,13 +394,7 @@ export class Personas {
 
     secondaryEmergencyPhoneNumber = '';
 
-    spouseDocumentPrefix = '';
-
-    childDocumentPrefixes: string[] = [];
-
     birthDatePicker: Date | null = null;
-
-    childBirthDatePickers: (Date | null)[] = [];
 
     familyMemberBirthDatePickers: (Date | null)[] = [];
 
@@ -391,14 +450,10 @@ export class Personas {
         this.openPersonDialog(person);
     }
 
-    openHealth(person: Person): void {
-        this.router.navigate(['/salud'], { queryParams: { trabajador: person.id } });
-    }
-
     private openPersonDialog(person: Person): void {
         this.person = {
             ...person,
-            familyData: person.familyData ? { ...person.familyData, children: person.familyData.children ? [...person.familyData.children.map(c => ({ ...c }))] : [] } : this.emptyFamilyData(),
+            familyData: person.familyData ? { ...person.familyData } : this.emptyFamilyData(),
             familyMembers: (person.familyMembers ?? []).map((member) => ({ ...member })),
             vacationData: person.vacationData ? { ...person.vacationData } : this.emptyVacationData(),
             medicalData: {
@@ -442,20 +497,11 @@ export class Personas {
         const secondaryEmergencyPhone = splitPhoneNumber(this.person.medicalData?.secondaryEmergencyContactPhone ?? '');
         this.secondaryEmergencyPhoneCode = secondaryEmergencyPhone.code;
         this.secondaryEmergencyPhoneNumber = secondaryEmergencyPhone.number;
-        this.childBirthDatePickers = (this.person.familyData?.children ?? []).map((child) => this.fromStoredDate(child.birthDate));
         this.familyMemberBirthDatePickers = (this.person.familyMembers ?? []).map((member) => this.fromStoredDate(member.birthDate));
         this.selectedFamilyMemberIndex = -1;
         this.familyMemberEditing = false;
         this.documentPrefix = extractDocumentPrefix(this.person.documentNumber) || prefixForDocumentType(this.person.documentType);
         this.person.documentNumber = stripDocumentPrefix(this.person.documentNumber);
-        this.spouseDocumentPrefix = extractDocumentPrefix(this.person.familyData?.spouseDocumentNumber ?? '');
-        if (this.person.familyData?.spouseDocumentNumber) {
-            this.person.familyData.spouseDocumentNumber = stripDocumentPrefix(this.person.familyData.spouseDocumentNumber);
-        }
-        this.childDocumentPrefixes = (this.person.familyData?.children ?? []).map((child) => extractDocumentPrefix(child.documentNumber ?? ''));
-        for (const child of this.person.familyData?.children ?? []) {
-            child.documentNumber = stripDocumentPrefix(child.documentNumber ?? '');
-        }
         this.vacationStartPicker = this.fromStoredDate(this.person.vacationData?.lastVacationStart);
         this.vacationEndPicker = this.fromStoredDate(this.person.vacationData?.lastVacationEnd);
         this.mpppstEntryDatePicker = this.fromStoredDate(this.person.laborData?.mpppstEntryDate);
@@ -468,15 +514,17 @@ export class Personas {
         this.submitted = false;
         this.clearValidationState();
         this.activeEditTab = '0';
+        this.showValidationHighlights.set(false);
         this.personDialog = true;
         this.personSnapshot = this.serializePersonState();
+        this.captureTabSnapshots();
     }
 
     hideDialog(): void {
         if (!this.viewMode && this.hasUnsavedChanges()) {
             this.confirmationService.confirm({
                 header: 'Cambios sin guardar',
-                message: 'Tienes cambios sin guardar. ¿Deseas salir sin guardar?',
+                message: this.unsavedChangesMessage(),
                 icon: 'pi pi-exclamation-triangle',
                 acceptLabel: 'Salir sin guardar',
                 rejectLabel: 'Seguir editando',
@@ -498,7 +546,7 @@ export class Personas {
             this.personDialog = true;
             this.confirmationService.confirm({
                 header: 'Cambios sin guardar',
-                message: 'Tienes cambios sin guardar. ¿Deseas salir sin guardar?',
+                message: this.unsavedChangesMessage(),
                 icon: 'pi pi-exclamation-triangle',
                 acceptLabel: 'Salir sin guardar',
                 rejectLabel: 'Seguir editando',
@@ -519,6 +567,8 @@ export class Personas {
         this.viewMode = false;
         this.submitted = false;
         this.personSnapshot = '';
+        this.tabSnapshots = {};
+        this.showValidationHighlights.set(false);
         this.clearValidationState();
     }
 
@@ -540,10 +590,157 @@ export class Personas {
             emergencyPhoneNumber: this.emergencyPhoneNumber,
             secondaryEmergencyPhoneCode: this.secondaryEmergencyPhoneCode,
             secondaryEmergencyPhoneNumber: this.secondaryEmergencyPhoneNumber,
-            spouseDocumentPrefix: this.spouseDocumentPrefix,
-            childDocumentPrefixes: this.childDocumentPrefixes,
             citySelection: this.citySelection
         });
+    }
+
+    private captureTabSnapshots(): void {
+        this.tabSnapshots = {};
+        for (const tab of Personas.TAB_ORDER) {
+            this.tabSnapshots[tab] = this.serializeTab(tab);
+        }
+    }
+
+    private serializeTab(tab: string): string {
+        const medical = this.person.medicalData;
+        switch (tab) {
+            case '0':
+                return JSON.stringify({
+                    documentPrefix: this.documentPrefix,
+                    documentNumber: this.person.documentNumber,
+                    firstName: this.person.firstName,
+                    secondName: this.person.secondName ?? '',
+                    lastName: this.person.lastName,
+                    secondLastName: this.person.secondLastName ?? '',
+                    birthPlace: this.person.birthPlace ?? '',
+                    birthDate: this.person.birthDate,
+                    gender: this.person.gender,
+                    maritalStatus: this.person.familyData?.maritalStatus ?? '',
+                    personalPhoneCode: this.personalPhoneCode,
+                    personalPhoneNumber: this.personalPhoneNumber,
+                    homePhoneCode: this.homePhoneCode,
+                    homePhoneNumber: this.homePhoneNumber,
+                    email: this.person.email ?? '',
+                    rif: this.person.rif ?? ''
+                });
+            case '7':
+                return JSON.stringify({
+                    laborData: this.person.laborData,
+                    type: this.person.type,
+                    status: this.person.status
+                });
+            case '8':
+                return JSON.stringify(this.person.familyMembers ?? []);
+            case '2':
+                return JSON.stringify(this.person.vacationData ?? null);
+            case '3':
+                return JSON.stringify({
+                    chronicPathologies: medical?.chronicPathologies ?? [],
+                    allergies: medical?.allergies ?? '',
+                    observations: medical?.observations ?? '',
+                    emergencyContactName: medical?.emergencyContactName ?? '',
+                    emergencyContactRelationship: medical?.emergencyContactRelationship ?? '',
+                    secondaryEmergencyContactName: medical?.secondaryEmergencyContactName ?? '',
+                    secondaryEmergencyContactRelationship: medical?.secondaryEmergencyContactRelationship ?? '',
+                    emergencyPhoneCode: this.emergencyPhoneCode,
+                    emergencyPhoneNumber: this.emergencyPhoneNumber,
+                    secondaryEmergencyPhoneCode: this.secondaryEmergencyPhoneCode,
+                    secondaryEmergencyPhoneNumber: this.secondaryEmergencyPhoneNumber
+                });
+            case '4':
+                return JSON.stringify({
+                    department: this.person.department,
+                    city: this.person.city,
+                    citySelection: this.citySelection,
+                    address: this.person.address,
+                    housingData: this.person.housingData
+                });
+            case '5':
+                return JSON.stringify({
+                    additionalData: this.person.additionalData,
+                    numberOfChildren: this.person.familyData?.numberOfChildren ?? 0,
+                    spouseMpppstDepartment: this.person.familyData?.spouseMpppstDepartment ?? '',
+                    hasOccupationalDisease: medical?.hasOccupationalDisease ?? false,
+                    occupationalDiseaseDescription: medical?.occupationalDiseaseDescription ?? '',
+                    hasDisability: medical?.hasDisability ?? false,
+                    disabilityType: medical?.disabilityType ?? '',
+                    disabilityGrade: medical?.disabilityGrade ?? '',
+                    conapdisCode: medical?.conapdisCode ?? '',
+                    laterality: medical?.laterality ?? '',
+                    bloodType: medical?.bloodType ?? ''
+                });
+            case '6':
+                return JSON.stringify(this.person.academicData ?? null);
+            default:
+                return '';
+        }
+    }
+
+    private dirtyTabKeys(): string[] {
+        return Personas.TAB_ORDER.filter((tab) => this.tabSnapshots[tab] !== undefined && this.tabSnapshots[tab] !== this.serializeTab(tab));
+    }
+
+    dirtyTabLabels(): string[] {
+        return this.dirtyTabKeys().map((tab) => Personas.TAB_LABELS[tab] ?? `Pestaña ${tab}`);
+    }
+
+    private unsavedChangesMessage(): string {
+        const labels = this.dirtyTabLabels();
+        return labels.length
+            ? `Tienes cambios sin guardar en: ${labels.join(', ')}. ¿Deseas salir sin guardar?`
+            : 'Tienes cambios sin guardar. ¿Deseas salir sin guardar?';
+    }
+
+    tabHasIssues(tab: string): boolean {
+        return this.showValidationHighlights() && this.tabHasMissingData(tab);
+    }
+
+    private tabHasMissingData(tab: string): boolean {
+        switch (tab) {
+            case '0':
+                return (
+                    !this.documentPrefix ||
+                    !this.person.documentNumber?.trim() ||
+                    !this.person.firstName?.trim() ||
+                    !this.person.lastName?.trim() ||
+                    !this.person.familyData?.maritalStatus ||
+                    !this.personalPhoneCode ||
+                    !/^\d{7}$/.test(this.personalPhoneNumber.replace(/\D/g, '')) ||
+                    !this.person.email?.trim()
+                );
+            case '7':
+                return (
+                    !this.person.type?.trim() ||
+                    !this.person.laborData?.administrativeState ||
+                    !this.person.laborData?.physicalLocation?.trim() ||
+                    !this.person.laborData?.officePhoneCode ||
+                    !/^\d{7}$/.test((this.person.laborData?.officePhone ?? '').replace(/\D/g, ''))
+                );
+            case '8':
+                return !!this.validateFamilyMembers();
+            case '3':
+                return !!this.validateEmergencyContact(1) || !!this.validateEmergencyContact(2);
+            case '4':
+                return (
+                    !this.person.department ||
+                    !this.person.housingData?.municipality?.trim() ||
+                    !this.person.housingData?.parish?.trim() ||
+                    !this.hasAddressType() ||
+                    !this.person.housingData?.referencePoint?.trim()
+                );
+            case '6':
+                return (
+                    !this.person.academicData?.continueStudies ||
+                    (this.person.academicData?.titles ?? []).some(
+                        (title) =>
+                            !!this.validateAcademicTitle(title) ||
+                            !!validateAcademicInstitution(title.university ?? '') ||
+                            !!validateAcademicCompletionYear(title.completionYear ?? '')
+                    )
+                );
+            default:
+                return false;
+        }
     }
 
     onDepartmentChange(): void {
@@ -561,7 +758,7 @@ export class Personas {
     }
 
     private emptyFamilyData(): FamilyData {
-        return { maritalStatus: '', numberOfChildren: 0, children: [] };
+        return { maritalStatus: '', numberOfChildren: 0 };
     }
 
     private emptyVacationData(): VacationData {
@@ -617,31 +814,6 @@ export class Personas {
                 wantsToFacilitate: false
             }
         };
-    }
-
-    addChild(): void {
-        if (!this.person.familyData) {
-            this.person.familyData = this.emptyFamilyData();
-        }
-        if (!this.person.familyData.children) {
-            this.person.familyData.children = [];
-        }
-        this.person.familyData.children.push({ name: '', birthDate: '', documentNumber: '' });
-        this.childBirthDatePickers.push(null);
-        this.childDocumentPrefixes.push('');
-        if (this.person.familyData.children.length > (this.person.familyData.numberOfChildren || 0)) {
-            this.person.familyData.numberOfChildren = this.person.familyData.children.length;
-        }
-    }
-
-    removeChild(index: number): void {
-        this.person.familyData?.children?.splice(index, 1);
-        this.childBirthDatePickers.splice(index, 1);
-        this.childDocumentPrefixes.splice(index, 1);
-        this.clearChildValidationState();
-        if (this.person.familyData && (this.person.familyData.children?.length ?? 0) < this.person.familyData.numberOfChildren) {
-            this.person.familyData.numberOfChildren = this.person.familyData.children?.length ?? 0;
-        }
     }
 
     addFamilyMember(): void {
@@ -721,6 +893,159 @@ export class Personas {
         return member.documentNumber || 'Sin documento';
     }
 
+    familyMemberAge(member: FamilyMember): number | null {
+        const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(member.birthDate ?? '');
+        if (!match) {
+            return null;
+        }
+        const today = new Date();
+        const year = Number(match[1]);
+        const month = Number(match[2]);
+        const day = Number(match[3]);
+        let age = today.getFullYear() - year;
+        if (today.getMonth() + 1 < month || (today.getMonth() + 1 === month && today.getDate() < day)) {
+            age--;
+        }
+        return age >= 0 ? age : null;
+    }
+
+    familyMemberRequiresRepresentative(member: FamilyMember): boolean {
+        const age = this.familyMemberAge(member);
+        return age !== null && age < 9;
+    }
+
+    familyMemberUsesSaime(member: FamilyMember): boolean {
+        const age = this.familyMemberAge(member);
+        return age !== null && age >= 9;
+    }
+
+    onFamilyMemberHasDocumentChange(index: number, value: boolean): void {
+        const member = this.person.familyMembers?.[index];
+        if (!member) {
+            return;
+        }
+        member.hasDocument = value;
+        if (!value) {
+            member.documentType = '';
+            member.documentNumber = '';
+            member.identitySource = undefined;
+            member.medicalAttentionEnabled = false;
+            this.clearFamilyMemberMedicalData(member);
+        }
+    }
+
+    familyMemberMedicalAllowed(member: FamilyMember): boolean {
+        return !this.familyMemberRequiresRepresentative(member) || member.medicalAttentionEnabled === true;
+    }
+
+    familyMemberRepresentativeDocument(member: FamilyMember): string {
+        return member.representativeDocumentNumber?.trim()
+            ? composeDocumentNumber(member.representativeDocumentType ?? 'V', member.representativeDocumentNumber)
+            : 'Sin documento';
+    }
+
+    onFamilyMemberRepresentativeChange(member: FamilyMember): void {
+        member.representativeName = '';
+        member.representativeStatus = '';
+        member.identitySource = undefined;
+        member.medicalAttentionEnabled = false;
+        this.clearFamilyMemberMedicalData(member);
+    }
+
+    verifyFamilyMemberRepresentative(index: number): void {
+        const member = this.person.familyMembers?.[index];
+        if (!member) {
+            return;
+        }
+        if (!member.representativeDocumentType || !member.representativeDocumentNumber?.trim()) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'Representante requerido',
+                detail: 'Selecciona el tipo y escribe el nro. de documento del representante.',
+                life: 4000
+            });
+            return;
+        }
+
+        const document = composeDocumentNumber(member.representativeDocumentType, member.representativeDocumentNumber);
+        const documentError = validateDocument(documentTypeForPrefix(member.representativeDocumentType), document);
+        if (documentError) {
+            this.messageService.add({ severity: 'error', summary: 'Documento inválido', detail: documentError, life: 4000 });
+            return;
+        }
+
+        const result = this.identityVerification.verifyRepresentative(document);
+        if (!result.found || !result.active || !result.record) {
+            this.onFamilyMemberRepresentativeChange(member);
+            this.messageService.add({ severity: 'error', summary: 'Representante no válido', detail: result.message, life: 5000 });
+            return;
+        }
+
+        member.representativeName = result.record.fullName;
+        member.representativeStatus = 'ACTIVO';
+        member.identitySource = 'SIGEFIRRHH';
+        member.medicalAttentionEnabled = true;
+        member.representativeDocumentNumber = stripDocumentPrefix(member.representativeDocumentNumber);
+        this.messageService.add({ severity: 'success', summary: 'Representante verificado', detail: result.message, life: 4000 });
+    }
+
+    onFamilyMemberDocumentChange(member: FamilyMember): void {
+        if (member.identitySource === 'SAIME') {
+            member.identitySource = undefined;
+        }
+    }
+
+    lookupFamilyMemberInSaime(index: number): void {
+        const member = this.person.familyMembers?.[index];
+        if (!member) {
+            return;
+        }
+        if (!member.hasDocument || !member.documentType || !member.documentNumber?.trim()) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'Documento requerido',
+                detail: 'Selecciona el tipo y escribe el nro. de documento del beneficiario antes de consultar SAIME.',
+                life: 4000
+            });
+            return;
+        }
+
+        const document = composeDocumentNumber(member.documentType, member.documentNumber);
+        const documentError = validateDocument(documentTypeForPrefix(member.documentType), document);
+        if (documentError) {
+            this.messageService.add({ severity: 'error', summary: 'Documento inválido', detail: documentError, life: 4000 });
+            return;
+        }
+
+        const result = this.identityVerification.lookupSaime(document);
+        if (!result.found || !result.record) {
+            this.messageService.add({ severity: 'warn', summary: 'Sin resultados en SAIME', detail: result.message, life: 5000 });
+            return;
+        }
+
+        const record = result.record;
+        member.firstName = member.firstName?.trim() || record.firstName;
+        member.secondName = member.secondName?.trim() || record.secondName || '';
+        member.lastName = member.lastName?.trim() || record.lastName;
+        member.secondLastName = member.secondLastName?.trim() || record.secondLastName || '';
+        member.gender = member.gender || record.gender || '';
+        if (!member.birthDate && record.birthDate) {
+            member.birthDate = record.birthDate;
+            this.familyMemberBirthDatePickers[index] = this.fromStoredDate(record.birthDate);
+        }
+        member.identitySource = 'SAIME';
+        this.messageService.add({ severity: 'success', summary: 'Consultado en SAIME', detail: result.message, life: 4000 });
+    }
+
+    private clearFamilyMemberMedicalData(member: FamilyMember): void {
+        member.hasDisability = false;
+        member.disabilityType = '';
+        member.disabilityGrade = '';
+        member.conapdisCode = '';
+        member.hasAllergies = false;
+        member.allergyTypes = '';
+    }
+
     onFamilyMemberDisabilityChange(index: number, value: boolean): void {
         const member = this.person.familyMembers?.[index];
         if (!member) {
@@ -740,31 +1065,17 @@ export class Personas {
             return;
         }
         member.birthDate = this.toStoredDate(value);
+        if (member.identitySource === 'SIGEFIRRHH' && !this.familyMemberRequiresRepresentative(member)) {
+            this.onFamilyMemberRepresentativeChange(member);
+        } else if (member.identitySource === 'SAIME' && this.familyMemberRequiresRepresentative(member)) {
+            member.identitySource = undefined;
+        }
         this.touchedFields.add(`familyMemberBirthDate:${index}`);
         this.notifyValidationError(
             `familyMemberBirthDate:${index}`,
             member.birthDate ? validateChildBirthDate(member.birthDate) : null,
             'Fecha de nacimiento inválida'
         );
-    }
-
-    trackByIndex(index: number): number {
-        return index;
-    }
-
-    hasSpouseFields(): boolean {
-        const status = this.person.familyData?.maritalStatus;
-        const hasExistingSpouse = !!this.person.familyData?.spouseName?.trim();
-        const partnerStatuses = [
-            'Casado/a',
-            'Unión estable',
-            'Unión estable de hecho / Concubinato',
-            'Separado/a',
-            'Separado/a de hecho',
-            'Separado/a legalmente',
-            'Comprometido/a'
-        ];
-        return hasExistingSpouse || (!!status && partnerStatuses.includes(status));
     }
 
     firstNameError(): string {
@@ -860,22 +1171,6 @@ export class Personas {
         return validateBirthDate(this.person.birthDate) ?? '';
     }
 
-    childNameError(index: number): string {
-        const child = this.person.familyData?.children?.[index];
-        if (!child || (!this.submitted && !this.touchedFields.has(`childName:${index}`))) {
-            return '';
-        }
-        return validatePersonName(child.name, 'nombre del hijo/a') ?? '';
-    }
-
-    childBirthDateError(index: number): string {
-        const child = this.person.familyData?.children?.[index];
-        if (!child || (!this.submitted && !this.touchedFields.has(`childBirthDate:${index}`))) {
-            return '';
-        }
-        return validateChildBirthDate(child.birthDate) ?? '';
-    }
-
     addAcademicTitle(): void {
         this.person.academicData?.titles.push({ academicLevel: '', specialty: '', graduated: undefined, university: '', completionYear: '' });
     }
@@ -925,13 +1220,6 @@ export class Personas {
             return 'Selecciona si está graduado(a) en ese título.';
         }
         return null;
-    }
-
-    optionalCedulaError(field: string, value: string | undefined): string {
-        if ((!this.submitted && !this.touchedFields.has(field)) || !value?.trim()) {
-            return '';
-        }
-        return this.validateOptionalCedula(field, value) ?? '';
     }
 
     onFirstNameChange(): void {
@@ -1074,11 +1362,6 @@ export class Personas {
         this.validateDocumentOnChange();
     }
 
-    onOptionalCedulaChange(field: string, value: string | undefined): void {
-        this.touchedFields.add(field);
-        this.notifyValidationError(field, this.validateOptionalCedula(field, value), 'Cédula inválida');
-    }
-
     onBirthDateChange(): void {
         this.touchedFields.add('birthDate');
         this.notifyValidationError('birthDate', this.person.birthDate ? validateBirthDate(this.person.birthDate) : null, 'Fecha de nacimiento inválida');
@@ -1087,26 +1370,6 @@ export class Personas {
     onBirthDatePickerChange(value: Date | null): void {
         this.person.birthDate = this.toStoredDate(value);
         this.onBirthDateChange();
-    }
-
-    onChildNameChange(index: number): void {
-        this.touchedFields.add(`childName:${index}`);
-        const child = this.person.familyData?.children?.[index];
-        this.notifyValidationError(`childName:${index}`, child ? validatePersonName(child.name, 'nombre del hijo/a') : null, 'Nombre del hijo/a inválido');
-    }
-
-    onChildBirthDateChange(index: number): void {
-        this.touchedFields.add(`childBirthDate:${index}`);
-        const child = this.person.familyData?.children?.[index];
-        this.notifyValidationError(`childBirthDate:${index}`, child ? validateChildBirthDate(child.birthDate) : null, 'Fecha de nacimiento del hijo/a inválida');
-    }
-
-    onChildBirthDatePickerChange(index: number, value: Date | null): void {
-        const child = this.person.familyData?.children?.[index];
-        if (child) {
-            child.birthDate = this.toStoredDate(value);
-        }
-        this.onChildBirthDateChange(index);
     }
 
     onVacationStartChange(value: Date | null): void {
@@ -1192,25 +1455,6 @@ export class Personas {
         this.notifyValidationError('document', error, 'Documento inválido');
     }
 
-    private validateOptionalCedula(field: string, value: string | undefined): string | null {
-        if (!value?.trim()) {
-            return null;
-        }
-        const prefix = this.optionalCedulaPrefix(field);
-        if (!prefix) {
-            return 'Selecciona el tipo de documento (V o E).';
-        }
-        return validateCedula(composeDocumentNumber(prefix, value));
-    }
-
-    private optionalCedulaPrefix(field: string): string {
-        if (field === 'spouseDocument') {
-            return this.spouseDocumentPrefix;
-        }
-        const match = /^childDocument:(\d+)$/.exec(field);
-        return match ? (this.childDocumentPrefixes[Number(match[1])] ?? '') : '';
-    }
-
     private notifyValidationError(field: string, error: string | null, summary: string): void {
         if (!error) {
             this.notifiedValidationErrors.delete(field);
@@ -1226,19 +1470,6 @@ export class Personas {
     private clearValidationState(): void {
         this.touchedFields.clear();
         this.notifiedValidationErrors.clear();
-    }
-
-    private clearChildValidationState(): void {
-        for (const field of this.touchedFields) {
-            if (field.startsWith('childName:') || field.startsWith('childBirthDate:')) {
-                this.touchedFields.delete(field);
-            }
-        }
-        for (const field of this.notifiedValidationErrors.keys()) {
-            if (field.startsWith('childName:') || field.startsWith('childBirthDate:')) {
-                this.notifiedValidationErrors.delete(field);
-            }
-        }
     }
 
     private startOfDay(date: Date): Date {
@@ -1307,6 +1538,26 @@ export class Personas {
             if (birthDateError) {
                 return birthDateError;
             }
+
+            const age = this.familyMemberAge(member);
+            if (age !== null && age < 9) {
+                if (!member.hasDocument) {
+                    if (!member.certificateNumber?.trim()) {
+                        return `Registra el nro. de certificado de nacimiento del ${position} (menor de 9 años).`;
+                    }
+                } else {
+                    if (!member.representativeDocumentType || !member.representativeDocumentNumber?.trim()) {
+                        return `Registra el nro. de documento del representante del ${position} (menor de 9 años).`;
+                    }
+                    if (
+                        member.identitySource !== 'SIGEFIRRHH' ||
+                        member.representativeStatus !== 'ACTIVO' ||
+                        !member.representativeName?.trim()
+                    ) {
+                        return `Verifica en Sigefirrhh el documento del representante del ${position}: debe ser un trabajador ACTIVO.`;
+                    }
+                }
+            }
             if (!member.maritalStatus) {
                 return `Selecciona el estado civil del ${position}.`;
             }
@@ -1357,8 +1608,10 @@ export class Personas {
 
     savePerson(): void {
         this.submitted = true;
+        this.showValidationHighlights.set(true);
 
         if (!this.documentPrefix) {
+            this.activeEditTab = '0';
             this.messageService.add({
                 severity: 'error',
                 summary: 'Documento requerido',
@@ -1476,32 +1729,6 @@ export class Personas {
             return;
         }
 
-        const spouseCedula = this.person.familyData?.spouseDocumentNumber?.trim();
-        if (spouseCedula) {
-            if (!this.spouseDocumentPrefix) {
-                this.activeEditTab = '8';
-                this.messageService.add({ severity: 'error', summary: 'Documento del cónyuge requerido', detail: 'Selecciona el tipo de documento (V o E) del cónyuge.', life: 4000 });
-                return;
-            }
-            const spouseCedulaError = validateCedula(composeDocumentNumber(this.spouseDocumentPrefix, spouseCedula));
-            if (spouseCedulaError) {
-                this.activeEditTab = '8';
-                this.messageService.add({ severity: 'error', summary: 'Cédula del cónyuge inválida', detail: spouseCedulaError, life: 4000 });
-                return;
-            }
-            this.person.familyData!.spouseDocumentNumber = composeDocumentNumber(this.spouseDocumentPrefix, spouseCedula);
-        }
-
-        const spousePhone = this.person.familyData?.spousePhone?.trim();
-        if (spousePhone) {
-            const spousePhoneError = validatePhone(spousePhone);
-            if (spousePhoneError) {
-                this.activeEditTab = '8';
-                this.messageService.add({ severity: 'error', summary: 'Teléfono del cónyuge inválido', detail: spousePhoneError, life: 4000 });
-                return;
-            }
-        }
-
         if (this.person.birthDate) {
             const birthErr = validateBirthDate(this.person.birthDate);
             if (birthErr) {
@@ -1512,48 +1739,6 @@ export class Personas {
                     life: 4000
                 });
                 return;
-            }
-        }
-
-        for (const [index, child] of (this.person.familyData?.children ?? []).entries()) {
-            const childNameErr = validatePersonName(child.name, 'nombre del hijo/a');
-            if (childNameErr) {
-                this.activeEditTab = '8';
-                this.messageService.add({
-                    severity: 'error',
-                    summary: 'Nombre del hijo/a inválido',
-                    detail: childNameErr,
-                    life: 4000
-                });
-                return;
-            }
-
-            const childBirthDateErr = validateChildBirthDate(child.birthDate);
-            if (childBirthDateErr) {
-                this.activeEditTab = '8';
-                this.messageService.add({
-                    severity: 'error',
-                    summary: 'Fecha de nacimiento del hijo/a inválida',
-                    detail: childBirthDateErr,
-                    life: 4000
-                });
-                return;
-            }
-
-            if (child.documentNumber?.trim()) {
-                const prefix = this.childDocumentPrefixes[index] ?? '';
-                if (!prefix) {
-                    this.activeEditTab = '8';
-                    this.messageService.add({ severity: 'error', summary: 'Documento del hijo/a requerido', detail: 'Selecciona el tipo de documento (V o E) del hijo/a.', life: 4000 });
-                    return;
-                }
-                child.documentNumber = composeDocumentNumber(prefix, child.documentNumber);
-                const childCedulaErr = validateCedula(child.documentNumber);
-                if (childCedulaErr) {
-                    this.activeEditTab = '8';
-                    this.messageService.add({ severity: 'error', summary: 'Cédula del hijo/a inválida', detail: childCedulaErr, life: 4000 });
-                    return;
-                }
             }
         }
 
@@ -1705,6 +1890,10 @@ export class Personas {
             return;
         }
 
+        if (this.person.familyData) {
+            this.person.familyData.spouseWorksAtMpppst = !!this.person.familyData.spouseMpppstDepartment?.trim();
+        }
+
         const input: NewPersonInput = {
             firstName: this.person.firstName,
             secondName: this.person.secondName,
@@ -1749,6 +1938,8 @@ export class Personas {
 
         this.personDialog = false;
         this.personSnapshot = '';
+        this.tabSnapshots = {};
+        this.showValidationHighlights.set(false);
         this.messageService.add({
             severity: 'success',
             summary: 'Trabajador actualizado',
@@ -1772,6 +1963,8 @@ export class Personas {
         const additional = p.additionalData;
         const vacation = p.vacationData;
 
+        const esc = (value: unknown): string => this.escapeHtml(value);
+
         const addressParts = [
             housing?.thoroughfareType ? `${housing.thoroughfareType}: ${housing.thoroughfareDetails ?? ''}` : '',
             housing?.buildingType ? `${housing.buildingType}: ${housing.buildingDetails ?? ''}` : '',
@@ -1779,22 +1972,30 @@ export class Personas {
             housing?.zoneType ? `${housing.zoneType}: ${housing.zoneDetails ?? ''}` : ''
         ].filter(Boolean).join(' · ');
 
+        const familyMembers = p.familyMembers ?? [];
+        const spouse = familyMembers.find(isSpouseMember);
+        const spouseName = spouse ? this.familyMemberFullName(spouse) : '';
+
         const pathologiesHtml = (medical?.chronicPathologies ?? [])
-            .map((row) => `<li><strong>${row.pathology}</strong>${row.treatment ? ` — ${row.treatment}` : ''}${row.observation ? ` (${row.observation})` : ''}</li>`)
+            .map((row) => `<li><strong>${esc(row.pathology)}</strong>${row.treatment ? ` — ${esc(row.treatment)}` : ''}${row.observation ? ` (${esc(row.observation)})` : ''}</li>`)
             .join('') || '<li>Ninguna registrada</li>';
 
-        const childrenHtml = (family?.children ?? [])
-            .map((c) => `<li>${c.name}${c.birthDate ? ` (${c.birthDate})` : ''}${c.documentNumber ? ` — ${c.documentNumber}` : ''}</li>`)
+        const childrenHtml = familyMembers
+            .filter(isChildMember)
+            .map((member) => {
+                const documentNumber = member.documentNumber ? `${member.documentType ?? ''}${member.documentNumber}` : '';
+                return `<li>${esc(this.familyMemberFullName(member))}${member.birthDate ? ` (${esc(member.birthDate)})` : ''}${documentNumber ? ` — ${esc(documentNumber)}` : ''}</li>`;
+            })
             .join('') || '<li>Sin hijos registrados</li>';
 
         const titlesHtml = (academic?.titles ?? [])
-            .map((t) => `<li>${t.academicLevel ?? ''}${t.specialty ? ` en ${t.specialty}` : ''} — ${t.university ?? ''}${t.completionYear ? ` (${t.completionYear})` : ''} ${t.graduated ? '✓ Graduado' : '○ No graduado'}</li>`)
+            .map((t) => `<li>${esc(t.academicLevel ?? '')}${t.specialty ? ` en ${esc(t.specialty)}` : ''} — ${esc(t.university ?? '')}${t.completionYear ? ` (${esc(t.completionYear)})` : ''} ${t.graduated ? '✓ Graduado' : '○ No graduado'}</li>`)
             .join('') || '<li>Sin títulos registrados</li>';
 
-        const familyMembersHtml = (p.familyMembers ?? [])
-            .map((m) => {
-                const mName = [m.firstName, m.secondName, m.lastName, m.secondLastName].filter(Boolean).join(' ') || 'Sin nombre';
-                return `<li>${mName} — ${m.relationship ?? 'Sin parentesco'}${m.documentNumber ? ` (${m.documentType ?? ''}${m.documentNumber})` : ''}</li>`;
+        const familyMembersHtml = familyMembers
+            .map((member) => {
+                const memberName = esc(this.familyMemberFullName(member));
+                return `<li>${memberName} — ${esc(member.relationship ?? 'Sin parentesco')}${member.documentNumber ? ` (${esc(member.documentType ?? '')}${esc(member.documentNumber)})` : ''}</li>`;
             })
             .join('') || '<li>Sin integrantes registrados</li>';
 
@@ -1806,7 +2007,7 @@ export class Personas {
         <html lang="es">
         <head>
             <meta charset="UTF-8">
-            <title>Ficha del Trabajador — ${fullName}</title>
+            <title>Ficha del Trabajador — ${esc(fullName)}</title>
             <style>
                 * { margin: 0; padding: 0; box-sizing: border-box; }
                 body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 10pt; color: #1a1a1a; line-height: 1.4; padding: 10mm; }
@@ -1840,63 +2041,63 @@ export class Personas {
             <div class="section">
                 <div class="section-title">1. Datos Básicos</div>
                 <div class="data-grid">
-                    <div class="data-item"><span class="label">Nombre completo</span><span class="value">${fullName}</span></div>
-                    <div class="data-item"><span class="label">Documento de identidad</span><span class="value">${doc}</span></div>
-                    <div class="data-item"><span class="label">Fecha de nacimiento</span><span class="value">${p.birthDate || '—'}</span></div>
-                    <div class="data-item"><span class="label">Lugar de nacimiento</span><span class="value">${p.birthPlace || '—'}</span></div>
-                    <div class="data-item"><span class="label">Sexo</span><span class="value">${p.gender || '—'}</span></div>
-                    <div class="data-item"><span class="label">Estado civil</span><span class="value">${family?.maritalStatus || '—'}</span></div>
-                    <div class="data-item"><span class="label">Teléfono personal</span><span class="value">${phone}</span></div>
-                    <div class="data-item"><span class="label">Teléfono de habitación</span><span class="value">${homePhone}</span></div>
-                    <div class="data-item"><span class="label">Correo electrónico</span><span class="value">${p.email || '—'}</span></div>
-                    <div class="data-item"><span class="label">RIF</span><span class="value">${p.rif || '—'}</span></div>
-                    <div class="data-item"><span class="label">Estado</span><span class="value">${p.department || '—'}</span></div>
-                    <div class="data-item"><span class="label">Ciudad</span><span class="value">${p.city || '—'}</span></div>
+                    <div class="data-item"><span class="label">Nombre completo</span><span class="value">${esc(fullName)}</span></div>
+                    <div class="data-item"><span class="label">Documento de identidad</span><span class="value">${esc(doc)}</span></div>
+                    <div class="data-item"><span class="label">Fecha de nacimiento</span><span class="value">${esc(p.birthDate) || '—'}</span></div>
+                    <div class="data-item"><span class="label">Lugar de nacimiento</span><span class="value">${esc(p.birthPlace) || '—'}</span></div>
+                    <div class="data-item"><span class="label">Sexo</span><span class="value">${esc(p.gender) || '—'}</span></div>
+                    <div class="data-item"><span class="label">Estado civil</span><span class="value">${esc(family?.maritalStatus) || '—'}</span></div>
+                    <div class="data-item"><span class="label">Teléfono personal</span><span class="value">${esc(phone)}</span></div>
+                    <div class="data-item"><span class="label">Teléfono de habitación</span><span class="value">${esc(homePhone)}</span></div>
+                    <div class="data-item"><span class="label">Correo electrónico</span><span class="value">${esc(p.email) || '—'}</span></div>
+                    <div class="data-item"><span class="label">RIF</span><span class="value">${esc(p.rif) || '—'}</span></div>
+                    <div class="data-item"><span class="label">Estado</span><span class="value">${esc(p.department) || '—'}</span></div>
+                    <div class="data-item"><span class="label">Ciudad</span><span class="value">${esc(p.city) || '—'}</span></div>
                 </div>
             </div>
 
             <div class="section">
                 <div class="section-title">2. Datos Laborales</div>
                 <div class="data-grid">
-                    <div class="data-item"><span class="label">Cargo</span><span class="value">${p.type || '—'}</span></div>
-                    <div class="data-item"><span class="label">Estatus</span><span class="value">${p.status}</span></div>
-                    <div class="data-item"><span class="label">Ubicación administrativa</span><span class="value">${labor?.administrativeLocation || '—'} (${labor?.administrativeState || '—'})</span></div>
-                    <div class="data-item"><span class="label">Ubicación física</span><span class="value">${labor?.physicalLocation || '—'}</span></div>
-                    <div class="data-item"><span class="label">Cargo titular</span><span class="value">${labor?.titularPosition || '—'}</span></div>
-                    <div class="data-item"><span class="label">Tipo de trabajador</span><span class="value">${labor?.workerType || '—'}</span></div>
-                    <div class="data-item"><span class="label">Código de nómina</span><span class="value">${labor?.payrollCode || '—'}</span></div>
-                    <div class="data-item"><span class="label">Teléfono de oficina</span><span class="value">${labor?.officePhoneCode ?? ''}${labor?.officePhone ?? ''}</span></div>
-                    <div class="data-item"><span class="label">Ingreso al MPPPST</span><span class="value">${labor?.mpppstEntryDate || '—'}</span></div>
-                    <div class="data-item"><span class="label">Ingreso Adm. Pública</span><span class="value">${labor?.publicAdministrationEntryDate || '—'}</span></div>
+                    <div class="data-item"><span class="label">Cargo</span><span class="value">${esc(p.type) || '—'}</span></div>
+                    <div class="data-item"><span class="label">Estatus</span><span class="value">${esc(p.status)}</span></div>
+                    <div class="data-item"><span class="label">Ubicación administrativa</span><span class="value">${esc(labor?.administrativeLocation) || '—'} (${esc(labor?.administrativeState) || '—'})</span></div>
+                    <div class="data-item"><span class="label">Ubicación física</span><span class="value">${esc(labor?.physicalLocation) || '—'}</span></div>
+                    <div class="data-item"><span class="label">Cargo titular</span><span class="value">${esc(labor?.titularPosition) || '—'}</span></div>
+                    <div class="data-item"><span class="label">Tipo de trabajador</span><span class="value">${esc(labor?.workerType) || '—'}</span></div>
+                    <div class="data-item"><span class="label">Código de nómina</span><span class="value">${esc(labor?.payrollCode) || '—'}</span></div>
+                    <div class="data-item"><span class="label">Teléfono de oficina</span><span class="value">${esc(labor?.officePhoneCode ?? '')}${esc(labor?.officePhone ?? '')}</span></div>
+                    <div class="data-item"><span class="label">Ingreso al MPPPST</span><span class="value">${esc(labor?.mpppstEntryDate) || '—'}</span></div>
+                    <div class="data-item"><span class="label">Ingreso Adm. Pública</span><span class="value">${esc(labor?.publicAdministrationEntryDate) || '—'}</span></div>
                 </div>
             </div>
 
             <div class="section">
                 <div class="section-title">3. Datos Médicos</div>
                 <div class="data-grid">
-                    <div class="data-item"><span class="label">Tipo de sangre</span><span class="value">${medical?.bloodType || '—'}</span></div>
-                    <div class="data-item"><span class="label">Lateralidad</span><span class="value">${medical?.laterality || '—'}</span></div>
-                    <div class="data-item"><span class="label">Discapacidad</span><span class="value">${medical?.hasDisability ? `Sí — ${medical?.disabilityType ?? ''} (${medical?.disabilityGrade ?? ''})` : 'No'}</span></div>
-                    <div class="data-item"><span class="label">Enfermedad ocupacional</span><span class="value">${medical?.hasOccupationalDisease ? `Sí — ${medical?.occupationalDiseaseDescription ?? ''}` : 'No'}</span></div>
-                    <div class="data-item data-full"><span class="label">Alergias</span><span class="value">${medical?.allergies || 'Ninguna registrada'}</span></div>
+                    <div class="data-item"><span class="label">Tipo de sangre</span><span class="value">${esc(medical?.bloodType) || '—'}</span></div>
+                    <div class="data-item"><span class="label">Lateralidad</span><span class="value">${esc(medical?.laterality) || '—'}</span></div>
+                    <div class="data-item"><span class="label">Discapacidad</span><span class="value">${medical?.hasDisability ? `Sí — ${esc(medical?.disabilityType ?? '')} (${esc(medical?.disabilityGrade ?? '')})` : 'No'}</span></div>
+                    <div class="data-item"><span class="label">Enfermedad ocupacional</span><span class="value">${medical?.hasOccupationalDisease ? `Sí — ${esc(medical?.occupationalDiseaseDescription ?? '')}` : 'No'}</span></div>
+                    <div class="data-item data-full"><span class="label">Alergias</span><span class="value">${esc(medical?.allergies) || 'Ninguna registrada'}</span></div>
                     <div class="data-item data-full"><span class="label">Patologías crónicas</span><ul>${pathologiesHtml}</ul></div>
-                    <div class="data-item"><span class="label">Contacto de emergencia</span><span class="value">${medical?.emergencyContactName || '—'} (${medical?.emergencyContactRelationship || '—'}) — ${medical?.emergencyContactPhone || '—'}</span></div>
-                    <div class="data-item"><span class="label">2do contacto de emergencia</span><span class="value">${medical?.secondaryEmergencyContactName || '—'} (${medical?.secondaryEmergencyContactRelationship || '—'}) — ${medical?.secondaryEmergencyContactPhone || '—'}</span></div>
+                    <div class="data-item"><span class="label">Contacto de emergencia</span><span class="value">${esc(medical?.emergencyContactName) || '—'} (${esc(medical?.emergencyContactRelationship) || '—'}) — ${esc(medical?.emergencyContactPhone) || '—'}</span></div>
+                    <div class="data-item"><span class="label">2do contacto de emergencia</span><span class="value">${esc(medical?.secondaryEmergencyContactName) || '—'} (${esc(medical?.secondaryEmergencyContactRelationship) || '—'}) — ${esc(medical?.secondaryEmergencyContactPhone) || '—'}</span></div>
                 </div>
             </div>
 
             <div class="section">
                 <div class="section-title">4. Datos Habitacionales</div>
                 <div class="data-grid">
-                    <div class="data-item"><span class="label">Municipio</span><span class="value">${housing?.municipality || '—'}</span></div>
-                    <div class="data-item"><span class="label">Parroquia</span><span class="value">${housing?.parish || '—'}</span></div>
-                    <div class="data-item data-full"><span class="label">Dirección</span><span class="value">${addressParts || '—'}</span></div>
-                    <div class="data-item"><span class="label">Punto de referencia</span><span class="value">${housing?.referencePoint || '—'}</span></div>
-                    <div class="data-item"><span class="label">Tipo de vivienda</span><span class="value">${housing?.housingType || '—'}</span></div>
-                    <div class="data-item"><span class="label">Condición</span><span class="value">${housing?.housingCondition || '—'}</span></div>
-                    <div class="data-item"><span class="label">Años en la dirección</span><span class="value">${housing?.yearsAtAddress ?? '—'}</span></div>
-                    <div class="data-item"><span class="label">Habitaciones</span><span class="value">${housing?.numberOfRooms ?? '—'}</span></div>
-                    <div class="data-item"><span class="label">Personas en la vivienda</span><span class="value">${housing?.numberOfPeopleInHouse ?? '—'}</span></div>
+                    <div class="data-item"><span class="label">Municipio</span><span class="value">${esc(housing?.municipality) || '—'}</span></div>
+                    <div class="data-item"><span class="label">Parroquia</span><span class="value">${esc(housing?.parish) || '—'}</span></div>
+                    <div class="data-item data-full"><span class="label">Dirección</span><span class="value">${esc(addressParts) || '—'}</span></div>
+                    <div class="data-item"><span class="label">Punto de referencia</span><span class="value">${esc(housing?.referencePoint) || '—'}</span></div>
+                    <div class="data-item"><span class="label">Tipo de vivienda</span><span class="value">${esc(housing?.housingType) || '—'}</span></div>
+                    <div class="data-item"><span class="label">Condición</span><span class="value">${esc(housing?.housingCondition) || '—'}</span></div>
+                    <div class="data-item"><span class="label">Años en la dirección</span><span class="value">${esc(housing?.yearsAtAddress ?? '—')}</span></div>
+                    <div class="data-item"><span class="label">Habitaciones</span><span class="value">${esc(housing?.numberOfRooms ?? '—')}</span></div>
+                    <div class="data-item"><span class="label">Personas en la vivienda</span><span class="value">${esc(housing?.numberOfPeopleInHouse ?? '—')}</span></div>
                     <div class="data-item"><span class="label">Servicios básicos</span><span class="value">${housing?.hasBasicServices ? 'Sí' : 'No'}</span></div>
                 </div>
             </div>
@@ -1904,9 +2105,9 @@ export class Personas {
             <div class="section">
                 <div class="section-title">5. Grupo Familiar</div>
                 <div class="data-grid">
-                    <div class="data-item"><span class="label">Estado civil</span><span class="value">${family?.maritalStatus || '—'}</span></div>
-                    <div class="data-item"><span class="label">Número de hijos</span><span class="value">${family?.numberOfChildren ?? 0}</span></div>
-                    <div class="data-item"><span class="label">Cónyuge</span><span class="value">${family?.spouseName || '—'}</span></div>
+                    <div class="data-item"><span class="label">Estado civil</span><span class="value">${esc(family?.maritalStatus) || '—'}</span></div>
+                    <div class="data-item"><span class="label">Número de hijos</span><span class="value">${esc(family?.numberOfChildren ?? 0)}</span></div>
+                    <div class="data-item"><span class="label">Cónyuge</span><span class="value">${esc(spouseName) || '—'}</span></div>
                     <div class="data-item data-full"><span class="label">Hijos</span><ul>${childrenHtml}</ul></div>
                     <div class="data-item data-full"><span class="label">Integrantes del grupo familiar</span><ul>${familyMembersHtml}</ul></div>
                 </div>
@@ -1916,7 +2117,7 @@ export class Personas {
                 <div class="section-title">6. Datos Académicos</div>
                 <div class="data-grid">
                     <div class="data-item data-full"><span class="label">Títulos obtenidos</span><ul>${titlesHtml}</ul></div>
-                    <div class="data-item"><span class="label">¿Desea continuar estudios?</span><span class="value">${academic?.continueStudies || '—'}${academic?.continueStudies === 'Sí' && academic?.studyOptions ? ` (${academic.studyOptions})` : ''}</span></div>
+                    <div class="data-item"><span class="label">¿Desea continuar estudios?</span><span class="value">${esc(academic?.continueStudies) || '—'}${academic?.continueStudies === 'Sí' && academic?.studyOptions ? ` (${esc(academic.studyOptions)})` : ''}</span></div>
                     <div class="data-item"><span class="label">¿Desea facilitar conocimientos?</span><span class="value">${academic?.wantsToFacilitate ? 'Sí' : 'No'}</span></div>
                 </div>
             </div>
@@ -1924,21 +2125,21 @@ export class Personas {
             <div class="section">
                 <div class="section-title">7. Vacaciones</div>
                 <div class="data-grid three-cols">
-                    <div class="data-item"><span class="label">Estatus</span><span class="value">${vacation?.status || '—'}</span></div>
-                    <div class="data-item"><span class="label">Última salida</span><span class="value">${vacation?.lastVacationStart || '—'}</span></div>
-                    <div class="data-item"><span class="label">Último regreso</span><span class="value">${vacation?.lastVacationEnd || '—'}</span></div>
-                    <div class="data-item"><span class="label">Días pendientes</span><span class="value">${vacation?.pendingDays ?? '—'}</span></div>
+                    <div class="data-item"><span class="label">Estatus</span><span class="value">${esc(vacation?.status) || '—'}</span></div>
+                    <div class="data-item"><span class="label">Última salida</span><span class="value">${esc(vacation?.lastVacationStart) || '—'}</span></div>
+                    <div class="data-item"><span class="label">Último regreso</span><span class="value">${esc(vacation?.lastVacationEnd) || '—'}</span></div>
+                    <div class="data-item"><span class="label">Días pendientes</span><span class="value">${esc(vacation?.pendingDays ?? '—')}</span></div>
                 </div>
             </div>
 
             <div class="section">
                 <div class="section-title">8. Datos Adicionales</div>
                 <div class="data-grid three-cols">
-                    <div class="data-item"><span class="label">Inscripción militar</span><span class="value">${additional?.militaryRegistration || '—'}${additional?.militaryRegistration === 'Sí' && additional?.militaryRegistrationNumber ? ` (${additional.militaryRegistrationNumber})` : ''}</span></div>
-                    <div class="data-item"><span class="label">Talla de camisa</span><span class="value">${additional?.shirtSize || '—'}</span></div>
-                    <div class="data-item"><span class="label">Talla de pantalón</span><span class="value">${additional?.pantsSize || '—'}</span></div>
-                    <div class="data-item"><span class="label">Talla de calzado</span><span class="value">${additional?.shoeSize || '—'}</span></div>
-                    <div class="data-item"><span class="label">Talla de chaqueta</span><span class="value">${additional?.jacketSize || '—'}</span></div>
+                    <div class="data-item"><span class="label">Inscripción militar</span><span class="value">${esc(additional?.militaryRegistration) || '—'}${additional?.militaryRegistration === 'Sí' && additional?.militaryRegistrationNumber ? ` (${esc(additional.militaryRegistrationNumber)})` : ''}</span></div>
+                    <div class="data-item"><span class="label">Talla de camisa</span><span class="value">${esc(additional?.shirtSize) || '—'}</span></div>
+                    <div class="data-item"><span class="label">Talla de pantalón</span><span class="value">${esc(additional?.pantsSize) || '—'}</span></div>
+                    <div class="data-item"><span class="label">Talla de calzado</span><span class="value">${esc(additional?.shoeSize) || '—'}</span></div>
+                    <div class="data-item"><span class="label">Talla de chaqueta</span><span class="value">${esc(additional?.jacketSize) || '—'}</span></div>
                 </div>
             </div>
 
@@ -1960,6 +2161,15 @@ export class Personas {
             printWindow.document.write(printContent);
             printWindow.document.close();
         }
+    }
+
+    private escapeHtml(value: unknown): string {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
     exportCsv(): void {

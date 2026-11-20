@@ -1,63 +1,135 @@
 # MPPPST · Sistema de Administración y Actualización de Trabajadores
 
-Aplicación Angular + PrimeNG para actualizar y administrar a los trabajadores del Ministerio del Poder Popular para el Proceso Social de Trabajo en Caracas, Venezuela. El sistema está enfocado en la actualización y administración de datos de trabajadores ya existentes (cargados desde base de datos o precargados).
+Aplicación web desarrollada con **Angular 21**, **PrimeNG 21** y **Tailwind CSS** para la administración, actualización y auditoría de los datos de los trabajadores del **Ministerio del Poder Popular para el Proceso Social de Trabajo** (Caracas, Venezuela).
 
-> **Nota importante:** En esta plataforma únicamente se registran los usuarios con rol de **Administrador**. Los trabajadores provienen de la base de datos institucional y el sistema permite consultar, actualizar y gestionar su estado (Activo o Egresado).
+> **Nota importante:** En esta plataforma únicamente se registran los usuarios con rol de **Administrador**. Los trabajadores provienen de la base de datos institucional y el sistema permite consultar, actualizar, auditar su expediente y gestionar su estado (*Activo* o *Egresado*).
 
-## Funcionalidades
+---
 
-- Inicio de sesión y registro exclusivo para usuarios **Administradores**.
-- Recuperación de contraseña mediante preguntas de seguridad: botón de ojo para mostrar/ocultar respuestas, resaltado rojo en la pregunta respondida de forma incorrecta y sin revelar la respuesta automáticamente.
-- Contraseñas y respuestas de seguridad en **mayúsculas** (el inicio de sesión sigue aceptando contraseñas en minúsculas de cuentas antiguas).
-- Panel con estadísticas de trabajadores, distribución por cargo y últimas actualizaciones.
-- Gestión integral de trabajadores: actualización por pestañas de datos personales, laborales, familiares, vacaciones, médicos, habitacionales, adicionales y académicos, con lista de pestañas desplazable horizontalmente.
-- Selector de tipo de documento por prefijo (V, E, P, J, G, C); en la actualización del trabajador se muestran las opciones con su nombre completo (ej. «V — Venezolano (Cédula de identidad)»).
-- Las cédulas se registran siempre con el tipo de documento (V o E) y el número sin puntos (ej. `V-18745632`); los formularios muestran el mensaje «La cédula debe llevar el tipo de documento y el número sin puntos» y las cédulas antiguas almacenadas con puntos se migran automáticamente al formato sin puntos.
-- Datos laborales con adscripción administrativa (estado, ubicación física, teléfono de oficina), cargo titular y cargo que ejerce, tipo de trabajador, código de nómina y fechas de ingreso.
-- Dirección de habitación con estado, municipio y parroquia dependientes, selección de tipo de dirección por grupos de radios (vía, edificación, inmueble y zona) con sus detalles y punto de referencias; estado, ciudad y dirección se gestionan en esta sección.
-- Calendarios en formato día/mes/año y validación de fechas imposibles.
-- Validación de cédulas y teléfonos con estructura venezolana en los formularios.
-- Control de estado laboral del trabajador (Activo o Egresado).
-- Exportación en formatos CSV y Excel; el Excel incluye la cantidad de hijos sin exportar sus datos individuales.
-- Administración de usuarios administradores (crear, editar datos básicos, activar/desactivar con motivo obligatorio y eliminar). La cédula es ineditable porque proviene de la base de datos cuando el usuario crea su cuenta, y la contraseña junto con las preguntas de seguridad solo pueden verlas y cambiarlas el propio usuario desde su propia cuenta.
-- Bitácora automática de ingresos, actualizaciones y cambios de estado.
-- Persistencia local en el navegador (`localStorage`) preparada para futura integración con API/BD.
+## 🚀 Módulos y Funcionalidades
 
-## Acceso de prueba
+### 1. Autenticación y Seguridad (`/auth`)
+- **Acceso exclusivo para Administradores:** Control de rutas mediante `authGuard` y `adminGuard`.
+- **Registro institucional:** Formulario validado para nuevos administradores del sistema.
+- **Recuperación de contraseña:** Mediante preguntas de seguridad personalizadas con alternador de visibilidad (icono de ojo) y validación visual de errores sin exponer la respuesta.
+- **Normalización de credenciales:** Contraseñas y respuestas de seguridad en mayúsculas automáticas (manteniendo compatibilidad con cuentas históricas).
 
-| Cédula | Contraseña | Rol |
-| --- | --- | --- |
-| `V-00000000` | `ADMIN123` | Administrador |
+### 2. Panel de Control (`/`)
+- Estadísticas en tiempo real: total de trabajadores, trabajadores activos, egresados y desglose por adscripción laboral.
+- Gráficos interactivos de distribución por cargo y estatus.
+- Historial reciente de últimas actualizaciones realizadas.
 
-También puedes registrar una nueva cuenta desde **Crear una cuenta**. Todas las cuentas creadas se registran automáticamente como **Administrador**.
+### 3. Gestión y Expediente de Trabajadores (`/personas`)
+- **Filtros avanzados y búsqueda global:** Filtrado instantáneo por cédula, nombre, departamento, estatus y tipo de trabajador.
+- **Modal de actualización por 8 pestañas:**
+  1. **Básicos:** Nombres, apellidos, cédula (prefijos V, E, P, J, G, C), sexo, estado civil, fecha y lugar de nacimiento, teléfonos y correo.
+  2. **Laborales:** Adscripción administrativa, ubicación física, teléfono de oficina, cargo titular, cargo que ejerce, tipo de trabajador, código de nómina y fechas de ingreso.
+  3. **Habitacionales:** Dirección jerárquica dependiente (Estado $\rightarrow$ Municipio $\rightarrow$ Parroquia), clasificación detallada por grupos de selección (vía, edificación, inmueble, zona) y puntos de referencia.
+  4. **Médicos:** Grupo sanguíneo, patologías, alergias y catálogo de más de 1.600 tratamientos.
+  5. **Familiares:** Carga de familiares y dependientes con validación de parentesco y fechas de nacimiento.
+  6. **Académicos:** Nivel educativo, profesión, institución y año de egreso.
+  7. **Vacaciones:** Control de periodos vacacionales, días correspondientes y estatus de disfrute.
+  8. **Adicionales:** Talla de uniforme, calzado y observaciones institucionales.
+- **Detección de cambios sin guardar:** Alerta interactiva con `ConfirmDialog` al intentar cerrar el modal si existen modificaciones no guardadas (mediante snapshot de estado).
+- **Impresión de Ficha Oficial:** Generación automática de la ficha técnica institucional del trabajador en ventana imprimible con membrete oficial del MPPPST, las 8 secciones consolidadas y área para firmas y sellos.
+- **Autocompletado de Tratamientos:** Catálogo precargado de más de 1.600 tratamientos y medicamentos con búsqueda predictiva (`p-autoComplete`).
+- **Exportación de expedientes:** Servicio desacoplado `PersonExportService` para exportación en **Excel (.xlsx)** y **CSV**, con conteo consolidado de hijos.
 
-## Servidor de desarrollo
+### 4. Administración de Usuarios (`/usuarios`)
+- Gestión centralizada de usuarios administradores.
+- Alta, edición de datos de contacto, eliminación y activación/desactivación con motivo obligatorio justificado.
+- Protección estricta de credenciales: cédula ineditable y preguntas de seguridad gestionadas exclusivamente por cada usuario.
 
+### 5. Bitácora de Auditoría (`/actividad`)
+- Registro automatizado de eventos clave del sistema: inicios de sesión, creaciones, modificaciones de trabajadores y cambios de estado laboral.
+- Traza de auditoría con fecha, hora, usuario responsable y detalle de la operación.
+
+---
+
+## 🛠️ Tecnologías Utilizadas
+
+- **Framework:** Angular 21 (Standalone Components, Signals, Reactive Forms)
+- **Componentes UI:** PrimeNG 21 + PrimeIcons
+- **Estilos:** Tailwind CSS + PostCSS + Tema institucional MPPPST
+- **Exportación:** SheetJS (`xlsx`) y `fflate`
+- **Gráficos:** Chart.js
+- **Tipado y Arquitectura:** Tipado estricto con `as const`, DTOs de comunicación API (`ApiResponse<T>`, `CreatePersonDto`, `UpdatePersonDto`) y modelos fuertemente tipados.
+- **Testing:** Jasmine + Karma (más de 80 pruebas unitarias automatizadas).
+
+---
+
+## 💻 Entorno de Desarrollo
+
+### Requisitos previos
+- Node.js (v18 o superior recomendado)
+- npm
+
+### Instalación de dependencias
+Desde la carpeta del proyecto (`Frontend`):
 ```bash
 npm install
+```
+
+### Ejecutar servidor local
+```bash
 npm start
 ```
+La aplicación estará disponible en `http://localhost:4200/`.
 
-Abre `http://localhost:4200/`.
+---
 
-## Compilación
+## 🧪 Pruebas Unitarias
 
-```bash
-npm run build
-```
-
-## Pruebas
-
+Para ejecutar la suite completa de pruebas:
 ```bash
 npm test -- --watch=false
 ```
 
-## Estructura principal
+---
 
-- `src/app/pages/auth`: inicio de sesión y registro de administradores.
-- `src/app/pages/dashboard`: panel principal con últimos trabajadores actualizados.
-- `src/app/pages/personas`: listado, filtros y formulario modal por pestañas para actualizar y consultar trabajadores.
-- `src/app/pages/usuarios`: administración de usuarios administradores.
-- `src/app/pages/actividad`: bitácora de auditoría del sistema.
-- `src/app/services`: modelos de datos, servicios de trabajadores, autenticación y bitácora.
-- `src/assets/styles.scss`: diseño global blanco y azul institucional.
+## 📦 Compilación y Despliegue
+
+### Compilar para producción
+```bash
+npm run build
+```
+Los archivos optimizados para producción se generarán en:
+```
+dist/sakai-ng/browser/
+```
+
+### Subida al Servidor Web (FileZilla / SFTP)
+1. Conéctate a tu servidor mediante SFTP/FTP.
+2. Navega a la raíz pública del servidor web (comúnmente `/var/www/html` o `/var/www`).
+3. Sube el **contenido** de la carpeta `dist/sakai-ng/browser` (archivos `index.html`, `.js`, `.css` y la carpeta `media`).
+
+---
+
+## 📂 Estructura del Código
+
+```
+Frontend/
+├── src/
+│   ├── app/
+│   │   ├── layout/               # Componentes de maquetación (navbar, sidebar, footer)
+│   │   ├── pages/
+│   │   │   ├── actividad/        # Bitácora de eventos y auditoría
+│   │   │   ├── auth/             # Login, registro y recuperación de contraseña
+│   │   │   ├── dashboard/        # Métricas y gráficas principales
+│   │   │   ├── personas/         # Gestión integral de trabajadores y ficha técnica
+│   │   │   └── usuarios/         # Control de administradores del sistema
+│   │   └── services/
+│   │       ├── auth.guard.ts     # Guardianes de ruta (authGuard, adminGuard)
+│   │       ├── auth.service.ts   # Autenticación y almacenamiento de sesiones
+│   │       ├── log.service.ts    # Auditoría y bitácora
+│   │       ├── models.ts         # Modelos, DTOs y constantes 'as const'
+│   │       ├── person-export.service.ts # Exportación a Excel y CSV
+│   │       ├── person.service.ts # Lógica y almacenamiento de trabajadores
+│   │       ├── treatment-catalog.ts     # Catálogo con +1600 medicamentos/tratamientos
+│   │       └── validators.ts     # Validadores de cédula, nombres, correo y fechas
+│   ├── assets/                   # Estilos institucionales globales (styles.scss) y recursos
+│   └── app.routes.ts             # Definición de rutas del sistema
+├── angular.json                  # Configuración de compilación Angular
+├── package.json                  # Dependencias y scripts
+└── vercel.json                   # Reglas de reescritura de rutas para producción
+```

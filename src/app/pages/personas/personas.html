@@ -3,7 +3,7 @@
 
         <div class="page-header">
             <div>
-                <span class="page-eyebrow">Talento humano</span>
+                <span class="page-eyebrow">Trabajadores</span>
                 <h1>Gestión de trabajadores</h1>
                 <p>Administración y actualización de datos de los trabajadores del Ministerio del Poder Popular para el Proceso Social de Trabajo en Caracas.</p>
             </div>
@@ -130,7 +130,6 @@
                             <div class="table-actions">
                                 <p-button icon="pi pi-eye" ariaLabel="Ver información del trabajador" [rounded]="true" [outlined]="true" severity="info" (click)="viewPerson(person)" />
                                 <p-button icon="pi pi-pencil" ariaLabel="Editar trabajador" [rounded]="true" [outlined]="true" (click)="editPerson(person)" />
-                                <p-button icon="pi pi-heart" ariaLabel="Administrar salud del trabajador" [rounded]="true" [outlined]="true" severity="danger" (click)="openHealth(person)" />
                             </div>
                         </td>
                     </tr>
@@ -157,14 +156,14 @@
             <fieldset [disabled]="viewMode" style="border: none; padding: 0; margin: 0">
             <p-tabs [(value)]="activeEditTab" [scrollable]="true">
                 <p-tablist>
-                    <p-tab value="0">Datos Básicos</p-tab>
-                    <p-tab value="7">Datos laborales</p-tab>
-                    <p-tab value="8">Grupo Familiar</p-tab>
-                    <p-tab value="2">Vacaciones</p-tab>
-                    <p-tab value="3">Datos médicos</p-tab>
-                    <p-tab value="4">Datos habitacionales</p-tab>
-                    <p-tab value="5">Datos adicionales</p-tab>
-                    <p-tab value="6">Datos académicos</p-tab>
+                    <p-tab value="0" [class.tab-attention]="tabHasIssues('0')">Datos Básicos</p-tab>
+                    <p-tab value="7" [class.tab-attention]="tabHasIssues('7')">Datos laborales</p-tab>
+                    <p-tab value="8" [class.tab-attention]="tabHasIssues('8')">Grupo Familiar</p-tab>
+                    <p-tab value="2" [class.tab-attention]="tabHasIssues('2')">Vacaciones</p-tab>
+                    <p-tab value="3" [class.tab-attention]="tabHasIssues('3')">Datos médicos</p-tab>
+                    <p-tab value="4" [class.tab-attention]="tabHasIssues('4')">Datos habitacionales</p-tab>
+                    <p-tab value="5" [class.tab-attention]="tabHasIssues('5')">Datos adicionales</p-tab>
+                    <p-tab value="6" [class.tab-attention]="tabHasIssues('6')">Datos académicos</p-tab>
                 </p-tablist>
 
                 <p-tabpanels>
@@ -527,6 +526,30 @@
                                                 <label>Nro. de documento</label>
                                                 <strong>{{ familyMemberDocumentNumber(member) }}</strong>
                                             </div>
+                                            @if (member.representativeName) {
+                                                <div class="form-field">
+                                                    <label>Representante</label>
+                                                    <strong>{{ member.representativeName }}</strong>
+                                                </div>
+                                                <div class="form-field">
+                                                    <label>Documento del representante</label>
+                                                    <strong>{{ familyMemberRepresentativeDocument(member) }}</strong>
+                                                </div>
+                                                <div class="form-field">
+                                                    <label>Estatus del representante</label>
+                                                    <strong>{{ member.representativeStatus || 'No verificado' }}</strong>
+                                                </div>
+                                            }
+                                            @if (member.identitySource) {
+                                                <div class="form-field">
+                                                    <label>Origen de la identidad</label>
+                                                    <strong>{{ member.identitySource }}</strong>
+                                                </div>
+                                            }
+                                            <div class="form-field">
+                                                <label>Atención médica</label>
+                                                <strong>{{ familyMemberMedicalAllowed(member) ? 'Habilitada' : 'No habilitada' }}</strong>
+                                            </div>
                                             <div class="form-field">
                                                 <label>Sexo</label>
                                                 <strong>{{ member.gender || 'No registrado' }}</strong>
@@ -599,21 +622,78 @@
 
                                         <div class="form-field">
                                             <label for="memberHasDocument-{{$index}}">¿Tiene documento de identidad?</label>
-                                            <p-select inputId="memberHasDocument-{{$index}}" [options]="yesNoOptions" optionLabel="label" optionValue="value" [(ngModel)]="member.hasDocument" appendTo="body" scrollHeight="300px" styleClass="w-full" />
+                                            <p-select inputId="memberHasDocument-{{$index}}" [options]="yesNoOptions" optionLabel="label" optionValue="value" [(ngModel)]="member.hasDocument" (ngModelChange)="onFamilyMemberHasDocumentChange($index, $event)" appendTo="body" scrollHeight="300px" styleClass="w-full" />
                                         </div>
                                         @if (member.hasDocument) {
                                             <div class="form-field">
                                                 <label for="memberDocType-{{$index}}">Tipo de Documento</label>
-                                                <p-select inputId="memberDocType-{{$index}}" [options]="documentTypeSelectOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="member.documentType" appendTo="body" scrollHeight="300px" styleClass="w-full" [showClear]="true" />
+                                                <p-select inputId="memberDocType-{{$index}}" [options]="documentTypeSelectOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="member.documentType" (ngModelChange)="onFamilyMemberDocumentChange(member)" appendTo="body" scrollHeight="300px" styleClass="w-full" [showClear]="true" />
                                             </div>
                                             <div class="form-field">
                                                 <label for="memberDocNumber-{{$index}}">Nro. de Documento</label>
-                                                <input pInputText id="memberDocNumber-{{$index}}" [(ngModel)]="member.documentNumber" placeholder="Ingrese..." />
+                                                <input pInputText id="memberDocNumber-{{$index}}" [(ngModel)]="member.documentNumber" (ngModelChange)="onFamilyMemberDocumentChange(member)" placeholder="Ingrese..." />
                                             </div>
                                         } @else {
                                             <div class="form-field">
                                                 <label for="memberCertificateNumber-{{$index}}">Nro. de certificado de nacimiento</label>
                                                 <input pInputText id="memberCertificateNumber-{{$index}}" [(ngModel)]="member.certificateNumber" placeholder="Ingrese..." />
+                                            </div>
+                                        }
+
+                                        @if (familyMemberRequiresRepresentative(member)) {
+                                            @if (member.hasDocument) {
+                                                <div class="form-field form-field-full member-notice">
+                                                    <i class="pi pi-info-circle"></i>
+                                                    <span>
+                                                        <strong>Beneficiario menor de 9 años.</strong>
+                                                        El nro. de documento corresponde al representante. Consúltalo en Sigefirrhh: debe ser un trabajador
+                                                        <strong>ACTIVO</strong> para registrar su información y habilitar la atención médica del beneficiario.
+                                                    </span>
+                                                </div>
+                                                <div class="form-field">
+                                                    <label for="memberRepDocType-{{$index}}">Tipo de documento del representante *</label>
+                                                    <p-select inputId="memberRepDocType-{{$index}}" [options]="documentTypeSelectOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="member.representativeDocumentType" (ngModelChange)="onFamilyMemberRepresentativeChange(member)" appendTo="body" scrollHeight="300px" styleClass="w-full" [showClear]="true" />
+                                                </div>
+                                                <div class="form-field">
+                                                    <label for="memberRepDocNumber-{{$index}}">Nro. de documento del representante *</label>
+                                                    <input pInputText id="memberRepDocNumber-{{$index}}" [(ngModel)]="member.representativeDocumentNumber" (ngModelChange)="onFamilyMemberRepresentativeChange(member)" placeholder="Ingrese..." />
+                                                </div>
+                                                <div class="form-field">
+                                                    <label for="memberRepRelationship-{{$index}}">Parentesco del representante</label>
+                                                    <p-select inputId="memberRepRelationship-{{$index}}" [options]="relationshipOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="member.representativeRelationship" appendTo="body" scrollHeight="300px" styleClass="w-full" [showClear]="true" />
+                                                </div>
+                                                <div class="form-field">
+                                                    <label>&nbsp;</label>
+                                                    <p-button label="Consultar en Sigefirrhh" icon="pi pi-search" size="small" (onClick)="verifyFamilyMemberRepresentative($index)" />
+                                                </div>
+                                                @if (member.identitySource === 'SIGEFIRRHH' && member.representativeName) {
+                                                    <div class="form-field form-field-full member-verified">
+                                                        <i class="pi pi-check-circle"></i>
+                                                        <span>
+                                                            Representante: <strong>{{ member.representativeName }}</strong> ·
+                                                            <strong>ACTIVO en Sigefirrhh</strong> · Documento {{ familyMemberRepresentativeDocument(member) }}
+                                                        </span>
+                                                    </div>
+                                                }
+                                                <div class="form-field form-field-full member-medical" [class.member-medical-blocked]="!familyMemberMedicalAllowed(member)">
+                                                    <i class="pi" [class.pi-check-circle]="familyMemberMedicalAllowed(member)" [class.pi-ban]="!familyMemberMedicalAllowed(member)"></i>
+                                                    <span>
+                                                        Atención médica:
+                                                        <strong>{{ familyMemberMedicalAllowed(member) ? 'habilitada' : 'bloqueada hasta verificar un representante ACTIVO en Sigefirrhh' }}</strong>
+                                                    </span>
+                                                </div>
+                                            } @else {
+                                                <div class="form-field form-field-full member-medical member-medical-blocked">
+                                                    <i class="pi pi-ban"></i>
+                                                    <span>Menor de 9 años sin documento de identidad: no se permite el registro de atención médica.</span>
+                                                </div>
+                                            }
+                                        } @else if (familyMemberUsesSaime(member) && member.hasDocument) {
+                                            <div class="form-field form-field-full member-verified-row">
+                                                <p-button label="Consultar en SAIME" icon="pi pi-search" size="small" severity="secondary" [outlined]="true" (onClick)="lookupFamilyMemberInSaime($index)" />
+                                                @if (member.identitySource === 'SAIME') {
+                                                    <span class="member-verified"><i class="pi pi-check-circle"></i> Documento verificado en SAIME</span>
+                                                }
                                             </div>
                                         }
 
@@ -706,34 +786,42 @@
                                         </div>
 
                                         <div class="form-field">
-                                            <label for="memberHasDisability-{{$index}}">¿Tiene alguna discapacidad? *</label>
-                                            <p-select inputId="memberHasDisability-{{$index}}" [options]="yesNoOptions" optionLabel="label" optionValue="value" [(ngModel)]="member.hasDisability" (ngModelChange)="onFamilyMemberDisabilityChange($index, $event)" appendTo="body" scrollHeight="300px" styleClass="w-full" />
-                                        </div>
-                                        <div class="form-field">
-                                            <label for="memberDisabilityType-{{$index}}">Tipo de discapacidad</label>
-                                            <p-select inputId="memberDisabilityType-{{$index}}" [options]="disabilityTypeOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="member.disabilityType" [disabled]="!member.hasDisability" appendTo="body" scrollHeight="300px" styleClass="w-full" [showClear]="true" />
-                                        </div>
-                                        <div class="form-field">
-                                            <label for="memberDisabilityGrade-{{$index}}">Grado de discapacidad</label>
-                                            <p-select inputId="memberDisabilityGrade-{{$index}}" [options]="disabilityGradeOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="member.disabilityGrade" [disabled]="!member.hasDisability" appendTo="body" scrollHeight="300px" styleClass="w-full" [showClear]="true" />
-                                        </div>
-                                        <div class="form-field">
-                                            <label for="memberConapdis-{{$index}}">Código CONAPDIS</label>
-                                            <input pInputText id="memberConapdis-{{$index}}" [(ngModel)]="member.conapdisCode" [disabled]="!member.hasDisability" placeholder="Ingrese..." />
-                                        </div>
-                                        <div class="form-field">
                                             <label for="memberLaterality-{{$index}}">Lateralidad *</label>
                                             <p-select inputId="memberLaterality-{{$index}}" [options]="lateralityOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="member.laterality" appendTo="body" scrollHeight="300px" styleClass="w-full" [showClear]="true" />
                                         </div>
 
-                                        <div class="form-field">
-                                            <label for="memberHasAllergies-{{$index}}">Alergias *</label>
-                                            <p-select inputId="memberHasAllergies-{{$index}}" [options]="yesNoOptions" optionLabel="label" optionValue="value" [(ngModel)]="member.hasAllergies" appendTo="body" scrollHeight="300px" styleClass="w-full" />
-                                        </div>
-                                        <div class="form-field">
-                                            <label for="memberAllergyTypes-{{$index}}">Tipo de alergias</label>
-                                            <input pInputText id="memberAllergyTypes-{{$index}}" [(ngModel)]="member.allergyTypes" placeholder="Ingrese..." />
-                                        </div>
+                                        @if (familyMemberMedicalAllowed(member)) {
+                                            <div class="form-field">
+                                                <label for="memberHasDisability-{{$index}}">¿Tiene alguna discapacidad? *</label>
+                                                <p-select inputId="memberHasDisability-{{$index}}" [options]="yesNoOptions" optionLabel="label" optionValue="value" [(ngModel)]="member.hasDisability" (ngModelChange)="onFamilyMemberDisabilityChange($index, $event)" appendTo="body" scrollHeight="300px" styleClass="w-full" />
+                                            </div>
+                                            <div class="form-field">
+                                                <label for="memberDisabilityType-{{$index}}">Tipo de discapacidad</label>
+                                                <p-select inputId="memberDisabilityType-{{$index}}" [options]="disabilityTypeOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="member.disabilityType" [disabled]="!member.hasDisability" appendTo="body" scrollHeight="300px" styleClass="w-full" [showClear]="true" />
+                                            </div>
+                                            <div class="form-field">
+                                                <label for="memberDisabilityGrade-{{$index}}">Grado de discapacidad</label>
+                                                <p-select inputId="memberDisabilityGrade-{{$index}}" [options]="disabilityGradeOptions" optionLabel="label" optionValue="value" placeholder="Seleccione..." [(ngModel)]="member.disabilityGrade" [disabled]="!member.hasDisability" appendTo="body" scrollHeight="300px" styleClass="w-full" [showClear]="true" />
+                                            </div>
+                                            <div class="form-field">
+                                                <label for="memberConapdis-{{$index}}">Código CONAPDIS</label>
+                                                <input pInputText id="memberConapdis-{{$index}}" [(ngModel)]="member.conapdisCode" [disabled]="!member.hasDisability" placeholder="Ingrese..." />
+                                            </div>
+
+                                            <div class="form-field">
+                                                <label for="memberHasAllergies-{{$index}}">Alergias *</label>
+                                                <p-select inputId="memberHasAllergies-{{$index}}" [options]="yesNoOptions" optionLabel="label" optionValue="value" [(ngModel)]="member.hasAllergies" appendTo="body" scrollHeight="300px" styleClass="w-full" />
+                                            </div>
+                                            <div class="form-field">
+                                                <label for="memberAllergyTypes-{{$index}}">Tipo de alergias</label>
+                                                <input pInputText id="memberAllergyTypes-{{$index}}" [(ngModel)]="member.allergyTypes" placeholder="Ingrese..." />
+                                            </div>
+                                        } @else {
+                                            <div class="form-field form-field-full member-medical member-medical-blocked">
+                                                <i class="pi pi-ban"></i>
+                                                <span>Registro de atención médica no habilitado. Los menores de 9 años requieren un representante ACTIVO en Sigefirrhh; los menores sin documento de identidad no pueden registrar atención médica.</span>
+                                            </div>
+                                        }
                                         <div class="form-field form-field-full">
                                             <label for="memberObservations-{{$index}}">Observacion(es)</label>
                                             <textarea pTextarea id="memberObservations-{{$index}}" rows="2" [(ngModel)]="member.observations" placeholder="Ingrese..." style="width: 100%"></textarea>
@@ -886,7 +974,7 @@
                         @if (person.housingData) {
                             <div class="form-grid" style="margin-top: 1rem">
                                 <div class="form-field form-field-full">
-                                    <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--primary-700, #1d4ed8)">Dirección de habitación</h3>
+                                    <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--primary-700, #1d4ed8)">Datos habitacionales</h3>
                                 </div>
 
                                 <div class="form-field form-field-full">

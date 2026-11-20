@@ -3,7 +3,7 @@
 
         <div class="page-header">
             <div>
-                <span class="page-eyebrow">Administración</span>
+                <span class="page-eyebrow">Usuarios</span>
                 <h1>Usuarios del sistema</h1>
                 <p>Crea administradores y controla quién puede acceder al sistema.</p>
             </div>
@@ -128,7 +128,7 @@
                 </div>
 
                 <div class="form-field form-field-full">
-                    <label for="userCedula">Documento de identidad *</label>
+                    <label for="userCedula">Nro. de documento *</label>
                     @if (editing) {
                         <input pInputText id="userCedula" type="text" [value]="displayCedula" disabled />
                         <small class="field-hint">La cédula no se puede modificar: proviene de la base de datos cuando el usuario crea su cuenta.</small>
@@ -141,7 +141,7 @@
                             <small class="field-error">{{ cedulaError() }}</small>
                         }
                         @if (!cedulaError()) {
-                            <small class="field-hint">La cédula debe llevar el tipo de documento y el número sin puntos (ej. V-18745632).</small>
+                            <small class="field-hint">Selecciona el tipo de documento e ingresa el nro. de documento (ej. V-18745632).</small>
                         }
                     }
                 </div>

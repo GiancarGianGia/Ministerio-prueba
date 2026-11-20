@@ -1,7 +1,8 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { AcademicData, AdditionalData, MedicalData, NewPersonInput, nextSequentialId, Person, PERSON_TYPES, STORAGE_KEYS } from './models';
+import { AcademicData, AdditionalData, FamilyData, FamilyMember, familyMemberName, isSpouseMember, MedicalData, NewPersonInput, nextSequentialId, Person, PERSON_TYPES, STORAGE_KEYS } from './models';
 import { LogService } from './log.service';
 import { StorageService } from './storage.service';
+import { extractDocumentPrefix, splitPhoneNumber, stripDocumentPrefix } from './validators';
 
 @Injectable({ providedIn: 'root' })
 export class PersonService {
@@ -65,7 +66,7 @@ export class PersonService {
         return person;
     }
 
-    update(id: string, input: NewPersonInput, actor: string): Person | null {
+    update(id: string, input: NewPersonInput, actor: string, options: { log?: boolean } = {}): Person | null {
         const current = this._persons().find((person) => person.id === id);
         if (!current) {
             return null;
@@ -79,7 +80,9 @@ export class PersonService {
 
         this._persons.update((persons) => persons.map((person) => (person.id === id ? updated : person)));
         this.persistPersons();
-        this.logService.record('Trabajador actualizado', `${actor} actualizó los datos del trabajador ${updated.firstName} ${updated.lastName} (${updated.id}).`, actor, updated.id);
+        if (options.log !== false) {
+            this.logService.record('Trabajador actualizado', `${actor} actualizó los datos del trabajador ${updated.firstName} ${updated.lastName} (${updated.id}).`, actor, updated.id);
+        }
 
         return updated;
     }
@@ -106,6 +109,8 @@ export class PersonService {
                 laborData.titularPosition = legacyCargo[1].trim();
             }
 
+            const family = this.normalizeFamily(person.familyData, person.familyMembers);
+
             return {
                 id: person.id ?? '',
                 firstName: person.firstName ?? '',
@@ -130,8 +135,7 @@ export class PersonService {
                 createdAt: person.createdAt ?? '',
                 updatedAt: person.updatedAt ?? '',
                 createdBy: person.createdBy ?? '',
-                ...(person.familyData ? { familyData: person.familyData } : {}),
-                ...(person.familyMembers ? { familyMembers: person.familyMembers } : {}),
+                ...family,
                 ...(person.vacationData ? { vacationData: person.vacationData } : {}),
                 ...(person.medicalData ? { medicalData: this.normalizeMedicalData(person.medicalData) } : {}),
                 ...(person.housingData ? { housingData: person.housingData } : {}),
@@ -140,6 +144,88 @@ export class PersonService {
                 ...(person.academicData ? { academicData: this.normalizeAcademicData(person.academicData) } : {})
             };
         });
+    }
+
+    private normalizeFamily(familyData: FamilyData | undefined, members: FamilyMember[] | undefined): { familyData?: FamilyData; familyMembers?: FamilyMember[] } {
+        const legacy = familyData as
+            | (FamilyData & {
+                  children?: { name?: string; birthDate?: string; documentNumber?: string }[];
+                  spouseName?: string;
+                  spouseDocumentNumber?: string;
+                  spousePhone?: string;
+              })
+            | undefined;
+        const result = (members ?? []).map((member) => ({ ...member }));
+
+        if (!legacy) {
+            return members ? { familyMembers: result } : {};
+        }
+
+        const existingKeys = new Set(result.map((member) => this.familyMemberKey(member)));
+        const addMember = (member: FamilyMember): void => {
+            const key = this.familyMemberKey(member);
+            if (!key || existingKeys.has(key)) {
+                return;
+            }
+            existingKeys.add(key);
+            result.push(member);
+        };
+
+        for (const child of legacy.children ?? []) {
+            if (!child.name?.trim()) {
+                continue;
+            }
+            const documentNumber = stripDocumentPrefix(child.documentNumber ?? '').replace(/[\s.]/g, '');
+            addMember({
+                hasDocument: !!documentNumber,
+                documentType: extractDocumentPrefix(child.documentNumber ?? '') || undefined,
+                documentNumber: documentNumber || undefined,
+                firstName: child.name.trim(),
+                birthDate: child.birthDate?.trim() ?? '',
+                relationship: 'Hijo/a',
+                hasDisability: false,
+                hasAllergies: false,
+                adoptedOrFoster: false
+            });
+        }
+
+        const spouseName = legacy.spouseName?.trim();
+        const spouseDocument = legacy.spouseDocumentNumber?.trim();
+        const spousePhone = splitPhoneNumber(legacy.spousePhone ?? '');
+        if ((spouseName || spouseDocument || spousePhone.number) && !result.some(isSpouseMember)) {
+            addMember({
+                hasDocument: !!spouseDocument,
+                documentType: extractDocumentPrefix(spouseDocument ?? '') || undefined,
+                documentNumber: stripDocumentPrefix(spouseDocument ?? '').replace(/[\s.]/g, '') || undefined,
+                firstName: spouseName || undefined,
+                relationship: 'Cónyuge',
+                personalPhoneCode: spousePhone.code || undefined,
+                personalPhone: spousePhone.number || undefined,
+                hasDisability: false,
+                hasAllergies: false,
+                adoptedOrFoster: false
+            });
+        }
+
+        return {
+            familyData: {
+                maritalStatus: legacy.maritalStatus ?? '',
+                numberOfChildren: legacy.numberOfChildren ?? 0,
+                spouseMpppstDepartment: legacy.spouseMpppstDepartment,
+                spouseWorksAtMpppst: !!legacy.spouseMpppstDepartment?.trim() || legacy.spouseWorksAtMpppst
+            },
+            familyMembers: result
+        };
+    }
+
+    private familyMemberKey(member: FamilyMember): string {
+        const name = familyMemberName(member)
+            .trim()
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '');
+        const documentNumber = (member.documentNumber ?? '').replace(/[\s.]/g, '').toLowerCase();
+        return name || documentNumber ? `${name}|${documentNumber}|${member.birthDate ?? ''}` : '';
     }
 
     private normalizeMedicalData(medical: MedicalData): MedicalData {
@@ -235,17 +321,17 @@ export class PersonService {
         return {
             firstName: input.firstName.trim(),
             lastName: input.lastName.trim(),
-            ...(input.secondName?.trim() ? { secondName: input.secondName.trim() } : {}),
-            ...(input.secondLastName?.trim() ? { secondLastName: input.secondLastName.trim() } : {}),
+            secondName: input.secondName?.trim() || undefined,
+            secondLastName: input.secondLastName?.trim() || undefined,
             documentType: input.documentType,
             documentNumber: input.documentNumber.trim().replace(/[\s.]/g, ''),
-            ...(input.birthPlace?.trim() ? { birthPlace: input.birthPlace.trim() } : {}),
+            birthPlace: input.birthPlace?.trim() || undefined,
             birthDate: input.birthDate,
             gender: input.gender,
             phone: input.phone.trim(),
-            ...(input.homePhone?.trim() ? { homePhone: input.homePhone.trim() } : {}),
-            ...(input.email?.trim() ? { email: input.email.trim() } : {}),
-            ...(input.rif?.trim() ? { rif: input.rif.trim() } : {}),
+            homePhone: input.homePhone?.trim() || undefined,
+            email: input.email?.trim() || undefined,
+            rif: input.rif?.trim() || undefined,
             address: input.address.trim(),
             city: input.city.trim(),
             department: input.department,
@@ -343,7 +429,7 @@ export class PersonService {
                 type: 'Director',
                 status: 'Activo',
                 notes: 'Dirección General de Talento Humano.',
-                familyData: { maritalStatus: 'Casado/a', numberOfChildren: 0, children: [] },
+                familyData: { maritalStatus: 'Casado/a', numberOfChildren: 0 },
                 vacationData: { status: 'Vacaciones tomadas', lastVacationStart: '2025-08-04', lastVacationEnd: '2025-08-18', pendingDays: 0, observations: '' },
                 medicalData: medical('Diestro', 'O+', 'José Rondón', 'Padre', '+58 412 5550110'),
                 housingData: housing('San Agustín', 'Av. Universidad, Esquina San Francisco', 'Frente a la plaza Francisco de Miranda'),
@@ -369,7 +455,7 @@ export class PersonService {
                 type: 'Supervisor',
                 status: 'Activo',
                 notes: 'Oficina de Administración y Finanzas.',
-                familyData: { maritalStatus: 'Casado/a', numberOfChildren: 2, children: [] },
+                familyData: { maritalStatus: 'Casado/a', numberOfChildren: 2 },
                 vacationData: { status: 'Solicitadas pendientes', pendingDays: 5, observations: 'Solicitud consignada ante Talento Humano.' },
                 medicalData: medical('Diestro', 'A+', 'María Contreras', 'Madre', '+58 414 5550203'),
                 housingData: housing('Altagracia', 'Av. Este 2, Sede del MPPPST', 'Diagonal a la Iglesia de Altagracia'),
@@ -395,7 +481,7 @@ export class PersonService {
                 type: 'Analista',
                 status: 'Activo',
                 notes: 'Dirección de Talento Humano.',
-                familyData: { maritalStatus: 'Soltero/a', numberOfChildren: 1, children: [] },
+                familyData: { maritalStatus: 'Soltero/a', numberOfChildren: 1 },
                 vacationData: { status: 'No ha tomado vacaciones', pendingDays: 15, observations: '' },
                 medicalData: medical('Diestro', 'B+', 'Ana Silva', 'Madre', '+58 424 5550304'),
                 housingData: housing('El Recreo', 'Av. Casanova, Torre del Trabajo', 'Frente a la estación de metro El Recreo'),
@@ -443,7 +529,7 @@ export class PersonService {
                 type: 'Trabajador obrero',
                 status: 'Activo',
                 notes: 'Dirección de Servicios Generales.',
-                familyData: { maritalStatus: 'Unión estable de hecho / Concubinato', numberOfChildren: 3, children: [] },
+                familyData: { maritalStatus: 'Unión estable de hecho / Concubinato', numberOfChildren: 3 },
                 vacationData: { status: 'Vacaciones parciales', lastVacationStart: '2025-12-15', lastVacationEnd: '2025-12-22', pendingDays: 7, observations: '' },
                 medicalData: medical('Zurdo', 'O-', 'Rosa Díaz', 'Madre', '+58 416 5550405'),
                 housingData: housing('La Candelaria', 'Calle Real de Sabana Grande', 'Frente al mercado de Quinta Crespo'),
@@ -469,7 +555,7 @@ export class PersonService {
                 type: 'Asistente administrativo',
                 status: 'Activo',
                 notes: 'Oficina de Atención al Ciudadano.',
-                familyData: { maritalStatus: 'Divorciado/a', numberOfChildren: 1, children: [] },
+                familyData: { maritalStatus: 'Divorciado/a', numberOfChildren: 1 },
                 vacationData: { status: 'Vacaciones tomadas', lastVacationStart: '2025-07-07', lastVacationEnd: '2025-07-21', pendingDays: 0, observations: '' },
                 medicalData: medical('Diestro', 'AB+', 'Pedro Rojas', 'Padre', '+58 412 5550506'),
                 housingData: housing('San Pedro', 'Av. Este 4, Residencias Los Jardines', 'Al lado del Centro Comercial Los Jardines'),
@@ -495,7 +581,7 @@ export class PersonService {
                 type: 'Analista',
                 status: 'Activo',
                 notes: 'Dirección de Inspección del Trabajo.',
-                familyData: { maritalStatus: 'Casado/a', numberOfChildren: 3, children: [] },
+                familyData: { maritalStatus: 'Casado/a', numberOfChildren: 3 },
                 vacationData: { status: 'No ha tomado vacaciones', pendingDays: 12, observations: '' },
                 medicalData: medical('Diestro', 'A-', 'Luisa Molina', 'Madre', '+58 414 5550607'),
                 housingData: housing('El Valle', 'Calle Los Jardines, Casa 12', 'Frente a la cancha deportiva de El Valle'),
@@ -521,7 +607,7 @@ export class PersonService {
                 type: 'Pasante',
                 status: 'Activo',
                 notes: 'Dirección de Talento Humano.',
-                familyData: { maritalStatus: 'Soltero/a', numberOfChildren: 0, children: [] },
+                familyData: { maritalStatus: 'Soltero/a', numberOfChildren: 0 },
                 vacationData: { status: 'Solicitadas pendientes', pendingDays: 3, observations: 'Pendiente de aprobación por la dirección.' },
                 medicalData: medical('Diestro', 'O-', 'Elena Linares', 'Madre', '+58 424 5550708'),
                 housingData: housing('Catia', 'Av. Sucre, Edificio Caracas', 'Frente a la plaza Catia'),
@@ -547,7 +633,7 @@ export class PersonService {
                 type: 'Abogado',
                 status: 'Egresado',
                 notes: 'Dirección de Consultoría Jurídica.',
-                familyData: { maritalStatus: 'Casado/a', numberOfChildren: 2, children: [] },
+                familyData: { maritalStatus: 'Casado/a', numberOfChildren: 2 },
                 vacationData: { status: 'Vacaciones tomadas', lastVacationStart: '2025-11-03', lastVacationEnd: '2025-11-17', pendingDays: 0, observations: '' },
                 medicalData: medical('Diestro', 'B-', 'Marta Ávila', 'Madre', '+58 416 5550809'),
                 housingData: housing('La Vega', 'Carretera Vieja Caracas-Los Teques', 'Frente a la entrada de La Vega'),

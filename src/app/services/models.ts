@@ -68,21 +68,32 @@ export interface DeletedUserRecord {
     deletedAt: string;
 }
 
-export interface ChildData {
-    name: string;
-    birthDate: string;
-    documentNumber?: string;
-}
-
 export interface FamilyData {
     maritalStatus: string;
-    spouseName?: string;
-    spouseDocumentNumber?: string;
-    spousePhone?: string;
     spouseWorksAtMpppst?: boolean;
     spouseMpppstDepartment?: string;
     numberOfChildren: number;
-    children?: ChildData[];
+}
+
+function normalizeRelationship(value?: string): string {
+    return (value ?? '')
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+}
+
+export function isSpouseMember(member: Pick<FamilyMember, 'relationship'>): boolean {
+    const relationship = normalizeRelationship(member.relationship);
+    return relationship === 'conyuge' || relationship.startsWith('concubin');
+}
+
+export function isChildMember(member: Pick<FamilyMember, 'relationship'>): boolean {
+    return normalizeRelationship(member.relationship).startsWith('hijo');
+}
+
+export function familyMemberName(member: Pick<FamilyMember, 'firstName' | 'secondName' | 'lastName' | 'secondLastName'>): string {
+    return [member.firstName, member.secondName, member.lastName, member.secondLastName].filter(Boolean).join(' ');
 }
 
 export interface FamilyMember {
@@ -113,6 +124,13 @@ export interface FamilyMember {
     observations?: string;
     adoptedOrFoster: boolean;
     courtRegistryNumber?: string;
+    representativeDocumentType?: string;
+    representativeDocumentNumber?: string;
+    representativeName?: string;
+    representativeRelationship?: string;
+    representativeStatus?: string;
+    identitySource?: 'SIGEFIRRHH' | 'SAIME';
+    medicalAttentionEnabled?: boolean;
 }
 
 export interface VacationData {

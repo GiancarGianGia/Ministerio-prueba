@@ -16,10 +16,21 @@ import { DocumentPrefixSelect } from '@/app/components/document-prefix-select/do
     selector: 'app-register',
     standalone: true,
     imports: [CommonModule, FormsModule, RouterModule, ButtonModule, DialogModule, DocumentPrefixSelect, InputTextModule, PasswordModule, SelectModule],
+    styles: [
+        `
+            .auth-brand-compact {
+                justify-content: flex-start;
+            }
+
+            .auth-brand-compact .auth-brand-body {
+                margin-block: auto;
+            }
+        `
+    ],
     template: `
         <div class="auth-page">
             <div class="auth-shell">
-                <section class="auth-brand">
+                <section class="auth-brand auth-brand-compact">
                     <div class="auth-brand-header">
                         <div class="auth-logo"><i class="pi pi-user-plus"></i></div>
                         <div>
@@ -48,11 +59,6 @@ import { DocumentPrefixSelect } from '@/app/components/document-prefix-select/do
                             </div>
                         </div>
                     </div>
-
-                    <div class="auth-brand-footer">
-                        <i class="pi pi-lock"></i>
-                        <span>La información se guarda en este navegador</span>
-                    </div>
                 </section>
 
                 <section class="auth-form-panel">
@@ -63,8 +69,7 @@ import { DocumentPrefixSelect } from '@/app/components/document-prefix-select/do
                         </button>
 
                         <div class="auth-form-header">
-                            <span class="page-eyebrow">Crear cuenta</span>
-                            <h2>Registro de usuario</h2>
+                            <h2>Crear cuenta</h2>
                             <p>Completa el formulario para crear tu acceso.</p>
                         </div>
 
@@ -75,7 +80,7 @@ import { DocumentPrefixSelect } from '@/app/components/document-prefix-select/do
                                 <small class="field-error">{{ fullNameError() }}</small>
                             }
 
-                            <label for="cedula">Documento de identidad *</label>
+                            <label for="cedula">Nro. de documento *</label>
                             <div class="doc-input-row">
                                 <app-document-prefix-select name="cedulaPrefix" [(ngModel)]="cedulaPrefix" (ngModelChange)="cedulaTouched = true" />
                                 <input pInputText id="cedula" name="cedula" type="text" [(ngModel)]="cedula" (ngModelChange)="cedulaTouched = true" placeholder="12345678" autocomplete="username" />
@@ -84,7 +89,7 @@ import { DocumentPrefixSelect } from '@/app/components/document-prefix-select/do
                                 <small class="field-error">{{ cedulaError() }}</small>
                             }
                             @if (!((submitted || cedulaTouched) && cedulaError())) {
-                                <small class="field-hint">La cédula debe llevar el tipo de documento y el número sin puntos (ej. V-18745632).</small>
+                                <small class="field-hint">Selecciona el tipo de documento e ingresa el nro. de documento (ej. V-18745632).</small>
                             }
 
                             <div class="auth-form-row">

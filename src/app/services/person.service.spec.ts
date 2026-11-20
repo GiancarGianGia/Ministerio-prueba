@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { NewPersonInput, DOCUMENT_TYPES, GENDERS } from './models';
+import { LogService } from './log.service';
 import { PersonService } from './person.service';
 
 function makePersonInput(overrides: Partial<NewPersonInput> = {}): NewPersonInput {
@@ -86,6 +87,63 @@ describe('PersonService', () => {
         expect(savedPersons[0].deactivationReason).toBeUndefined();
     });
 
+    it('migra los hijos y el cónyuge heredados al grupo familiar', () => {
+        localStorage.setItem(
+            'registro.personas.v4',
+            JSON.stringify([
+                {
+                    ...makePersonInput({ documentNumber: 'V-33333333' }),
+                    familyData: {
+                        maritalStatus: 'Casado/a',
+                        numberOfChildren: 2,
+                        children: [{ name: 'Luis Pérez', birthDate: '2010-05-01', documentNumber: 'V-12.345.678' }],
+                        spouseName: 'Ana Torres',
+                        spouseDocumentNumber: 'V-87654321',
+                        spousePhone: '+58 412 0000000'
+                    },
+                    familyMembers: [],
+                    id: 'PER-0001',
+                    createdAt: '2026-01-01',
+                    updatedAt: '2026-01-01',
+                    createdBy: 'Tester'
+                }
+            ])
+        );
+        TestBed.resetTestingModule();
+        TestBed.configureTestingModule({});
+
+        const migratedService = TestBed.inject(PersonService);
+        const person = migratedService.persons()[0];
+        const members = person.familyMembers ?? [];
+
+        const spouse = members.find((member) => member.relationship === 'Cónyuge');
+        expect(spouse?.firstName).toBe('Ana Torres');
+        expect(spouse?.documentType).toBe('V');
+        expect(spouse?.documentNumber).toBe('87654321');
+
+        const child = members.find((member) => member.relationship === 'Hijo/a');
+        expect(child?.firstName).toBe('Luis Pérez');
+        expect(child?.documentType).toBe('V');
+        expect(child?.documentNumber).toBe('12345678');
+        expect(person.familyData?.numberOfChildren).toBe(2);
+
+        const saved = JSON.parse(localStorage.getItem('registro.personas.v4') ?? '[]')[0];
+        expect(saved.familyData.children).toBeUndefined();
+        expect(saved.familyData.spouseName).toBeUndefined();
+        expect(saved.familyData.spouseDocumentNumber).toBeUndefined();
+        expect(saved.familyData.spousePhone).toBeUndefined();
+    });
+
+    it('update() con log:false no registra la actualización genérica', () => {
+        const logService = TestBed.inject(LogService);
+        const created = service.add(makePersonInput({ documentNumber: 'V-99999011' }), 'Tester');
+        const before = logService.logs().length;
+
+        service.update(created.id, makePersonInput({ documentNumber: 'V-99999011' }), 'Tester', { log: false });
+
+        expect(logService.logs().length).toBe(before);
+    });
+
     it('migra las cédulas almacenadas con puntos a formato sin puntos', () => {
         localStorage.setItem(
             'registro.personas.v4',
@@ -127,6 +185,29 @@ describe('PersonService', () => {
         const created = service.add(makePersonInput({ documentNumber: 'V-99999005' }), 'Tester');
         const updated = service.update(created.id, { ...makePersonInput({ documentNumber: 'V-99999005' }), firstName: 'Beatriz' }, 'Tester');
         expect(updated?.firstName).toBe('Beatriz');
+    });
+
+    it('update() debe permitir vaciar los campos opcionales', () => {
+        const created = service.add(
+            makePersonInput({
+                documentNumber: 'V-99999010',
+                secondName: 'María',
+                birthPlace: 'Valencia',
+                homePhone: '+58 212 0000000',
+                email: 'ana@example.com',
+                rif: 'V-11111111-1'
+            }),
+            'Tester'
+        );
+
+        service.update(created.id, makePersonInput({ documentNumber: 'V-99999010', secondName: '', birthPlace: '', homePhone: '', email: '', rif: '' }), 'Tester');
+
+        const stored = service.persons().find((person) => person.id === created.id);
+        expect(stored?.secondName).toBeUndefined();
+        expect(stored?.birthPlace).toBeUndefined();
+        expect(stored?.homePhone).toBeUndefined();
+        expect(stored?.email).toBeUndefined();
+        expect(stored?.rif).toBeUndefined();
     });
 
     it('update() debe retornar null si el ID no existe', () => {

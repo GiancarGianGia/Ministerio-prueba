@@ -58,7 +58,7 @@ import { DocumentPrefixSelect } from '@/app/components/document-prefix-select/do
                         </div>
 
                         <form class="auth-form" (ngSubmit)="submit()">
-                            <label for="cedula">Documento de identidad</label>
+                            <label for="cedula">Nro. de documento</label>
                             <div class="doc-input-row">
                                 <app-document-prefix-select name="cedulaPrefix" [(ngModel)]="cedulaPrefix" (ngModelChange)="cedulaTouched = true" />
                                 <input
@@ -91,7 +91,7 @@ import { DocumentPrefixSelect } from '@/app/components/document-prefix-select/do
                             />
 
                             <div style="display: flex; justify-content: flex-end; margin: 0.2rem 0 0.3rem;">
-                                <button type="button" class="auth-link" (click)="openForgotDialog()">¿Olvidaste tu contraseña?</button>
+                                <button type="button" class="auth-link" (click)="openForgotDialog()">Recuperar contraseña</button>
                             </div>
 
                             @if (error) {
@@ -114,13 +114,13 @@ import { DocumentPrefixSelect } from '@/app/components/document-prefix-select/do
         <p-dialog [(visible)]="forgotDialog" [header]="forgotDialogHeader" [modal]="true" [style]="{ width: '440px', maxWidth: '95vw' }" (onHide)="resetForgotState()">
             <div class="auth-form" style="gap: 0.75rem;">
 
-                <!-- PASO 1: Ingresar cédula -->
+                <!-- PASO 1: Ingresar nro. de documento -->
                 @if (forgotStep === 1) {
                     <p style="font-size: 0.85rem; color: #64748b; margin: 0 0 0.5rem;">
-                        Selecciona el tipo de documento e ingresa tu número para verificar tu identidad.
+                        Selecciona el tipo de documento e ingresa tu nro. de documento para verificar tu identidad.
                     </p>
                     <div>
-                        <label for="forgotCedula">Documento de identidad *</label>
+                        <label for="forgotCedula">Nro. de documento *</label>
                         <div class="doc-input-row">
                             <app-document-prefix-select [(ngModel)]="forgotCedulaPrefix" (ngModelChange)="forgotCedulaTouched = true" />
                             <input
@@ -267,14 +267,7 @@ export class Login {
 
     readonly passwordConfirmationLabel = PASSWORD_CONFIRMATION_LABEL;
 
-    get forgotDialogHeader(): string {
-        switch (this.forgotStep) {
-            case 1: return 'Recuperar contraseña — Paso 1 de 3';
-            case 2: return 'Recuperar contraseña — Paso 2 de 3';
-            case 3: return 'Recuperar contraseña — Paso 3 de 3';
-            default: return 'Recuperar contraseña';
-        }
-    }
+    forgotDialogHeader = 'Recuperar contraseña';
 
     constructor() {
         if (this.auth.currentUser()) {
@@ -301,7 +294,7 @@ export class Login {
     submit(): void {
         this.error = '';
         if (!this.cedulaPrefix || !this.cedula.trim() || !this.password) {
-            this.error = 'Selecciona el tipo de documento, escribe tu cédula y tu contraseña.';
+            this.error = 'Selecciona el tipo de documento, escribe tu nro. de documento y tu contraseña.';
             return;
         }
         const cedulaError = validateIdentityDocument(this.cedulaPrefix, this.cedula);
@@ -344,6 +337,10 @@ export class Login {
     forgotStep1(): void {
         this.forgotError = '';
         this.forgotCedulaTouched = true;
+        if (!this.forgotCedulaPrefix || !this.forgotCedula.trim()) {
+            this.forgotError = 'Ingrese su nro. de documento.';
+            return;
+        }
         const cedulaErr = this.forgotCedulaError();
         if (cedulaErr) { this.forgotError = cedulaErr; return; }
 
